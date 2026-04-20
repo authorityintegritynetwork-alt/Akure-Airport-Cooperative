@@ -3,20 +3,31 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Akure Airport Staff Cooperative Society API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: members
+  - name: savings
+  - name: loans
+  - name: store
+  - name: transactions
+  - name: uploads
+  - name: notifications
+  - name: audit
+  - name: settings
+  - name: storage
+  - name: dashboard
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,890 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── AUTH / PROFILE ──────────────────────────────────────────────────────────
+  /auth/profile:
+    get:
+      operationId: getProfile
+      tags: [auth]
+      summary: Get current user profile (member record for current clerk user)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberProfile"
+        "404":
+          description: Not found
+
+  /auth/register:
+    post:
+      operationId: registerMember
+      tags: [auth]
+      summary: Self-register a new member (locked until admin activates)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterMemberBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Bad request
+
+  # ── MEMBERS ──────────────────────────────────────────────────────────────────
+  /members:
+    get:
+      operationId: listMembers
+      tags: [members]
+      summary: List all members (Admin+)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, active, inactive]
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+    post:
+      operationId: createMember
+      tags: [members]
+      summary: Create a member account (Admin+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMemberBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+
+  /members/{id}:
+    get:
+      operationId: getMember
+      tags: [members]
+      summary: Get a member by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateMember
+      tags: [members]
+      summary: Update member (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+
+  /members/{id}/activate:
+    post:
+      operationId: activateMember
+      tags: [members]
+      summary: Activate a pending member (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+
+  /members/{id}/deactivate:
+    post:
+      operationId: deactivateMember
+      tags: [members]
+      summary: Deactivate a member (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+
+  /members/{id}/summary:
+    get:
+      operationId: getMemberSummary
+      tags: [members]
+      summary: Get member financial summary
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberSummary"
+
+  # ── SAVINGS ──────────────────────────────────────────────────────────────────
+  /savings/my:
+    get:
+      operationId: getMySavings
+      tags: [savings]
+      summary: Get current member savings balance
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsBalance"
+
+  /savings/{memberId}:
+    get:
+      operationId: getMemberSavings
+      tags: [savings]
+      summary: Get savings balance for a member (Admin+)
+      parameters:
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsBalance"
+
+  # ── TRANSACTIONS ─────────────────────────────────────────────────────────────
+  /transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List all transactions (Admin+)
+      parameters:
+        - in: query
+          name: memberId
+          schema:
+            type: integer
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [savings, loan_repayment, store_repayment]
+        - in: query
+          name: month
+          schema:
+            type: string
+        - in: query
+          name: year
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /transactions/my:
+    get:
+      operationId: listMyTransactions
+      tags: [transactions]
+      summary: List current member's transactions
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [savings, loan_repayment, store_repayment]
+        - in: query
+          name: year
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  # ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
+  /uploads/excel/preview:
+    post:
+      operationId: previewExcelUpload
+      tags: [uploads]
+      summary: Preview an Excel upload before processing (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExcelUploadPreviewBody"
+      responses:
+        "200":
+          description: Preview result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExcelUploadPreview"
+
+  /uploads/excel/process:
+    post:
+      operationId: processExcelUpload
+      tags: [uploads]
+      summary: Process a validated Excel upload (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExcelUploadProcessBody"
+      responses:
+        "200":
+          description: Processing result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExcelUploadResult"
+
+  /uploads/history:
+    get:
+      operationId: listUploadHistory
+      tags: [uploads]
+      summary: List past Excel uploads (Admin+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadRecord"
+
+  # ── LOANS ────────────────────────────────────────────────────────────────────
+  /loans:
+    get:
+      operationId: listLoans
+      tags: [loans]
+      summary: List all loans (Admin+)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, admin_approved, auditor_approved, super_admin_approved, disbursed, rejected]
+        - in: query
+          name: memberId
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+    post:
+      operationId: createLoan
+      tags: [loans]
+      summary: Apply for a loan (Member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoanBody"
+      responses:
+        "201":
+          description: Loan application created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/my:
+    get:
+      operationId: listMyLoans
+      tags: [loans]
+      summary: List current member's loans
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+
+  /loans/calculate:
+    post:
+      operationId: calculateLoan
+      tags: [loans]
+      summary: Calculate loan repayment preview (any authenticated user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoanCalculateBody"
+      responses:
+        "200":
+          description: Calculation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoanCalculation"
+
+  /loans/{id}:
+    get:
+      operationId: getLoan
+      tags: [loans]
+      summary: Get a single loan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+        "404":
+          description: Not found
+
+  /loans/{id}/approve:
+    post:
+      operationId: approveLoan
+      tags: [loans]
+      summary: Approve a loan (role-dependent stage)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoanActionBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/{id}/reject:
+    post:
+      operationId: rejectLoan
+      tags: [loans]
+      summary: Reject a loan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoanActionBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/{id}/disburse:
+    post:
+      operationId: disburseLoan
+      tags: [loans]
+      summary: Mark loan as disbursed (Treasurer)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoanActionBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/{id}/repayments:
+    get:
+      operationId: getLoanRepayments
+      tags: [loans]
+      summary: Get repayment history for a loan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  # ── STORE ────────────────────────────────────────────────────────────────────
+  /store/items:
+    get:
+      operationId: listStoreItems
+      tags: [store]
+      summary: List available store items
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: available
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoreItem"
+    post:
+      operationId: createStoreItem
+      tags: [store]
+      summary: Add a store item (Admin+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStoreItemBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreItem"
+
+  /store/items/{id}:
+    get:
+      operationId: getStoreItem
+      tags: [store]
+      summary: Get a store item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreItem"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateStoreItem
+      tags: [store]
+      summary: Update a store item (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStoreItemBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreItem"
+    delete:
+      operationId: deleteStoreItem
+      tags: [store]
+      summary: Delete a store item (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /store/purchases:
+    get:
+      operationId: listStorePurchases
+      tags: [store]
+      summary: List store purchases (Admin+)
+      parameters:
+        - in: query
+          name: memberId
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StorePurchase"
+    post:
+      operationId: createStorePurchase
+      tags: [store]
+      summary: Record a store purchase (Member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStorePurchaseBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorePurchase"
+
+  /store/purchases/my:
+    get:
+      operationId: listMyStorePurchases
+      tags: [store]
+      summary: List current member's store purchases
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StorePurchase"
+
+  /store/debt/my:
+    get:
+      operationId: getMyStoreDebt
+      tags: [store]
+      summary: Get current member's outstanding store debt
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreDebt"
+
+  # ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List current user's notifications
+      parameters:
+        - in: query
+          name: unread
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: OK
+
+  # ── AUDIT LOGS ────────────────────────────────────────────────────────────────
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs (Super Admin / Auditor)
+      parameters:
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: actorId
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
+  # ── DASHBOARD ─────────────────────────────────────────────────────────────────
+  /dashboard/admin-summary:
+    get:
+      operationId: getAdminDashboardSummary
+      tags: [dashboard]
+      summary: Admin dashboard summary (totals, pending counts)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboardSummary"
+
+  /dashboard/member-summary:
+    get:
+      operationId: getMemberDashboardSummary
+      tags: [dashboard]
+      summary: Member dashboard summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberDashboardSummary"
+
+  /dashboard/loan-pipeline:
+    get:
+      operationId: getLoanPipeline
+      tags: [dashboard]
+      summary: Loan pipeline breakdown by status (Admin+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LoanPipelineItem"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent system activity feed (Admin+)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  # ── SETTINGS ──────────────────────────────────────────────────────────────────
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get system settings (Super Admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update system settings (Super Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettings"
+
+  # ── OBJECT STORAGE ────────────────────────────────────────────────────────────
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUploadUrlBody"
+      responses:
+        "200":
+          description: Presigned URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestUploadUrlResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +926,810 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ── MEMBER ──────────────────────────────────────────────────────────────────
+    Member:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: ["string", "null"]
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        staffId:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [member, admin, financial_auditor, treasurer, super_admin]
+        status:
+          type: string
+          enum: [pending, active, inactive]
+        savingsBalance:
+          type: number
+        totalLoanBalance:
+          type: number
+        totalStoreDebt:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - fullName
+        - email
+        - role
+        - status
+        - savingsBalance
+        - totalLoanBalance
+        - totalStoreDebt
+        - createdAt
+        - updatedAt
+
+    MemberProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: ["string", "null"]
+        staffId:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [member, admin, financial_auditor, treasurer, super_admin]
+        status:
+          type: string
+          enum: [pending, active, inactive]
+        savingsBalance:
+          type: number
+        totalLoanBalance:
+          type: number
+        totalStoreDebt:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkUserId
+        - fullName
+        - email
+        - role
+        - status
+        - savingsBalance
+        - totalLoanBalance
+        - totalStoreDebt
+        - createdAt
+
+    RegisterMemberBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        staffId:
+          type: string
+      required: [fullName]
+
+    CreateMemberBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        staffId:
+          type: string
+        role:
+          type: string
+          enum: [member, admin, financial_auditor, treasurer, super_admin]
+        status:
+          type: string
+          enum: [pending, active, inactive]
+      required: [fullName, email]
+
+    UpdateMemberBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        staffId:
+          type: string
+        role:
+          type: string
+          enum: [member, admin, financial_auditor, treasurer, super_admin]
+        status:
+          type: string
+          enum: [pending, active, inactive]
+
+    MemberSummary:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        fullName:
+          type: string
+        savingsBalance:
+          type: number
+        totalLoanBalance:
+          type: number
+        totalStoreDebt:
+          type: number
+        totalSavingsContributed:
+          type: number
+        totalLoansRepaid:
+          type: number
+        activeLoansCount:
+          type: integer
+        pendingStoreDebt:
+          type: number
+      required:
+        - memberId
+        - fullName
+        - savingsBalance
+        - totalLoanBalance
+        - totalStoreDebt
+        - totalSavingsContributed
+        - totalLoansRepaid
+        - activeLoansCount
+        - pendingStoreDebt
+
+    # ── SAVINGS ─────────────────────────────────────────────────────────────────
+    SavingsBalance:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        balance:
+          type: number
+        lastUpdated:
+          type: string
+          format: date-time
+      required: [memberId, balance, lastUpdated]
+
+    # ── TRANSACTIONS ─────────────────────────────────────────────────────────────
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        type:
+          type: string
+          enum: [savings, loan_repayment, store_repayment]
+        amount:
+          type: number
+        description:
+          type: ["string", "null"]
+        uploadRecordId:
+          type: ["integer", "null"]
+        month:
+          type: ["string", "null"]
+        year:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - type
+        - amount
+        - createdAt
+
+    # ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
+    ExcelUploadPreviewBody:
+      type: object
+      properties:
+        fileObjectPath:
+          type: string
+        month:
+          type: string
+        year:
+          type: integer
+      required: [fileObjectPath, month, year]
+
+    ExcelRowPreview:
+      type: object
+      properties:
+        rowNumber:
+          type: integer
+        rawName:
+          type: string
+        matchedMemberId:
+          type: ["integer", "null"]
+        matchedMemberName:
+          type: ["string", "null"]
+        savings:
+          type: number
+        realLoan:
+          type: number
+        provisionalLoan:
+          type: number
+        electricity:
+          type: number
+        furnitureVentilation:
+          type: number
+        emergencyLoan:
+          type: number
+        commodity:
+          type: number
+        land:
+          type: number
+        otherDeductions:
+          type: number
+        total:
+          type: number
+        errors:
+          type: array
+          items:
+            type: string
+        hasErrors:
+          type: boolean
+      required:
+        - rowNumber
+        - rawName
+        - savings
+        - realLoan
+        - provisionalLoan
+        - electricity
+        - furnitureVentilation
+        - emergencyLoan
+        - commodity
+        - land
+        - otherDeductions
+        - total
+        - errors
+        - hasErrors
+
+    ExcelUploadPreview:
+      type: object
+      properties:
+        month:
+          type: string
+        year:
+          type: integer
+        totalRows:
+          type: integer
+        validRows:
+          type: integer
+        errorRows:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExcelRowPreview"
+      required: [month, year, totalRows, validRows, errorRows, rows]
+
+    ExcelUploadProcessBody:
+      type: object
+      properties:
+        fileObjectPath:
+          type: string
+        month:
+          type: string
+        year:
+          type: integer
+        skipErrors:
+          type: boolean
+      required: [fileObjectPath, month, year]
+
+    ExcelUploadResult:
+      type: object
+      properties:
+        uploadRecordId:
+          type: integer
+        processed:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+      required: [uploadRecordId, processed, skipped, errors]
+
+    UploadRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        uploadedBy:
+          type: integer
+        uploaderName:
+          type: string
+        month:
+          type: string
+        year:
+          type: integer
+        fileObjectPath:
+          type: string
+        rowsProcessed:
+          type: integer
+        rowsSkipped:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processed, failed]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - uploadedBy
+        - uploaderName
+        - month
+        - year
+        - fileObjectPath
+        - rowsProcessed
+        - rowsSkipped
+        - status
+        - createdAt
+
+    # ── LOANS ─────────────────────────────────────────────────────────────────
+    Loan:
+      type: object
+      properties:
+        id:
+          type: integer
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        amount:
+          type: number
+        interestRate:
+          type: number
+        interestAmount:
+          type: number
+        totalRepayable:
+          type: number
+        monthlyRepayment:
+          type: number
+        tenureMonths:
+          type: integer
+        purpose:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, admin_approved, auditor_approved, super_admin_approved, disbursed, rejected]
+        outstandingBalance:
+          type: number
+        adminApprovedAt:
+          type: ["string", "null"]
+          format: date-time
+        adminApprovedBy:
+          type: ["integer", "null"]
+        auditorApprovedAt:
+          type: ["string", "null"]
+          format: date-time
+        auditorApprovedBy:
+          type: ["integer", "null"]
+        superAdminApprovedAt:
+          type: ["string", "null"]
+          format: date-time
+        superAdminApprovedBy:
+          type: ["integer", "null"]
+        disbursedAt:
+          type: ["string", "null"]
+          format: date-time
+        disbursedBy:
+          type: ["integer", "null"]
+        rejectedAt:
+          type: ["string", "null"]
+          format: date-time
+        rejectedBy:
+          type: ["integer", "null"]
+        rejectionReason:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - amount
+        - interestRate
+        - interestAmount
+        - totalRepayable
+        - monthlyRepayment
+        - tenureMonths
+        - status
+        - outstandingBalance
+        - createdAt
+        - updatedAt
+
+    CreateLoanBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        tenureMonths:
+          type: integer
+        purpose:
+          type: string
+      required: [amount, tenureMonths]
+
+    LoanActionBody:
+      type: object
+      properties:
+        notes:
+          type: string
+
+    LoanCalculateBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        tenureMonths:
+          type: integer
+      required: [amount, tenureMonths]
+
+    LoanCalculation:
+      type: object
+      properties:
+        principal:
+          type: number
+        interestRate:
+          type: number
+        interestAmount:
+          type: number
+        totalRepayable:
+          type: number
+        monthlyRepayment:
+          type: number
+        tenureMonths:
+          type: integer
+      required:
+        - principal
+        - interestRate
+        - interestAmount
+        - totalRepayable
+        - monthlyRepayment
+        - tenureMonths
+
+    # ── STORE ────────────────────────────────────────────────────────────────────
+    StoreItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        price:
+          type: number
+        imageObjectPath:
+          type: ["string", "null"]
+        quantityAvailable:
+          type: integer
+        isAvailable:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - price
+        - quantityAvailable
+        - isAvailable
+        - createdAt
+        - updatedAt
+
+    CreateStoreItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        imageObjectPath:
+          type: string
+        quantityAvailable:
+          type: integer
+      required: [name, price]
+
+    UpdateStoreItemBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        imageObjectPath:
+          type: string
+        quantityAvailable:
+          type: integer
+        isAvailable:
+          type: boolean
+
+    StorePurchase:
+      type: object
+      properties:
+        id:
+          type: integer
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        storeItemId:
+          type: integer
+        itemName:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        totalPrice:
+          type: number
+        outstandingBalance:
+          type: number
+        status:
+          type: string
+          enum: [outstanding, partial, settled]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - storeItemId
+        - itemName
+        - quantity
+        - unitPrice
+        - totalPrice
+        - outstandingBalance
+        - status
+        - createdAt
+
+    CreateStorePurchaseBody:
+      type: object
+      properties:
+        storeItemId:
+          type: integer
+        quantity:
+          type: integer
+        payFromSavings:
+          type: boolean
+      required: [storeItemId, quantity]
+
+    StoreDebt:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        totalDebt:
+          type: number
+        purchases:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorePurchase"
+      required: [memberId, totalDebt, purchases]
+
+    # ── NOTIFICATIONS ─────────────────────────────────────────────────────────
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        memberId:
+          type: integer
+        type:
+          type: string
+          enum: [loan_update, transaction, store_purchase, system]
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, memberId, type, title, message, isRead, createdAt]
+
+    # ── AUDIT LOG ──────────────────────────────────────────────────────────────
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        actorId:
+          type: ["integer", "null"]
+        actorName:
+          type: ["string", "null"]
+        action:
+          type: string
+        entity:
+          type: ["string", "null"]
+        entityId:
+          type: ["integer", "null"]
+        details:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, action, createdAt]
+
+    # ── DASHBOARD ─────────────────────────────────────────────────────────────
+    AdminDashboardSummary:
+      type: object
+      properties:
+        totalMembers:
+          type: integer
+        activeMembers:
+          type: integer
+        pendingMembers:
+          type: integer
+        totalSavings:
+          type: number
+        totalLoansOutstanding:
+          type: number
+        totalStoreDebt:
+          type: number
+        loansAwaitingAdminApproval:
+          type: integer
+        loansAwaitingAuditorApproval:
+          type: integer
+        loansAwaitingSuperAdminApproval:
+          type: integer
+        loansAwaitingDisbursement:
+          type: integer
+        storeItemsCount:
+          type: integer
+      required:
+        - totalMembers
+        - activeMembers
+        - pendingMembers
+        - totalSavings
+        - totalLoansOutstanding
+        - totalStoreDebt
+        - loansAwaitingAdminApproval
+        - loansAwaitingAuditorApproval
+        - loansAwaitingSuperAdminApproval
+        - loansAwaitingDisbursement
+        - storeItemsCount
+
+    MemberDashboardSummary:
+      type: object
+      properties:
+        savingsBalance:
+          type: number
+        activeLoanCount:
+          type: integer
+        outstandingLoanBalance:
+          type: number
+        storeDebt:
+          type: number
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+      required:
+        - savingsBalance
+        - activeLoanCount
+        - outstandingLoanBalance
+        - storeDebt
+        - recentTransactions
+
+    LoanPipelineItem:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+        totalAmount:
+          type: number
+      required: [status, count, totalAmount]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        actorName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, description, createdAt]
+
+    # ── SETTINGS ─────────────────────────────────────────────────────────────
+    SystemSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        loanInterestRate:
+          type: number
+        maxLoanAmount:
+          type: ["number", "null"]
+        maxLoanTenureMonths:
+          type: integer
+        cooperativeName:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - loanInterestRate
+        - maxLoanTenureMonths
+        - cooperativeName
+        - updatedAt
+
+    UpdateSettingsBody:
+      type: object
+      properties:
+        loanInterestRate:
+          type: number
+        maxLoanAmount:
+          type: number
+        maxLoanTenureMonths:
+          type: integer
+        cooperativeName:
+          type: string
+
+    # ── STORAGE ───────────────────────────────────────────────────────────────
+    RequestUploadUrlBody:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+        contentType:
+          type: string
+      required: [name, size, contentType]
+
+    RequestUploadUrlResponse:
+      type: object
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+      required: [uploadURL, objectPath]

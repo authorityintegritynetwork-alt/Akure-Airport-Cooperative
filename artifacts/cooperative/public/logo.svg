@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <!-- Background Shield/Coin -->
+  <path d="M100 10 L180 40 L180 100 C180 150 140 180 100 190 C60 180 20 150 20 100 L20 40 Z" fill="#1e3a8a"/>
+  <!-- Airplane pointing up and right -->
+  <path d="M70 140 L130 80 L160 80 C165 80 170 85 170 90 L170 120 L110 180 Z" fill="#38bdf8" opacity="0.8"/>
+  <path d="M60 90 L120 30 L150 30 C155 30 160 35 160 40 L160 70 L100 130 Z" fill="#e0f2fe"/>
+  <!-- Finance Element (Bars) -->
+  <rect x="60" y="110" width="15" height="40" rx="3" fill="#ffffff" opacity="0.9"/>
+  <rect x="85" y="90" width="15" height="60" rx="3" fill="#ffffff" opacity="0.9"/>
+  <rect x="110" y="70" width="15" height="80" rx="3" fill="#ffffff" opacity="0.9"/>
+</svg>
