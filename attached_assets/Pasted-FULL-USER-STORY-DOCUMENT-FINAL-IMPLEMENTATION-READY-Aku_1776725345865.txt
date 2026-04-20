@@ -1,0 +1,188 @@
+FULL USER STORY DOCUMENT (FINAL – IMPLEMENTATION READY)
+Akure Airport Staff Cooperative Multipurpose Society Web ApplicationPRODUCT GOAL
+To develop a secure, role-based web application that manages cooperative operations including member accounts, savings, loan processing, and cooperative store transactions with full transparency, auditability, and controlled financial workflows.
+
+USER ROLES
+1. Super Admin
+Full system control
+Final authority on loan approvals
+Manages roles, permissions, and system configurations
+Access to full audit logs
+
+2. Admin
+Handles daily operations
+Manages members, store items, and Excel uploads
+Reviews and approves loan applications (first stage)
+
+3. Financial Auditor
+Validates financial records
+Reviews loan applications after Admin approval
+Confirms or flags loan applications before final approval
+Audits all financial transactions
+Generates audit and compliance reports
+Limited edit rights (validation only, no transaction creation)
+
+4. Treasurer
+Monitors loan lifecycle across all stages
+Disburses loans after Super Admin approval
+Marks loan status as Disbursed
+Oversees fund allocation and reconciliation
+Supports financial reporting
+
+5. Member
+Views personal financial data
+Applies for loans
+Purchases store items
+Tracks savings, loans, and repayments
+
+AUTHENTICATION & SECURITY
+As a User, I want to log in using my email and password so that I can access my account securely.
+As a User, I want to receive an OTP via email during login so that my account is protected.
+As a System, I must enforce OTP verification before granting access.
+As a System, I must log all activities (logins, approvals, transactions) for audit purposes.
+
+MEMBER USER STORIES
+Dashboard
+As a Member, I want to view:
+Total savings
+Active loans
+Outstanding loan balance
+Store debt
+ so that I have a complete financial overview.
+
+Savings & Transactions
+As a Member, I want to view my savings balance so that I can track contributions.
+As a Member, I want to see my full transaction history.
+As a Member, I want each monthly transaction to show:
+Savings contribution
+Loan repayment deduction
+Store repayment deduction
+As a System, transactions must be automatically generated from Admin Excel uploads.
+
+Loan Management
+As a Member, I want to apply for a loan.
+As a Member, I want to see:
+Loan amount
+Interest
+Monthly repayment
+ before submitting.
+As a Member, I want to track:
+Loan status
+Approval stage
+Outstanding balance
+Repayment history
+
+Cooperative Store
+As a Member, I want to browse available items.
+As a Member, I want to purchase items using my savings balance.
+As a Member, I want to pay in installments.
+As a Member, I want to track outstanding store debt.
+
+Notifications
+As a Member, I want:
+Email notifications
+In-app notifications
+For:
+Loan updates
+Transactions
+Store purchases
+
+📊 Reports
+As a Member, I want to generate and download my financial statement.
+
+ADMIN USER STORIES
+Member Management
+Create, update, and deactivate member accounts
+
+Excel Upload & Transaction Processing (CORE SYSTEM)
+As an Admin, I want to upload a monthly Excel file
+As a System, I must:
+Validate file format
+Detect errors (invalid member ID, incorrect values)
+Provide preview before processing
+As a System, I must split each record into:
+Savings → credit savings wallet
+Loan repayment → reduce loan balance
+Store repayment → reduce store debt
+As a System, I must log all processed transactions
+
+Loan Management
+As an Admin, I want to:
+View loan applications
+Approve or reject loans (first stage)
+
+ Store Management
+Add, update, and manage store items
+Track purchases and repayment obligations
+
+ Reporting
+Generate:
+Member reports
+Savings summaries
+Loan reports
+Store debt reports
+
+FINANCIAL AUDITOR USER STORIES
+Review loan applications after Admin approval
+Validate and confirm loan correctness
+Flag inconsistencies for correction
+Audit all financial transactions
+Generate audit reports
+
+ TREASURER USER STORIES
+Monitor loan progress across all stages
+Review fully approved loans
+Disburse loans after Super Admin approval
+Update loan status to Disbursed
+Oversee financial reconciliation
+
+SUPER ADMIN USER STORIES
+Provide final approval for loans
+Manage system roles and permissions
+Access full audit logs
+Configure system settings
+
+SYSTEM WORKFLOWS
+Loan Approval Workflow
+Member applies for loan
+Admin approves
+Financial Auditor validates
+Super Admin gives final approval
+Treasurer disburses loan
+Status → Disbursed
+
+Monthly Transaction Workflow
+Admin uploads Excel file
+System validates file
+System processes records:
+Savings allocation
+Loan repayment update
+Store repayment update
+Member balances updated
+Notifications sent
+
+Store Purchase Workflow
+Member selects item
+Purchase recorded
+Payment deducted from savings OR tracked as debt
+Outstanding balance created
+Monthly repayment handled via Excel upload
+
+LOAN STATUS FLOW (CRITICAL FOR DEVELOPMENT)
+Pending
+Admin Approved
+Auditor Approved
+Super Admin Approved
+Disbursed
+
+NON-FUNCTIONAL REQUIREMENTS
+OTP-based authentication
+Role-based access control
+Full audit logging
+Secure financial data handling
+Mobile & desktop responsive
+Error handling for uploads
+High-performance bulk processing
+
+
+
