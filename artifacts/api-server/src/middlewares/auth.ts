@@ -1,4 +1,13 @@
 import { getAuth } from "@clerk/express";
+function reverificationError(level: "strict" | "moderate" | "lax" = "strict") {
+  return {
+    clerk_error: {
+      type: "forbidden" as const,
+      reason: "reverification-error" as const,
+      metadata: { reverification: { level } },
+    },
+  };
+}
 import { Request, Response, NextFunction } from "express";
 import { db, membersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -57,6 +66,36 @@ export function requireRole(...roles: string[]) {
 }
 
 export const requireMember = requireRole("member");
+
+/**
+ * Step-up reverification for sensitive admin actions.
+ * Requires the user to have completed a fresh credential check (email code, etc.)
+ * within the last 10 minutes via Clerk's built-in reverification flow.
+ *
+ * Returns Clerk's standard reverification hint body so the frontend
+ * `useReverification()` hook can detect it and prompt the user automatically.
+ */
+export function requireReverification(req: AuthRequest, res: Response, next: NextFunction): void {
+  const auth = getAuth(req);
+  const ok = auth?.has?.({ reverification: "strict" });
+  if (!ok) {
+    res.status(403).json(reverificationError("strict"));
+    return;
+  }
+  next();
+}
+
+/**
+ * Conditional reverification — only enforces the check when `predicate` returns true.
+ * Useful for endpoints where only some payloads are sensitive (e.g. role changes).
+ */
+export function requireReverificationIf(predicate: (req: AuthRequest) => boolean) {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!predicate(req)) return next();
+    requireReverification(req, res, next);
+  };
+}
+
 export const requireAdmin = requireRole("admin", "financial_auditor", "treasurer", "super_admin");
 export const requireAdminOnly = requireRole("admin", "super_admin");
 export const requireAuditor = requireRole("financial_auditor", "super_admin");

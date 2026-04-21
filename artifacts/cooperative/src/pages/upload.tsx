@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useStepUpAction } from "@/lib/step-up";
 import {
   Upload,
   CheckCircle,
@@ -80,6 +81,7 @@ export function UploadPage() {
   const listSheets = useListExcelSheets();
   const preview = usePreviewExcelUpload();
   const process = useProcessExcelUpload();
+  const processWithStepUp = useStepUpAction((data: any) => process.mutateAsync({ data }));
   const { data: members } = useListMembers({ status: "active" });
 
   const memberOptions = useMemo(
@@ -185,37 +187,30 @@ export function UploadPage() {
     }
   }
 
-  function handleProcess(skipErrors: boolean) {
+  async function handleProcess(skipErrors: boolean) {
     if (!uploadedPath || !chosenSheet) return;
-    process.mutate(
-      {
-        data: {
-          fileObjectPath: uploadedPath,
-          sheetName: chosenSheet,
-          month,
-          year,
-          organization,
-          skipErrors,
-          manualMatches: Object.entries(manualMatches).map(([rowNumber, memberId]) => ({
-            rowNumber: Number(rowNumber),
-            memberId,
-          })),
-        },
-      },
-      {
-        onSuccess: (result) => {
-          toast({
-            title: "Upload processed",
-            description: `${result.processed} members processed, ${result.skipped} skipped.`,
-          });
-          queryClient.invalidateQueries({ queryKey: getListUploadHistoryQueryKey() });
-          reset();
-        },
-        onError: (err: any) => {
-          toast({ title: "Processing failed", description: err.message, variant: "destructive" });
-        },
-      },
-    );
+    try {
+      const result: any = await processWithStepUp({
+        fileObjectPath: uploadedPath,
+        sheetName: chosenSheet,
+        month,
+        year,
+        organization,
+        skipErrors,
+        manualMatches: Object.entries(manualMatches).map(([rowNumber, memberId]) => ({
+          rowNumber: Number(rowNumber),
+          memberId,
+        })),
+      });
+      toast({
+        title: "Upload processed",
+        description: `${result.processed ?? 0} members processed, ${result.skipped ?? 0} skipped.`,
+      });
+      queryClient.invalidateQueries({ queryKey: getListUploadHistoryQueryKey() });
+      reset();
+    } catch (err: any) {
+      toast({ title: "Processing failed", description: err.message, variant: "destructive" });
+    }
   }
 
   return (

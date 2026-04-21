@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useStepUpAction } from "@/lib/step-up";
 import { PlusCircle, Search, UserCheck, UserX, Eye, Pencil, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -116,6 +117,16 @@ export function MembersPage() {
   const deleteMember = useDeleteMember();
   const bulkAssign = useBulkAssignOrganization();
 
+  const updateMemberWithStepUp = useStepUpAction(
+    (id: number, data: any) => updateMember.mutateAsync({ id, data }),
+  );
+  const deleteMemberWithStepUp = useStepUpAction(
+    (id: number) => deleteMember.mutateAsync({ id }),
+  );
+  const bulkAssignWithStepUp = useStepUpAction(
+    (data: any) => bulkAssign.mutateAsync({ data }),
+  );
+
   const editForm = useForm<EditMemberForm>({
     resolver: zodResolver(editMemberSchema),
     defaultValues: { fullName: "", phone: "", staffId: "", role: "member", status: "active", organization: "faan" },
@@ -133,48 +144,35 @@ export function MembersPage() {
     setEditingMember(member);
   }
 
-  function onEditSubmit(data: EditMemberForm) {
+  async function onEditSubmit(data: EditMemberForm) {
     if (!editingMember) return;
-    updateMember.mutate(
-      {
-        id: editingMember.id,
-        data: {
-          fullName: data.fullName,
-          phone: data.phone || undefined,
-          staffId: data.staffId || undefined,
-          role: data.role,
-          status: data.status,
-          organization: data.organization,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Member updated" });
-          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
-          setEditingMember(null);
-        },
-        onError: (err: any) => {
-          toast({ title: "Update failed", description: err.message, variant: "destructive" });
-        },
-      },
-    );
+    try {
+      await updateMemberWithStepUp(editingMember.id, {
+        fullName: data.fullName,
+        phone: data.phone || undefined,
+        staffId: data.staffId || undefined,
+        role: data.role,
+        status: data.status,
+        organization: data.organization,
+      });
+      toast({ title: "Member updated" });
+      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
+      setEditingMember(null);
+    } catch (err: any) {
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    }
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deletingMember) return;
-    deleteMember.mutate(
-      { id: deletingMember.id },
-      {
-        onSuccess: () => {
-          toast({ title: "Member deleted", description: deletingMember.fullName });
-          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
-          setDeletingMember(null);
-        },
-        onError: (err: any) => {
-          toast({ title: "Delete failed", description: err.message, variant: "destructive" });
-        },
-      },
-    );
+    try {
+      await deleteMemberWithStepUp(deletingMember.id);
+      toast({ title: "Member deleted", description: deletingMember.fullName });
+      queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
+      setDeletingMember(null);
+    } catch (err: any) {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    }
   }
 
   const form = useForm<CreateMemberForm>({
@@ -367,32 +365,21 @@ export function MembersPage() {
                 size="sm"
                 variant="outline"
                 disabled={bulkAssign.isPending}
-                onClick={() => {
-                  bulkAssign.mutate(
-                    {
-                      data: {
-                        memberIds: Array.from(selectedIds),
-                        organization: o,
-                      },
-                    },
-                    {
-                      onSuccess: (r) => {
-                        toast({
-                          title: `Assigned to ${o.toUpperCase()}`,
-                          description: `${r.updated} member(s) updated.`,
-                        });
-                        setSelectedIds(new Set());
-                        queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
-                      },
-                      onError: (err: any) => {
-                        toast({
-                          title: "Bulk assign failed",
-                          description: err.message,
-                          variant: "destructive",
-                        });
-                      },
-                    },
-                  );
+                onClick={async () => {
+                  try {
+                    const r: any = await bulkAssignWithStepUp({
+                      memberIds: Array.from(selectedIds),
+                      organization: o,
+                    });
+                    toast({
+                      title: `Assigned to ${o.toUpperCase()}`,
+                      description: `${r.updated ?? 0} member(s) updated.`,
+                    });
+                    setSelectedIds(new Set());
+                    queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
+                  } catch (err: any) {
+                    toast({ title: "Bulk assign failed", description: err.message, variant: "destructive" });
+                  }
                 }}
                 data-testid={`button-bulk-${o}`}
               >

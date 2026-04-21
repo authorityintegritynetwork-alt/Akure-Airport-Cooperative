@@ -7,7 +7,7 @@ import {
   loansTable,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
+import { requireAuth, requireAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
 import {
@@ -290,6 +290,7 @@ router.post(
   "/uploads/excel/process",
   requireAuth,
   requireAdmin,
+  requireReverification,
   async (req: AuthRequest, res): Promise<void> => {
     const parsed = ProcessExcelUploadBody.safeParse(req.body);
     if (!parsed.success) {

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, systemSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth, requireSuperAdmin, AuthRequest } from "../middlewares/auth";
+import { requireAuth, requireSuperAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { UpdateSettingsBody } from "@workspace/api-zod";
 
@@ -23,7 +23,7 @@ router.get("/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest,
   res.json(formatSettings(settings));
 });
 
-router.patch("/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.patch("/settings", requireAuth, requireSuperAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const parsed = UpdateSettingsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

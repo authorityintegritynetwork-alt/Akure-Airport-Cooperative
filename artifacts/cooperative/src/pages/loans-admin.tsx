@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useStepUpAction } from "@/lib/step-up";
 
 function loanStatusBadge(status: string) {
   const map: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -75,34 +76,38 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
   const rejectLoan = useRejectLoan();
   const disburseLoan = useDisburseLoan();
 
-  function handleApprove() {
-    approveLoan.mutate(
-      { id: loan.id, data: {} },
-      {
-        onSuccess: () => {
-          toast({ title: "Loan approved" });
-          queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
-        },
-        onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      },
-    );
+  const approveWithStepUp = useStepUpAction((id: number) =>
+    approveLoan.mutateAsync({ id, data: {} }),
+  );
+  const rejectWithStepUp = useStepUpAction((id: number, notes: string) =>
+    rejectLoan.mutateAsync({ id, data: { notes } }),
+  );
+  const disburseWithStepUp = useStepUpAction((id: number, phrase: string) =>
+    disburseLoan.mutateAsync({ id, data: { confirmationPhrase: phrase } }),
+  );
+
+  async function handleApprove() {
+    try {
+      await approveWithStepUp(loan.id);
+      toast({ title: "Loan approved" });
+      queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   }
 
-  function handleReject() {
-    rejectLoan.mutate(
-      { id: loan.id, data: { notes: rejectReason } },
-      {
-        onSuccess: () => {
-          toast({ title: "Loan rejected" });
-          queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
-          setRejectDialogOpen(false);
-        },
-        onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      },
-    );
+  async function handleReject() {
+    try {
+      await rejectWithStepUp(loan.id, rejectReason);
+      toast({ title: "Loan rejected" });
+      queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
+      setRejectDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   }
 
-  function handleDisburse() {
+  async function handleDisburse() {
     const expected = `DISBURSE-${loan.id}`;
     const phrase = window.prompt(
       `Disbursing ₦${loan.amount.toLocaleString()} to ${loan.memberName}.\n\nThis action moves money and cannot be undone.\nType the confirmation phrase below to authorize:\n\n${expected}`,
@@ -113,16 +118,13 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
       toast({ title: "Disbursement cancelled", description: "Confirmation phrase did not match.", variant: "destructive" });
       return;
     }
-    disburseLoan.mutate(
-      { id: loan.id, data: { confirmationPhrase: expected } },
-      {
-        onSuccess: () => {
-          toast({ title: "Loan disbursed" });
-          queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
-        },
-        onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      },
-    );
+    try {
+      await disburseWithStepUp(loan.id, expected);
+      toast({ title: "Loan disbursed" });
+      queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   }
 
   return (

@@ -82,3 +82,16 @@ Store repayments tracked only via Excel upload.
 - `artifacts/cooperative/src/components/layout.tsx` — Sidebar + layout
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
 - `lib/db/src/schema.ts` — Database schema (Drizzle ORM)
+
+## Clerk Dashboard Setup (Required for 2FA)
+
+Email two-step verification is enforced through Clerk:
+1. **Clerk Dashboard → User & Authentication → Multi-factor**: enable **Email verification code** as a second factor (set to "Required" or "Optional" per policy).
+2. **Clerk Dashboard → Sessions → Reverification**: ensure reverification is enabled (the app calls `auth.has({ reverification: 'strict' })` for sensitive actions, with a 10-minute window).
+3. No code changes are needed when toggling these settings — middleware in `artifacts/api-server/src/middlewares/auth.ts` (`requireReverification`, `requireReverificationIf`) and the frontend hook `artifacts/cooperative/src/lib/step-up.tsx` (`useStepUpAction`) handle it automatically.
+
+Sensitive actions that trigger step-up reverification:
+- Loan approve / reject / disburse
+- Settings updates (interest rate, etc.)
+- Member role/status changes, deletions, bulk org assignment
+- Excel deduction file processing

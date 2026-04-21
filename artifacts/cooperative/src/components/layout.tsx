@@ -176,7 +176,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">
-            {isAdmin && !twoFaDismissed && user && !user.twoFactorEnabled && (
+            {!twoFaDismissed && user && !user.twoFactorEnabled && (
               <div
                 className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 p-3"
                 data-testid="banner-2fa-reminder"
@@ -184,11 +184,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 text-sm">
                   <p className="font-medium text-amber-900 dark:text-amber-200">
-                    Protect your admin account with two-factor authentication
+                    Protect your account with two-factor authentication
                   </p>
                   <p className="text-amber-800 dark:text-amber-300/80 mt-0.5">
-                    Your role can move money and change member data. Enable 2FA from your account
-                    security settings — it takes under a minute.
+                    Add a second sign-in step to keep your savings, loans and member data safe.
+                    It takes under a minute from your account security settings.
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">

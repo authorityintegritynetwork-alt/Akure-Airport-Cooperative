@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useStepUpAction } from "@/lib/step-up";
 import { UserCog } from "lucide-react";
 
 const ROLES = [
@@ -34,18 +35,18 @@ export function RolesPage() {
     query: { queryKey: getListMembersQueryKey({ status: "active" }) },
   });
   const updateMember = useUpdateMember();
+  const updateMemberWithStepUp = useStepUpAction(
+    (id: number, role: string) => updateMember.mutateAsync({ id, data: { role: role as any } }),
+  );
 
-  function handleRoleChange(memberId: number, newRole: string) {
-    updateMember.mutate(
-      { id: memberId, data: { role: newRole as any } },
-      {
-        onSuccess: () => {
-          toast({ title: "Role updated" });
-          queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
-        },
-        onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      },
-    );
+  async function handleRoleChange(memberId: number, newRole: string) {
+    try {
+      await updateMemberWithStepUp(memberId, newRole);
+      toast({ title: "Role updated" });
+      queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   }
 
   return (

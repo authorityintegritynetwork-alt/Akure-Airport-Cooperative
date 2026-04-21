@@ -1,4 +1,5 @@
 import { useGetSettings, useUpdateSettings, getGetSettingsQueryKey } from "@workspace/api-client-react";
+import { useStepUpAction } from "@/lib/step-up";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,6 +33,7 @@ export function SettingsPage() {
   const { toast } = useToast();
   const { data: settings, isLoading } = useGetSettings();
   const updateSettings = useUpdateSettings();
+  const updateWithStepUp = useStepUpAction((data: any) => updateSettings.mutateAsync({ data }));
 
   const form = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema),
@@ -49,24 +51,19 @@ export function SettingsPage() {
     }
   }, [settings]);
 
-  function onSubmit(data: SettingsForm) {
-    updateSettings.mutate(
-      {
-        data: {
-          cooperativeName: data.cooperativeName,
-          loanInterestRate: data.loanInterestRate,
-          maxLoanAmount: data.maxLoanAmount || undefined,
-          maxLoanTenureMonths: data.maxLoanTenureMonths,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Settings updated" });
-          queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
-        },
-        onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      },
-    );
+  async function onSubmit(data: SettingsForm) {
+    try {
+      await updateWithStepUp({
+        cooperativeName: data.cooperativeName,
+        loanInterestRate: data.loanInterestRate,
+        maxLoanAmount: data.maxLoanAmount || undefined,
+        maxLoanTenureMonths: data.maxLoanTenureMonths,
+      });
+      toast({ title: "Settings updated" });
+      queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   }
 
   if (isLoading) return <Skeleton className="h-64 w-full max-w-lg" />;

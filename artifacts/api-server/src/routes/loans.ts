@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, loansTable, membersTable, transactionsTable, systemSettingsTable, notificationsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireAuditor, requireMember, requireSuperAdmin, requireTreasurer, AuthRequest } from "../middlewares/auth";
+import { requireAuth, requireAdmin, requireAuditor, requireMember, requireReverification, requireSuperAdmin, requireTreasurer, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
 import {
@@ -155,7 +155,7 @@ router.get("/loans/:id", requireAuth, async (req: AuthRequest, res): Promise<voi
   res.json(formatLoan(result.loan, result.memberName));
 });
 
-router.post("/loans/:id/approve", requireAuth, async (req: AuthRequest, res): Promise<void> => {
+router.post("/loans/:id/approve", requireAuth, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
@@ -239,7 +239,7 @@ router.post("/loans/:id/approve", requireAuth, async (req: AuthRequest, res): Pr
   res.json(formatLoan(updated, result.memberName));
 });
 
-router.post("/loans/:id/reject", requireAuth, async (req: AuthRequest, res): Promise<void> => {
+router.post("/loans/:id/reject", requireAuth, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
@@ -299,7 +299,7 @@ router.post("/loans/:id/reject", requireAuth, async (req: AuthRequest, res): Pro
   res.json(formatLoan(updated, result.memberName));
 });
 
-router.post("/loans/:id/disburse", requireAuth, requireTreasurer, async (req: AuthRequest, res): Promise<void> => {
+router.post("/loans/:id/disburse", requireAuth, requireTreasurer, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 

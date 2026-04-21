@@ -13,6 +13,8 @@ import {
   requireAuth,
   requireAdmin,
   requireSuperAdmin,
+  requireReverification,
+  requireReverificationIf,
   AuthRequest,
 } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
@@ -127,7 +129,16 @@ router.get("/members/:id", requireAuth, async (req: AuthRequest, res): Promise<v
   res.json(formatMember(member));
 });
 
-router.patch("/members/:id", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.patch(
+  "/members/:id",
+  requireAuth,
+  requireAdmin,
+  // Step-up only when role or status is being changed (governance-sensitive)
+  requireReverificationIf((req) => {
+    const b = req.body || {};
+    return b.role != null || b.status != null;
+  }),
+  async (req: AuthRequest, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
 
@@ -183,6 +194,7 @@ router.post(
   "/members/bulk-organization",
   requireAuth,
   requireAdmin,
+  requireReverification,
   async (req: AuthRequest, res): Promise<void> => {
     const parsed = BulkAssignOrganizationBody.safeParse(req.body);
     if (!parsed.success) {
@@ -213,7 +225,7 @@ router.post(
   },
 );
 
-router.post("/members/:id/activate", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.post("/members/:id/activate", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
@@ -239,7 +251,7 @@ router.post("/members/:id/activate", requireAuth, requireAdmin, async (req: Auth
   res.json(formatMember(member));
 });
 
-router.post("/members/:id/deactivate", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.post("/members/:id/deactivate", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
@@ -269,6 +281,7 @@ router.delete(
   "/members/:id",
   requireAuth,
   requireAdmin,
+  requireReverification,
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
