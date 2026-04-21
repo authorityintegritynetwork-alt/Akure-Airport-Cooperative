@@ -180,7 +180,8 @@ router.post(
   async (req: AuthRequest, res): Promise<void> => {
     const parsed = PreviewExcelUploadBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.message });
+      req.log?.warn({ issues: parsed.error.issues, body: req.body }, "preview body invalid");
+      res.status(400).json({ error: parsed.error.message, issues: parsed.error.issues });
       return;
     }
 
