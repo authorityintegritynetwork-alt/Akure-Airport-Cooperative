@@ -56,6 +56,7 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+export const requireMember = requireRole("member");
 export const requireAdmin = requireRole("admin", "financial_auditor", "treasurer", "super_admin");
 export const requireAdminOnly = requireRole("admin", "super_admin");
 export const requireAuditor = requireRole("financial_auditor", "super_admin");

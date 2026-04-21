@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, loansTable, membersTable, transactionsTable, systemSettingsTable, notificationsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireAuditor, requireSuperAdmin, requireTreasurer, AuthRequest } from "../middlewares/auth";
+import { requireAuth, requireAdmin, requireAuditor, requireMember, requireSuperAdmin, requireTreasurer, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
 import {
@@ -66,7 +66,7 @@ router.get("/loans", requireAuth, requireAdmin, async (req: AuthRequest, res): P
   res.json(loans.map((l) => formatLoan(l, memberMap[l.memberId] || "Unknown")));
 });
 
-router.post("/loans", requireAuth, async (req: AuthRequest, res): Promise<void> => {
+router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CreateLoanBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -113,7 +113,7 @@ router.get("/loans/my", requireAuth, async (req: AuthRequest, res): Promise<void
   res.json(loans.map((l) => formatLoan(l, member?.fullName || "Unknown")));
 });
 
-router.post("/loans/calculate", requireAuth, async (req: AuthRequest, res): Promise<void> => {
+router.post("/loans/calculate", requireAuth, requireMember, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CalculateLoanBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

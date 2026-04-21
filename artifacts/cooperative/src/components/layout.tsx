@@ -52,6 +52,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = profile.role === "admin" || profile.role === "super_admin";
   const isSuperAdmin = profile.role === "super_admin";
+  const isMember = profile.role === "member";
 
   const navItem = (href: string, icon: React.ReactNode, label: string) => (
     <SidebarMenuItem key={href}>
@@ -91,10 +92,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarGroupLabel>Personal</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navItem("/my-savings", <Wallet className="w-4 h-4" />, "My Savings")}
-                  {navItem("/my-loans", <CreditCard className="w-4 h-4" />, "My Loans")}
-                  {navItem("/store", <ShoppingCart className="w-4 h-4" />, "Store")}
-                  {navItem("/my-purchases", <ShoppingBag className="w-4 h-4" />, "My Purchases")}
+                  {isMember && navItem("/my-savings", <Wallet className="w-4 h-4" />, "My Savings")}
+                  {isMember && navItem("/my-loans", <CreditCard className="w-4 h-4" />, "My Loans")}
+                  {isMember && navItem("/store", <ShoppingCart className="w-4 h-4" />, "Store")}
+                  {isMember && navItem("/my-purchases", <ShoppingBag className="w-4 h-4" />, "My Purchases")}
                   {navItem("/my-notifications", <Bell className="w-4 h-4" />, "Notifications")}
                 </SidebarMenu>
               </SidebarGroupContent>

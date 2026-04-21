@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, storeItemsTable, storePurchasesTable, membersTable } from "@workspace/db";
 import { eq, and, ilike, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
+import { requireAuth, requireAdmin, requireMember, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
 import {
@@ -146,7 +146,7 @@ router.get("/store/purchases", requireAuth, requireAdmin, async (req: AuthReques
   res.json(purchases.map((p) => formatPurchase(p, memberMap[p.memberId] || "Unknown", itemMap[p.storeItemId] || "Unknown")));
 });
 
-router.post("/store/purchases", requireAuth, async (req: AuthRequest, res): Promise<void> => {
+router.post("/store/purchases", requireAuth, requireMember, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CreateStorePurchaseBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
