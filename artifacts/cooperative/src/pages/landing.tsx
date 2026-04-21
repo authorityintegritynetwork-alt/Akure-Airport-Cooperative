@@ -2,15 +2,14 @@ import { SignInButton, SignUpButton } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, ShieldCheck, TrendingUp, Users, CheckCircle2, Sparkles } from "lucide-react";
+import logoUrl from "@assets/Gemini_Generated_Image_7ln8yf7ln8yf7ln8_1776751040922.png";
 
 export function LandingPage() {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
       <header className="px-6 lg:px-12 py-5 flex items-center justify-between border-b border-border/60 backdrop-blur-sm sticky top-0 bg-background/80 z-10">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm tracking-tight">AA</span>
-          </div>
+          <img src={logoUrl} alt="AASCMS Logo" className="w-10 h-10 object-contain" />
           <span className="font-semibold text-lg tracking-tight text-foreground">AAS Cooperative</span>
         </div>
         <div className="flex items-center gap-2">
