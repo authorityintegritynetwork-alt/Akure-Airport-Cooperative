@@ -2,7 +2,7 @@ import { SignInButton, SignUpButton } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, ShieldCheck, TrendingUp, Users, CheckCircle2, Sparkles } from "lucide-react";
-import logoUrl from "@assets/Gemini_Generated_Image_7ln8yf7ln8yf7ln8_1776751040922.png";
+import logoUrl from "@assets/aacs-logo_1776751208467.png";
 
 export function LandingPage() {
   return (
