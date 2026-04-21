@@ -31,19 +31,34 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-const CATEGORY_COLUMNS = [
-  { key: "savings", label: "Savings" },
-  { key: "provident", label: "Provident" },
-  { key: "christmas", label: "Christmas" },
-  { key: "realLoan", label: "Real Loan" },
-  { key: "emergencyLoan", label: "Emer. Loan" },
-  { key: "electronics", label: "Electronics" },
-  { key: "sElectronics", label: "S/Elect" },
-  { key: "furniture", label: "Furniture" },
-  { key: "commodity", label: "Commodity" },
-  { key: "ghlForm", label: "Loan Form" },
-  { key: "fire", label: "Fire" },
-] as const;
+type Org = "faan" | "nama";
+
+const CATEGORY_COLUMNS_BY_ORG: Record<Org, { key: string; label: string }[]> = {
+  faan: [
+    { key: "savings", label: "Savings" },
+    { key: "provident", label: "Provident" },
+    { key: "christmas", label: "Christmas" },
+    { key: "realLoan", label: "Real Loan" },
+    { key: "emergencyLoan", label: "Emer. Loan" },
+    { key: "electronics", label: "Electronics" },
+    { key: "sElectronics", label: "S/Elect" },
+    { key: "furniture", label: "Furniture" },
+    { key: "commodity", label: "Commodity" },
+    { key: "ghlForm", label: "Loan Form" },
+    { key: "fire", label: "Fire" },
+  ],
+  nama: [
+    { key: "savings", label: "Savings" },
+    { key: "provident", label: "Provident" },
+    { key: "realLoan", label: "Real Loan" },
+    { key: "emergencyLoan", label: "Emer. Loan" },
+    { key: "electronics", label: "Electronics (S/Elect)" },
+    { key: "fuelVenture", label: "Fuel Venture" },
+    { key: "landLoan", label: "Land Loan" },
+    { key: "commodity", label: "Commodity" },
+    { key: "ghlForm", label: "Loan Form" },
+  ],
+};
 
 type Stage = "select" | "pickSheet" | "preview";
 
@@ -51,6 +66,7 @@ export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
   const [year, setYear] = useState(new Date().getFullYear());
+  const [organization, setOrganization] = useState<Org>("faan");
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean }[]>([]);
@@ -106,7 +122,9 @@ export function UploadPage() {
 
       setUploadedPath(objectPath);
 
-      const sheetResult = await listSheets.mutateAsync({ data: { fileObjectPath: objectPath } });
+      const sheetResult = await listSheets.mutateAsync({
+        data: { fileObjectPath: objectPath, organization },
+      });
       setSheets(sheetResult.sheets);
       const firstValid = sheetResult.sheets.find((s) => s.looksValid);
       if (sheetResult.sheets.length === 1 && firstValid) {
@@ -134,6 +152,7 @@ export function UploadPage() {
           sheetName,
           month,
           year,
+          organization,
           manualMatches: Object.entries(manual).map(([rowNumber, memberId]) => ({
             rowNumber: Number(rowNumber),
             memberId,
@@ -175,6 +194,7 @@ export function UploadPage() {
           sheetName: chosenSheet,
           month,
           year,
+          organization,
           skipErrors,
           manualMatches: Object.entries(manualMatches).map(([rowNumber, memberId]) => ({
             rowNumber: Number(rowNumber),
@@ -223,6 +243,30 @@ export function UploadPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Organization</label>
+              <div className="flex gap-2 mt-1">
+                {(["faan", "nama"] as Org[]).map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => setOrganization(o)}
+                    className={`flex-1 border rounded-md px-3 py-2 text-sm font-medium ${
+                      organization === o
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background hover:bg-muted"
+                    }`}
+                    data-testid={`org-${o}`}
+                  >
+                    {o.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Pick the employer this spreadsheet is from. Matched members will be tagged
+                to this organization automatically.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Month</label>
@@ -348,7 +392,8 @@ export function UploadPage() {
                     <th className="text-left p-2">Row</th>
                     <th className="text-left p-2 min-w-[140px]">Name in File</th>
                     <th className="text-left p-2 min-w-[200px]">Matched Member</th>
-                    {CATEGORY_COLUMNS.map((c) => (
+                    <th className="text-left p-2">Org</th>
+                    {CATEGORY_COLUMNS_BY_ORG[organization].map((c) => (
                       <th key={c.key} className="text-right p-2">{c.label}</th>
                     ))}
                     <th className="text-right p-2">Total</th>
@@ -358,10 +403,17 @@ export function UploadPage() {
                 <tbody>
                   {previewData.rows.map((row: any) => {
                     const isUnmatched = row.matchedMemberId == null;
+                    const rowClass = isUnmatched
+                      ? "bg-destructive/5"
+                      : row.orgMismatch
+                      ? "bg-amber-100"
+                      : row.totalMismatch
+                      ? "bg-amber-50"
+                      : "";
                     return (
                       <tr
                         key={row.rowNumber}
-                        className={isUnmatched ? "bg-destructive/5" : row.totalMismatch ? "bg-amber-50" : ""}
+                        className={rowClass}
                         data-testid={`preview-row-${row.rowNumber}`}
                       >
                         <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
@@ -395,7 +447,20 @@ export function UploadPage() {
                             </div>
                           )}
                         </td>
-                        {CATEGORY_COLUMNS.map((c) => {
+                        <td className="p-2">
+                          {row.memberOrganization ? (
+                            <Badge
+                              variant={row.orgMismatch ? "destructive" : "secondary"}
+                              className="text-[10px] py-0 px-1 uppercase"
+                              data-testid={`org-badge-${row.rowNumber}`}
+                            >
+                              {row.memberOrganization}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-[10px]">—</span>
+                          )}
+                        </td>
+                        {CATEGORY_COLUMNS_BY_ORG[organization].map((c) => {
                           const v = row[c.key] || 0;
                           return (
                             <td key={c.key} className="p-2 text-right tabular-nums">

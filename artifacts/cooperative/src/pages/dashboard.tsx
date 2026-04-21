@@ -25,19 +25,34 @@ export function Dashboard() {
   );
 }
 
-const BALANCE_CARDS = [
-  { key: "savingsBalance", label: "Savings", direction: "credit" },
-  { key: "providentBalance", label: "Provident", direction: "credit" },
-  { key: "christmasBalance", label: "Christmas", direction: "credit" },
-  { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
-  { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
-  { key: "electronicsDebt", label: "Electronics", direction: "debit" },
-  { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit" },
-  { key: "furnitureDebt", label: "Furniture", direction: "debit" },
-  { key: "commodityDebt", label: "Commodity", direction: "debit" },
-  { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
-  { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
-] as const;
+type BalanceCard = { key: string; label: string; direction: "credit" | "debit" };
+
+const BALANCE_CARDS_BY_ORG: Record<"faan" | "nama", BalanceCard[]> = {
+  faan: [
+    { key: "savingsBalance", label: "Savings", direction: "credit" },
+    { key: "providentBalance", label: "Provident", direction: "credit" },
+    { key: "christmasBalance", label: "Christmas", direction: "credit" },
+    { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
+    { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
+    { key: "electronicsDebt", label: "Electronics", direction: "debit" },
+    { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit" },
+    { key: "furnitureDebt", label: "Furniture", direction: "debit" },
+    { key: "commodityDebt", label: "Commodity", direction: "debit" },
+    { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
+    { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
+  ],
+  nama: [
+    { key: "savingsBalance", label: "Savings", direction: "credit" },
+    { key: "providentBalance", label: "Provident", direction: "credit" },
+    { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
+    { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
+    { key: "electronicsDebt", label: "Electronics (S/Elect)", direction: "debit" },
+    { key: "fuelVentureBalance", label: "Fuel Venture Loan", direction: "debit" },
+    { key: "landLoanBalance", label: "Land Loan", direction: "debit" },
+    { key: "commodityDebt", label: "Commodity", direction: "debit" },
+    { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
+  ],
+};
 
 function AdminDashboard() {
   const { data: summary, isLoading } = useGetAdminDashboardSummary();
@@ -120,8 +135,20 @@ function MemberDashboard({ profile }: { profile: any }) {
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!summary) return null;
 
+  const org: "faan" | "nama" = profile.organization === "nama" ? "nama" : "faan";
+  const balanceCards = BALANCE_CARDS_BY_ORG[org];
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Organization:</span>
+        <span
+          className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold uppercase bg-primary/10 text-primary border-primary/30"
+          data-testid="dashboard-org-badge"
+        >
+          {org}
+        </span>
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -161,7 +188,7 @@ function MemberDashboard({ profile }: { profile: any }) {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {BALANCE_CARDS.map((b) => {
+            {balanceCards.map((b) => {
               const value = Number(profile[b.key] ?? 0);
               return (
                 <div

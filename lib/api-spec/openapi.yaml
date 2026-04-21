@@ -86,6 +86,11 @@ paths:
             type: string
             enum: [pending, active, inactive]
         - in: query
+          name: organization
+          schema:
+            type: string
+            enum: [faan, nama]
+        - in: query
           name: search
           schema:
             type: string
@@ -159,6 +164,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Member"
+
+  /members/bulk-organization:
+    post:
+      operationId: bulkAssignOrganization
+      tags: [members]
+      summary: Bulk assign organization tag to members (Admin+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkOrganizationBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                required: [updated]
 
   /members/{id}/activate:
     post:
@@ -969,6 +997,9 @@ components:
         status:
           type: string
           enum: [pending, active, inactive]
+        organization:
+          type: string
+          enum: [faan, nama]
         savingsBalance:
           type: number
         providentBalance:
@@ -978,6 +1009,10 @@ components:
         realLoanBalance:
           type: number
         emergencyLoanBalance:
+          type: number
+        fuelVentureBalance:
+          type: number
+        landLoanBalance:
           type: number
         totalLoanBalance:
           type: number
@@ -1007,11 +1042,14 @@ components:
         - email
         - role
         - status
+        - organization
         - savingsBalance
         - providentBalance
         - christmasBalance
         - realLoanBalance
         - emergencyLoanBalance
+        - fuelVentureBalance
+        - landLoanBalance
         - totalLoanBalance
         - electronicsDebt
         - sElectronicsDebt
@@ -1070,6 +1108,13 @@ components:
           type: number
         totalStoreDebt:
           type: number
+        fuelVentureBalance:
+          type: number
+        landLoanBalance:
+          type: number
+        organization:
+          type: string
+          enum: [faan, nama]
         createdAt:
           type: string
           format: date-time
@@ -1123,6 +1168,9 @@ components:
         status:
           type: string
           enum: [pending, active, inactive]
+        organization:
+          type: string
+          enum: [faan, nama]
       required: [fullName, email]
 
     UpdateMemberBody:
@@ -1140,6 +1188,22 @@ components:
         status:
           type: string
           enum: [pending, active, inactive]
+        organization:
+          type: string
+          enum: [faan, nama]
+
+    BulkOrganizationBody:
+      type: object
+      properties:
+        memberIds:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+        organization:
+          type: string
+          enum: [faan, nama]
+      required: [memberIds, organization]
 
     MemberSummary:
       type: object
@@ -1161,6 +1225,13 @@ components:
         activeLoansCount:
           type: integer
         pendingStoreDebt:
+          type: number
+        organization:
+          type: string
+          enum: [faan, nama]
+        fuelVentureBalance:
+          type: number
+        landLoanBalance:
           type: number
       required:
         - memberId
@@ -1226,7 +1297,10 @@ components:
       properties:
         fileObjectPath:
           type: string
-      required: [fileObjectPath]
+        organization:
+          type: string
+          enum: [faan, nama]
+      required: [fileObjectPath, organization]
 
     ExcelSheetInfo:
       type: object
@@ -1268,11 +1342,14 @@ components:
           type: string
         year:
           type: integer
+        organization:
+          type: string
+          enum: [faan, nama]
         manualMatches:
           type: array
           items:
             $ref: "#/components/schemas/ManualMatch"
-      required: [fileObjectPath, month, year]
+      required: [fileObjectPath, month, year, organization]
 
     ExcelRowPreview:
       type: object
@@ -1310,6 +1387,15 @@ components:
           type: number
         fire:
           type: number
+        fuelVenture:
+          type: number
+        landLoan:
+          type: number
+        memberOrganization:
+          type: ["string", "null"]
+          enum: [faan, nama, null]
+        orgMismatch:
+          type: boolean
         total:
           type: number
         computedTotal:
@@ -1339,6 +1425,9 @@ components:
         - commodity
         - ghlForm
         - fire
+        - fuelVenture
+        - landLoan
+        - orgMismatch
         - total
         - computedTotal
         - totalMismatch
@@ -1381,13 +1470,18 @@ components:
           type: string
         year:
           type: integer
+        organization:
+          type: string
+          enum: [faan, nama]
         skipErrors:
+          type: boolean
+        autoTagOrganization:
           type: boolean
         manualMatches:
           type: array
           items:
             $ref: "#/components/schemas/ManualMatch"
-      required: [fileObjectPath, month, year]
+      required: [fileObjectPath, month, year, organization]
 
     ExcelUploadResult:
       type: object
@@ -1417,6 +1511,9 @@ components:
           type: string
         year:
           type: integer
+        organization:
+          type: string
+          enum: [faan, nama]
         fileObjectPath:
           type: string
         rowsProcessed:
@@ -1435,6 +1532,7 @@ components:
         - uploaderName
         - month
         - year
+        - organization
         - fileObjectPath
         - rowsProcessed
         - rowsSkipped

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ExcelRowPreviewMatchConfidence } from "./excelRowPreviewMatchConfidence";
+import type { ExcelRowPreviewMemberOrganization } from "./excelRowPreviewMemberOrganization";
 
 export interface ExcelRowPreview {
   rowNumber: number;
@@ -26,6 +27,11 @@ export interface ExcelRowPreview {
   commodity: number;
   ghlForm: number;
   fire: number;
+  fuelVenture: number;
+  landLoan: number;
+  /** @nullable */
+  memberOrganization?: ExcelRowPreviewMemberOrganization;
+  orgMismatch: boolean;
   total: number;
   computedTotal: number;
   totalMismatch: boolean;

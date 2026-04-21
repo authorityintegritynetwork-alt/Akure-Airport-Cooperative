@@ -20,6 +20,8 @@ import type {
   ActivityItem,
   AdminDashboardSummary,
   AuditLog,
+  BulkAssignOrganization200,
+  BulkOrganizationBody,
   CreateLoanBody,
   CreateMemberBody,
   CreateStoreItemBody,
@@ -660,6 +662,95 @@ export const useUpdateMember = <
   TContext
 > => {
   return useMutation(getUpdateMemberMutationOptions(options));
+};
+
+/**
+ * @summary Bulk assign organization tag to members (Admin+)
+ */
+export const getBulkAssignOrganizationUrl = () => {
+  return `/api/members/bulk-organization`;
+};
+
+export const bulkAssignOrganization = async (
+  bulkOrganizationBody: BulkOrganizationBody,
+  options?: RequestInit,
+): Promise<BulkAssignOrganization200> => {
+  return customFetch<BulkAssignOrganization200>(
+    getBulkAssignOrganizationUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(bulkOrganizationBody),
+    },
+  );
+};
+
+export const getBulkAssignOrganizationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkAssignOrganization>>,
+    TError,
+    { data: BodyType<BulkOrganizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkAssignOrganization>>,
+  TError,
+  { data: BodyType<BulkOrganizationBody> },
+  TContext
+> => {
+  const mutationKey = ["bulkAssignOrganization"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkAssignOrganization>>,
+    { data: BodyType<BulkOrganizationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkAssignOrganization(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkAssignOrganizationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkAssignOrganization>>
+>;
+export type BulkAssignOrganizationMutationBody = BodyType<BulkOrganizationBody>;
+export type BulkAssignOrganizationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Bulk assign organization tag to members (Admin+)
+ */
+export const useBulkAssignOrganization = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkAssignOrganization>>,
+    TError,
+    { data: BodyType<BulkOrganizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkAssignOrganization>>,
+  TError,
+  { data: BodyType<BulkOrganizationBody> },
+  TContext
+> => {
+  return useMutation(getBulkAssignOrganizationMutationOptions(options));
 };
 
 /**

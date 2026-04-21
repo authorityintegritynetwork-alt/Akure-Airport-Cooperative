@@ -12,7 +12,9 @@ export type DeductionCategory =
   | "furniture"
   | "commodity"
   | "ghlForm"
-  | "fire";
+  | "fire"
+  | "fuelVenture"
+  | "landLoan";
 
 export const ALL_CATEGORIES: DeductionCategory[] = [
   "savings",
@@ -26,7 +28,40 @@ export const ALL_CATEGORIES: DeductionCategory[] = [
   "commodity",
   "ghlForm",
   "fire",
+  "fuelVenture",
+  "landLoan",
 ];
+
+export type Organization = "faan" | "nama";
+
+// Per-organization allow-list of categories that may appear in that org's spreadsheet.
+// Used to gate parsing so a stray header in one file does not credit the wrong bucket.
+export const ORG_CATEGORIES: Record<Organization, DeductionCategory[]> = {
+  faan: [
+    "savings",
+    "provident",
+    "christmas",
+    "realLoan",
+    "emergencyLoan",
+    "electronics",
+    "sElectronics",
+    "furniture",
+    "commodity",
+    "ghlForm",
+    "fire",
+  ],
+  nama: [
+    "savings",
+    "provident",
+    "realLoan",
+    "emergencyLoan",
+    "electronics",
+    "commodity",
+    "ghlForm",
+    "fuelVenture",
+    "landLoan",
+  ],
+};
 
 const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
   savings: ["savings", "saving"],
@@ -64,7 +99,7 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
     "se/land",
     "s/eland",
   ],
-  furniture: ["f/vent", "f vent", "fvent", "furniture", "furn"],
+  furniture: ["furniture", "furn"],
   commodity: ["comm", "commodity", "commodities"],
   ghlForm: [
     "g/h&l/form",
@@ -79,6 +114,8 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
     "g/hl/f",
   ],
   fire: ["fire", "fire fund", "fire contribution", "fire/fund"],
+  fuelVenture: ["f/vent", "f vent", "fvent", "fuel vent", "fuel venture", "fuel-venture"],
+  landLoan: ["land", "land loan", "land/loan"],
 };
 
 const NAME_HEADERS = ["name", "names", "member name", "full name"];
@@ -106,7 +143,10 @@ interface HeaderMap {
   categoryCols: Partial<Record<DeductionCategory, number>>;
 }
 
-function detectHeader(rows: unknown[][]): HeaderMap | null {
+function detectHeader(
+  rows: unknown[][],
+  allowedCategories: DeductionCategory[] = ALL_CATEGORIES,
+): HeaderMap | null {
   const scanLimit = Math.min(rows.length, 25);
   for (let r = 0; r < scanLimit; r++) {
     const row = rows[r];
@@ -134,7 +174,7 @@ function detectHeader(rows: unknown[][]): HeaderMap | null {
         totalCol = c;
         continue;
       }
-      for (const cat of ALL_CATEGORIES) {
+      for (const cat of allowedCategories) {
         if (categoryCols[cat] !== undefined) continue;
         if (HEADER_ALIASES[cat].includes(h)) {
           categoryCols[cat] = c;
@@ -175,7 +215,11 @@ function emptyAmounts(): Record<DeductionCategory, number> {
   );
 }
 
-export function parseSheet(workbook: xlsx.WorkBook, sheetName: string): ParsedSheet {
+export function parseSheet(
+  workbook: xlsx.WorkBook,
+  sheetName: string,
+  organization: Organization = "faan",
+): ParsedSheet {
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) {
     throw new Error(`Sheet not found: ${sheetName}`);
@@ -186,7 +230,8 @@ export function parseSheet(workbook: xlsx.WorkBook, sheetName: string): ParsedSh
     blankrows: false,
   });
 
-  const header = detectHeader(rows);
+  const allowed = ORG_CATEGORIES[organization];
+  const header = detectHeader(rows, allowed);
   if (!header) {
     return {
       sheetName,
@@ -274,7 +319,11 @@ export interface SheetSummary {
   looksValid: boolean;
 }
 
-export function summarizeSheets(workbook: xlsx.WorkBook): SheetSummary[] {
+export function summarizeSheets(
+  workbook: xlsx.WorkBook,
+  organization: Organization = "faan",
+): SheetSummary[] {
+  const allowed = ORG_CATEGORIES[organization];
   return workbook.SheetNames.map((name) => {
     const sheet = workbook.Sheets[name];
     const rows: unknown[][] = xlsx.utils.sheet_to_json(sheet, {
@@ -282,7 +331,7 @@ export function summarizeSheets(workbook: xlsx.WorkBook): SheetSummary[] {
       defval: null,
       blankrows: false,
     });
-    const header = detectHeader(rows);
+    const header = detectHeader(rows, allowed);
     const dataRowCount = header
       ? Math.max(0, rows.length - header.headerRowIndex - 1)
       : 0;

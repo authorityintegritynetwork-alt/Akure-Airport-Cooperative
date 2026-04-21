@@ -22,6 +22,8 @@ export const transactionsTable = pgTable("transactions", {
       "commodity_repayment",
       "ghl_form_repayment",
       "fire",
+      "fuel_venture_repayment",
+      "land_loan_repayment",
       "store_repayment",
     ],
   }).notNull(),

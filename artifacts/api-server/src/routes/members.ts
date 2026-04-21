@@ -18,7 +18,9 @@ import {
   ActivateMemberParams,
   DeactivateMemberParams,
   GetMemberSummaryParams,
+  BulkAssignOrganizationBody,
 } from "@workspace/api-zod";
+import { inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -36,6 +38,9 @@ router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res):
 
   if (params.data.status) {
     conditions.push(eq(membersTable.status, params.data.status as any));
+  }
+  if ((params.data as any).organization) {
+    conditions.push(eq(membersTable.organization, (params.data as any).organization));
   }
   if (params.data.search) {
     conditions.push(
@@ -72,6 +77,7 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
       staffId: parsed.data.staffId ?? undefined,
       role: (parsed.data.role as any) ?? "member",
       status: (parsed.data.status as any) ?? "active",
+      organization: ((parsed.data as any).organization as any) ?? "faan",
     })
     .returning();
 
@@ -129,6 +135,8 @@ router.patch("/members/:id", requireAuth, requireAdmin, async (req: AuthRequest,
   if (parsed.data.staffId != null) updateData.staffId = parsed.data.staffId;
   if (parsed.data.role != null) updateData.role = parsed.data.role;
   if (parsed.data.status != null) updateData.status = parsed.data.status;
+  if ((parsed.data as any).organization != null)
+    updateData.organization = (parsed.data as any).organization;
 
   const [member] = await db
     .update(membersTable)
@@ -151,6 +159,40 @@ router.patch("/members/:id", requireAuth, requireAdmin, async (req: AuthRequest,
 
   res.json(formatMember(member));
 });
+
+router.post(
+  "/members/bulk-organization",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const parsed = BulkAssignOrganizationBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const { memberIds, organization } = parsed.data;
+    if (memberIds.length === 0) {
+      res.json({ updated: 0 });
+      return;
+    }
+
+    const updated = await db
+      .update(membersTable)
+      .set({ organization: organization as any })
+      .where(inArray(membersTable.id, memberIds))
+      .returning({ id: membersTable.id });
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "BULK_ASSIGN_ORGANIZATION",
+      entity: "member",
+      entityId: 0,
+      details: `Assigned ${organization.toUpperCase()} to ${updated.length} member(s): ${memberIds.join(",")}`,
+    });
+
+    res.json({ updated: updated.length });
+  },
+);
 
 router.post("/members/:id/activate", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -240,9 +282,12 @@ router.get("/members/:id/summary", requireAuth, async (req: AuthRequest, res): P
   res.json({
     memberId: member.id,
     fullName: member.fullName,
+    organization: member.organization,
     savingsBalance: parseFloat(member.savingsBalance),
     totalLoanBalance: parseFloat(member.totalLoanBalance),
     totalStoreDebt: parseFloat(member.totalStoreDebt),
+    fuelVentureBalance: parseFloat(member.fuelVentureBalance),
+    landLoanBalance: parseFloat(member.landLoanBalance),
     totalSavingsContributed: totalSavings,
     totalLoansRepaid,
     activeLoansCount: activeLoans.length,

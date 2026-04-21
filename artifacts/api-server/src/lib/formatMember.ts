@@ -12,6 +12,8 @@ type MemberRow = {
   ghlFormDebt: string;
   fireFundBalance: string;
   totalStoreDebt: string;
+  fuelVentureBalance: string;
+  landLoanBalance: string;
   [k: string]: any;
 };
 
@@ -31,5 +33,7 @@ export function formatMember<T extends MemberRow>(m: T) {
     ghlFormDebt: parseFloat(m.ghlFormDebt),
     fireFundBalance: parseFloat(m.fireFundBalance),
     totalStoreDebt: parseFloat(m.totalStoreDebt),
+    fuelVentureBalance: parseFloat(m.fuelVentureBalance),
+    landLoanBalance: parseFloat(m.landLoanBalance),
   };
 }

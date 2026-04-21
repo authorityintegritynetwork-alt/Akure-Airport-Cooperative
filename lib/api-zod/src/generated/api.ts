@@ -62,6 +62,7 @@ export const RegisterMemberBody = zod.object({
  */
 export const ListMembersQueryParams = zod.object({
   status: zod.enum(["pending", "active", "inactive"]).optional(),
+  organization: zod.enum(["faan", "nama"]).optional(),
   search: zod.coerce.string().optional(),
 });
 
@@ -80,11 +81,14 @@ export const ListMembersResponseItem = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.enum(["faan", "nama"]),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
   realLoanBalance: zod.number(),
   emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
   electronicsDebt: zod.number(),
   sElectronicsDebt: zod.number(),
@@ -110,6 +114,7 @@ export const CreateMemberBody = zod.object({
     .enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"])
     .optional(),
   status: zod.enum(["pending", "active", "inactive"]).optional(),
+  organization: zod.enum(["faan", "nama"]).optional(),
 });
 
 /**
@@ -134,11 +139,14 @@ export const GetMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.enum(["faan", "nama"]),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
   realLoanBalance: zod.number(),
   emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
   electronicsDebt: zod.number(),
   sElectronicsDebt: zod.number(),
@@ -166,6 +174,7 @@ export const UpdateMemberBody = zod.object({
     .enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"])
     .optional(),
   status: zod.enum(["pending", "active", "inactive"]).optional(),
+  organization: zod.enum(["faan", "nama"]).optional(),
 });
 
 export const UpdateMemberResponse = zod.object({
@@ -183,11 +192,14 @@ export const UpdateMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.enum(["faan", "nama"]),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
   realLoanBalance: zod.number(),
   emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
   electronicsDebt: zod.number(),
   sElectronicsDebt: zod.number(),
@@ -198,6 +210,19 @@ export const UpdateMemberResponse = zod.object({
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Bulk assign organization tag to members (Admin+)
+ */
+
+export const BulkAssignOrganizationBody = zod.object({
+  memberIds: zod.array(zod.number()).min(1),
+  organization: zod.enum(["faan", "nama"]),
+});
+
+export const BulkAssignOrganizationResponse = zod.object({
+  updated: zod.number(),
 });
 
 /**
@@ -222,11 +247,14 @@ export const ActivateMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.enum(["faan", "nama"]),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
   realLoanBalance: zod.number(),
   emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
   electronicsDebt: zod.number(),
   sElectronicsDebt: zod.number(),
@@ -261,11 +289,14 @@ export const DeactivateMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.enum(["faan", "nama"]),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
   realLoanBalance: zod.number(),
   emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
   electronicsDebt: zod.number(),
   sElectronicsDebt: zod.number(),
@@ -372,6 +403,7 @@ export const ListMyTransactionsResponse = zod.array(
  */
 export const ListExcelSheetsBody = zod.object({
   fileObjectPath: zod.string(),
+  organization: zod.enum(["faan", "nama"]),
 });
 
 export const ListExcelSheetsResponse = zod.object({
@@ -392,6 +424,7 @@ export const PreviewExcelUploadBody = zod.object({
   sheetName: zod.string().optional(),
   month: zod.string(),
   year: zod.number(),
+  organization: zod.enum(["faan", "nama"]),
   manualMatches: zod
     .array(
       zod.object({
@@ -429,6 +462,12 @@ export const PreviewExcelUploadResponse = zod.object({
       commodity: zod.number(),
       ghlForm: zod.number(),
       fire: zod.number(),
+      fuelVenture: zod.number(),
+      landLoan: zod.number(),
+      memberOrganization: zod
+        .union([zod.literal("faan"), zod.literal("nama"), zod.literal(null)])
+        .nullish(),
+      orgMismatch: zod.boolean(),
       total: zod.number(),
       computedTotal: zod.number(),
       totalMismatch: zod.boolean(),
@@ -446,7 +485,9 @@ export const ProcessExcelUploadBody = zod.object({
   sheetName: zod.string().optional(),
   month: zod.string(),
   year: zod.number(),
+  organization: zod.enum(["faan", "nama"]),
   skipErrors: zod.boolean().optional(),
+  autoTagOrganization: zod.boolean().optional(),
   manualMatches: zod
     .array(
       zod.object({
@@ -473,6 +514,7 @@ export const ListUploadHistoryResponseItem = zod.object({
   uploaderName: zod.string(),
   month: zod.string(),
   year: zod.number(),
+  organization: zod.enum(["faan", "nama"]),
   fileObjectPath: zod.string(),
   rowsProcessed: zod.number(),
   rowsSkipped: zod.number(),

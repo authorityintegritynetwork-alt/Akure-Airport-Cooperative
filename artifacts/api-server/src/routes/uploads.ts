@@ -39,7 +39,9 @@ interface CategoryConfig {
     | "furniture_repayment"
     | "commodity_repayment"
     | "ghl_form_repayment"
-    | "fire";
+    | "fire"
+    | "fuel_venture_repayment"
+    | "land_loan_repayment";
   balanceField: keyof typeof membersTable.$inferSelect;
   direction: "credit" | "debit";
   label: string;
@@ -115,6 +117,18 @@ const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
     direction: "credit",
     label: "Fire Fund Contribution",
   },
+  fuelVenture: {
+    txType: "fuel_venture_repayment",
+    balanceField: "fuelVentureBalance",
+    direction: "debit",
+    label: "Fuel Venture Loan Repayment",
+  },
+  landLoan: {
+    txType: "land_loan_repayment",
+    balanceField: "landLoanBalance",
+    direction: "debit",
+    label: "Land Loan Repayment",
+  },
 };
 
 async function loadMatcher(): Promise<NameMatcher> {
@@ -152,7 +166,7 @@ router.post(
     }
     try {
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
-      res.json({ sheets: summarizeSheets(wb) });
+      res.json({ sheets: summarizeSheets(wb, parsed.data.organization) });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to read Excel file: ${err.message}` });
     }
@@ -178,11 +192,15 @@ router.post(
         return;
       }
 
-      const sheet = parseSheet(wb, sheetName);
+      const sheet = parseSheet(wb, sheetName, parsed.data.organization);
       const matcher = await loadMatcher();
 
       const allMembers = await db
-        .select({ id: membersTable.id, fullName: membersTable.fullName })
+        .select({
+          id: membersTable.id,
+          fullName: membersTable.fullName,
+          organization: membersTable.organization,
+        })
         .from(membersTable);
       const membersById = new Map(allMembers.map((m) => [m.id, m]));
 
@@ -191,6 +209,7 @@ router.post(
         manualMap.set(m.rowNumber, m.memberId);
       }
 
+      const uploadOrg = parsed.data.organization;
       const dup = await db
         .select({ id: uploadRecordsTable.id })
         .from(uploadRecordsTable)
@@ -198,13 +217,23 @@ router.post(
           and(
             eq(uploadRecordsTable.month, parsed.data.month),
             eq(uploadRecordsTable.year, parsed.data.year),
+            eq(uploadRecordsTable.organization, uploadOrg),
             eq(uploadRecordsTable.status, "processed"),
           ),
         );
-
       const previewRows = sheet.rows.map((row) => {
         const baseMatch = matcher.match(row.rawName);
         const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
+        const member =
+          finalMatch.memberId != null ? membersById.get(finalMatch.memberId) : null;
+        const memberOrg = member?.organization ?? null;
+        const orgMismatch = memberOrg != null && memberOrg !== uploadOrg;
+        const warnings = [...row.warnings];
+        if (orgMismatch) {
+          warnings.push(
+            `Member is tagged as ${memberOrg.toUpperCase()} but this upload is for ${uploadOrg.toUpperCase()}.`,
+          );
+        }
         return {
           rowNumber: row.rowNumber,
           rawName: row.rawName,
@@ -222,11 +251,15 @@ router.post(
           commodity: row.amounts.commodity,
           ghlForm: row.amounts.ghlForm,
           fire: row.amounts.fire,
+          fuelVenture: row.amounts.fuelVenture,
+          landLoan: row.amounts.landLoan,
+          memberOrganization: memberOrg,
+          orgMismatch,
           total: row.total,
           computedTotal: row.computedTotal,
           totalMismatch: row.totalMismatch,
           errors: row.errors,
-          warnings: row.warnings,
+          warnings,
         };
       });
 
@@ -271,11 +304,15 @@ router.post(
         return;
       }
 
-      const sheet = parseSheet(wb, sheetName);
+      const sheet = parseSheet(wb, sheetName, parsed.data.organization);
       const matcher = await loadMatcher();
 
       const allMembers = await db
-        .select({ id: membersTable.id, fullName: membersTable.fullName })
+        .select({
+          id: membersTable.id,
+          fullName: membersTable.fullName,
+          organization: membersTable.organization,
+        })
         .from(membersTable);
       const membersById = new Map(allMembers.map((m) => [m.id, m]));
 
@@ -283,6 +320,9 @@ router.post(
       for (const m of parsed.data.manualMatches || []) {
         manualMap.set(m.rowNumber, m.memberId);
       }
+
+      const uploadOrg = parsed.data.organization;
+      const autoTag = parsed.data.autoTagOrganization !== false;
 
       // Run the entire processing in a single DB transaction so that any
       // failure rolls back all transaction inserts and balance/loan mutations.
@@ -305,6 +345,7 @@ router.post(
             and(
               eq(uploadRecordsTable.month, parsed.data.month),
               eq(uploadRecordsTable.year, parsed.data.year),
+              eq(uploadRecordsTable.organization, parsed.data.organization),
               eq(uploadRecordsTable.status, "processed"),
             ),
           );
@@ -321,6 +362,7 @@ router.post(
             uploadedBy: req.memberId!,
             month: parsed.data.month,
             year: parsed.data.year,
+            organization: uploadOrg,
             fileObjectPath: parsed.data.fileObjectPath,
             status: "pending",
           })
@@ -346,12 +388,23 @@ router.post(
           const memberId = finalMatch.memberId;
 
           // Lock the member row for the duration of this row's processing.
-          const lockedRows = await tx.execute<{ id: number }>(
-            sql`SELECT id FROM ${membersTable} WHERE id = ${memberId} FOR UPDATE`,
+          const lockedRows = await tx.execute<{ id: number; organization: string }>(
+            sql`SELECT id, organization FROM ${membersTable} WHERE id = ${memberId} FOR UPDATE`,
           );
           if (!lockedRows.rows || lockedRows.rows.length === 0) {
             skipped++;
             continue;
+          }
+          const lockedMemberOrg = (lockedRows.rows[0] as any).organization as
+            | "faan"
+            | "nama";
+
+          // Auto-tag matched member to upload's organization when configured.
+          if (autoTag && lockedMemberOrg !== uploadOrg) {
+            await tx
+              .update(membersTable)
+              .set({ organization: uploadOrg })
+              .where(eq(membersTable.id, memberId));
           }
 
           const balanceDeltas: Record<string, number> = {};

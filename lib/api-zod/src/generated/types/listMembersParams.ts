@@ -5,9 +5,11 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListMembersOrganization } from "./listMembersOrganization";
 import type { ListMembersStatus } from "./listMembersStatus";
 
 export type ListMembersParams = {
   status?: ListMembersStatus;
+  organization?: ListMembersOrganization;
   search?: string;
 };

@@ -5,6 +5,7 @@ import {
   useActivateMember,
   useDeactivateMember,
   useCreateMember,
+  useBulkAssignOrganization,
   getListMembersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,6 +50,7 @@ const createMemberSchema = z.object({
   staffId: z.string().optional(),
   role: z.enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"]).optional(),
   status: z.enum(["pending", "active", "inactive"]).optional(),
+  organization: z.enum(["faan", "nama"]).optional(),
 });
 type CreateMemberForm = z.infer<typeof createMemberSchema>;
 
@@ -64,13 +66,16 @@ function memberStatusBadge(status: string) {
 export function MembersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [orgFilter, setOrgFilter] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const params: any = {};
   if (search) params.search = search;
   if (statusFilter) params.status = statusFilter;
+  if (orgFilter) params.organization = orgFilter;
 
   const { data: members, isLoading } = useListMembers(params, {
     query: { queryKey: getListMembersQueryKey(params) },
@@ -79,10 +84,11 @@ export function MembersPage() {
   const activateMember = useActivateMember();
   const deactivateMember = useDeactivateMember();
   const createMember = useCreateMember();
+  const bulkAssign = useBulkAssignOrganization();
 
   const form = useForm<CreateMemberForm>({
     resolver: zodResolver(createMemberSchema),
-    defaultValues: { fullName: "", email: "", phone: "", staffId: "", role: "member", status: "active" },
+    defaultValues: { fullName: "", email: "", phone: "", staffId: "", role: "member", status: "active", organization: "faan" },
   });
 
   function handleActivate(id: number) {
@@ -119,6 +125,7 @@ export function MembersPage() {
           staffId: data.staffId || undefined,
           role: data.role,
           status: data.status,
+          organization: data.organization,
         },
       },
       {
@@ -209,7 +216,7 @@ export function MembersPage() {
         </Dialog>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -225,12 +232,75 @@ export function MembersPage() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={orgFilter || "all"} onValueChange={(v) => setOrgFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="w-36" data-testid="select-org-filter">
+            <SelectValue placeholder="Organization" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Orgs</SelectItem>
+            <SelectItem value="faan">FAAN</SelectItem>
+            <SelectItem value="nama">NAMA</SelectItem>
+          </SelectContent>
+        </Select>
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 ml-auto bg-muted rounded-md px-3 py-1.5">
+            <span className="text-sm font-medium" data-testid="selected-count">
+              {selectedIds.size} selected
+            </span>
+            {(["faan", "nama"] as const).map((o) => (
+              <Button
+                key={o}
+                size="sm"
+                variant="outline"
+                disabled={bulkAssign.isPending}
+                onClick={() => {
+                  bulkAssign.mutate(
+                    {
+                      data: {
+                        memberIds: Array.from(selectedIds),
+                        organization: o,
+                      },
+                    },
+                    {
+                      onSuccess: (r) => {
+                        toast({
+                          title: `Assigned to ${o.toUpperCase()}`,
+                          description: `${r.updated} member(s) updated.`,
+                        });
+                        setSelectedIds(new Set());
+                        queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
+                      },
+                      onError: (err: any) => {
+                        toast({
+                          title: "Bulk assign failed",
+                          description: err.message,
+                          variant: "destructive",
+                        });
+                      },
+                    },
+                  );
+                }}
+                data-testid={`button-bulk-${o}`}
+              >
+                Assign to {o.toUpperCase()}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedIds(new Set())}
+              data-testid="button-clear-selection"
+            >
+              Clear
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card>
@@ -244,6 +314,18 @@ export function MembersPage() {
               {members.map((member: any) => (
                 <div key={member.id} className="flex items-center justify-between px-4 py-3" data-testid={`member-row-${member.id}`}>
                   <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 cursor-pointer"
+                      checked={selectedIds.has(member.id)}
+                      onChange={(e) => {
+                        const next = new Set(selectedIds);
+                        if (e.target.checked) next.add(member.id);
+                        else next.delete(member.id);
+                        setSelectedIds(next);
+                      }}
+                      data-testid={`checkbox-member-${member.id}`}
+                    />
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
                       {member.fullName.charAt(0)}
                     </div>
@@ -254,6 +336,9 @@ export function MembersPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {memberStatusBadge(member.status)}
+                    <Badge variant="outline" className="text-xs uppercase" data-testid={`member-org-${member.id}`}>
+                      {member.organization || "faan"}
+                    </Badge>
                     <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
                     <div className="text-right hidden md:block">
                       <p className="text-xs text-muted-foreground">Savings</p>

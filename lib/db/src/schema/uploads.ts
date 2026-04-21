@@ -10,6 +10,9 @@ export const uploadRecordsTable = pgTable("upload_records", {
     .references(() => membersTable.id),
   month: text("month").notNull(),
   year: integer("year").notNull(),
+  organization: text("organization", { enum: ["faan", "nama"] })
+    .notNull()
+    .default("faan"),
   fileObjectPath: text("file_object_path").notNull(),
   rowsProcessed: integer("rows_processed").notNull().default(0),
   rowsSkipped: integer("rows_skipped").notNull().default(0),
