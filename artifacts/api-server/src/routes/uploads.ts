@@ -288,7 +288,33 @@ router.post(
       // failure rolls back all transaction inserts and balance/loan mutations.
       // Use SQL arithmetic (col = col + amt) for race-safe updates and
       // SELECT ... FOR UPDATE to lock member rows during the batch.
+      // A Postgres advisory lock keyed on (month, year) serializes any
+      // concurrent attempts for the same period so the duplicate check
+      // and insertion happen atomically.
+      const periodKey = `${parsed.data.month.toLowerCase()}-${parsed.data.year}`;
       const result = await db.transaction(async (tx) => {
+        // Acquire a transaction-scoped advisory lock for this period.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${periodKey}))`);
+
+        // Re-check duplicates inside the lock so two concurrent requests
+        // cannot both pass the guard.
+        const dupInTx = await tx
+          .select({ id: uploadRecordsTable.id })
+          .from(uploadRecordsTable)
+          .where(
+            and(
+              eq(uploadRecordsTable.month, parsed.data.month),
+              eq(uploadRecordsTable.year, parsed.data.year),
+              eq(uploadRecordsTable.status, "processed"),
+            ),
+          );
+        if (dupInTx.length > 0) {
+          return {
+            __duplicate: true as const,
+            existingUploadId: dupInTx[0].id,
+          };
+        }
+
         const [uploadRecord] = await tx
           .insert(uploadRecordsTable)
           .values({
@@ -422,6 +448,14 @@ router.post(
 
         return { uploadRecord, processed, skipped, errors, notifications };
       });
+
+      if ("__duplicate" in result && result.__duplicate) {
+        res.status(409).json({
+          error: `An upload for ${parsed.data.month} ${parsed.data.year} has already been processed (record #${result.existingUploadId}). Void it first if you need to re-run.`,
+          existingUploadId: result.existingUploadId,
+        });
+        return;
+      }
 
       const { uploadRecord, processed, skipped, errors, notifications } = result;
 

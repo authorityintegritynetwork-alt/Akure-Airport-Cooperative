@@ -103,8 +103,18 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
   }
 
   function handleDisburse() {
+    const expected = `DISBURSE-${loan.id}`;
+    const phrase = window.prompt(
+      `Disbursing ₦${loan.amount.toLocaleString()} to ${loan.memberName}.\n\nThis action moves money and cannot be undone.\nType the confirmation phrase below to authorize:\n\n${expected}`,
+      "",
+    );
+    if (phrase == null) return;
+    if (phrase.trim() !== expected) {
+      toast({ title: "Disbursement cancelled", description: "Confirmation phrase did not match.", variant: "destructive" });
+      return;
+    }
     disburseLoan.mutate(
-      { id: loan.id, data: {} },
+      { id: loan.id, data: { confirmationPhrase: expected } },
       {
         onSuccess: () => {
           toast({ title: "Loan disbursed" });

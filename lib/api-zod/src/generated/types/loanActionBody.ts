@@ -8,4 +8,6 @@
 
 export interface LoanActionBody {
   notes?: string;
+  /** For disburse — must equal "DISBURSE-{loanId}" */
+  confirmationPhrase?: string;
 }

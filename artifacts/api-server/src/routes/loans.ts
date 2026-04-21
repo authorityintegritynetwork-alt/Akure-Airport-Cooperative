@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, loansTable, membersTable, transactionsTable, systemSettingsTable, notificationsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireAuditor, requireSuperAdmin, requireTreasurer, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
@@ -167,41 +167,59 @@ router.post("/loans/:id/approve", requireAuth, async (req: AuthRequest, res): Pr
 
   const { loan } = result;
   const role = req.memberRole!;
-  let updateData: any = {};
+  const actorId = req.memberId!;
+
+  // Strict state machine: each stage requires a specific role and the prior stage must be complete.
+  // Separation of duties: the same actor cannot approve more than one stage of the same loan.
+  let updateData: Record<string, any>;
   let newStatus: string;
 
-  if (role === "admin" || role === "super_admin") {
-    if (loan.status !== "pending") {
-      res.status(400).json({ error: "Loan must be in pending status for admin approval" });
+  if (loan.status === "pending") {
+    if (role !== "admin" && role !== "super_admin") {
+      res.status(403).json({ error: "Only an Admin can perform the first approval" });
       return;
     }
     newStatus = "admin_approved";
-    updateData = { status: newStatus, adminApprovedAt: new Date(), adminApprovedBy: req.memberId };
-  } else if (role === "financial_auditor") {
-    if (loan.status !== "admin_approved") {
-      res.status(400).json({ error: "Loan must be admin-approved first" });
+    updateData = { status: newStatus, adminApprovedAt: new Date(), adminApprovedBy: actorId };
+  } else if (loan.status === "admin_approved") {
+    if (role !== "financial_auditor" && role !== "super_admin") {
+      res.status(403).json({ error: "Only the Financial Auditor can perform the second approval" });
+      return;
+    }
+    if (loan.adminApprovedBy === actorId) {
+      res.status(403).json({ error: "Separation of duties: you already approved a previous stage of this loan" });
       return;
     }
     newStatus = "auditor_approved";
-    updateData = { status: newStatus, auditorApprovedAt: new Date(), auditorApprovedBy: req.memberId };
-  } else if (role === "super_admin" && loan.status === "auditor_approved") {
+    updateData = { status: newStatus, auditorApprovedAt: new Date(), auditorApprovedBy: actorId };
+  } else if (loan.status === "auditor_approved") {
+    if (role !== "super_admin") {
+      res.status(403).json({ error: "Only a Super Admin can perform the final approval" });
+      return;
+    }
+    if (loan.adminApprovedBy === actorId || loan.auditorApprovedBy === actorId) {
+      res.status(403).json({ error: "Separation of duties: you already approved a previous stage of this loan" });
+      return;
+    }
     newStatus = "super_admin_approved";
-    updateData = { status: newStatus, superAdminApprovedAt: new Date(), superAdminApprovedBy: req.memberId };
+    updateData = { status: newStatus, superAdminApprovedAt: new Date(), superAdminApprovedBy: actorId };
   } else {
-    res.status(403).json({ error: "You cannot approve this loan at its current stage" });
+    res.status(400).json({ error: `Loan cannot be approved from current status: ${loan.status}` });
     return;
   }
 
-  if (role === "super_admin" && loan.status === "auditor_approved") {
-    newStatus = "super_admin_approved";
-    updateData = { status: newStatus, superAdminApprovedAt: new Date(), superAdminApprovedBy: req.memberId };
-  }
-
+  // Compare-and-set: include the expected prior status so concurrent approvals
+  // cannot both succeed against the same row.
   const [updated] = await db
     .update(loansTable)
     .set(updateData)
-    .where(eq(loansTable.id, id))
+    .where(and(eq(loansTable.id, id), eq(loansTable.status, loan.status)))
     .returning();
+
+  if (!updated) {
+    res.status(409).json({ error: "Loan status changed since you loaded it. Please refresh and try again." });
+    return;
+  }
 
   await logAudit({
     actorId: req.memberId,
@@ -240,6 +258,13 @@ router.post("/loans/:id/reject", requireAuth, async (req: AuthRequest, res): Pro
   const parsed = RejectLoanBody.safeParse(req.body);
   const notes = parsed.success ? parsed.data.notes : undefined;
 
+  // Reject is only valid from a non-terminal status. Compare-and-set protects against
+  // racing with an approve/disburse in flight.
+  if (["disbursed", "rejected"].includes(result.loan.status)) {
+    res.status(400).json({ error: `Loan in status "${result.loan.status}" cannot be rejected` });
+    return;
+  }
+
   const [updated] = await db
     .update(loansTable)
     .set({
@@ -248,8 +273,13 @@ router.post("/loans/:id/reject", requireAuth, async (req: AuthRequest, res): Pro
       rejectedBy: req.memberId,
       rejectionReason: notes ?? null,
     })
-    .where(eq(loansTable.id, id))
+    .where(and(eq(loansTable.id, id), eq(loansTable.status, result.loan.status)))
     .returning();
+
+  if (!updated) {
+    res.status(409).json({ error: "Loan status changed since you loaded it. Please refresh and try again." });
+    return;
+  }
 
   await logAudit({
     actorId: req.memberId,
@@ -284,22 +314,66 @@ router.post("/loans/:id/disburse", requireAuth, requireTreasurer, async (req: Au
     return;
   }
 
-  const [updated] = await db
-    .update(loansTable)
-    .set({ status: "disbursed", disbursedAt: new Date(), disbursedBy: req.memberId })
-    .where(eq(loansTable.id, id))
-    .returning();
+  // Step-up confirmation: treasurer must type the exact phrase to authorize money movement.
+  // This is an auditable, deliberate friction step in addition to role/auth checks.
+  const expectedPhrase = `DISBURSE-${id}`;
+  const provided = (req.body?.confirmationPhrase ?? "").toString().trim();
+  if (provided !== expectedPhrase) {
+    res.status(403).json({
+      error: `Disbursement requires confirmation. Type "${expectedPhrase}" in the confirmationPhrase field to authorize.`,
+    });
+    return;
+  }
 
-  await db
-    .update(membersTable)
-    .set({
-      totalLoanBalance: db
-        .select({ val: membersTable.totalLoanBalance })
-        .from(membersTable)
-        .where(eq(membersTable.id, result.loan.memberId))
-        .then(() => (parseFloat(result.loan.outstandingBalance)).toString()) as any,
-    })
-    .where(eq(membersTable.id, result.loan.memberId));
+  // Separation of duties: the disbursing treasurer must not have approved any prior stage of this loan.
+  const actorId = req.memberId!;
+  if (
+    result.loan.adminApprovedBy === actorId ||
+    result.loan.auditorApprovedBy === actorId ||
+    result.loan.superAdminApprovedBy === actorId
+  ) {
+    res.status(403).json({ error: "Separation of duties: you cannot disburse a loan you previously approved" });
+    return;
+  }
+
+  // Run inside a transaction with row lock and compare-and-set to fully prevent
+  // double-disbursement under concurrent requests.
+  const txResult = await db.transaction(async (tx) => {
+    // Lock the loan row for the duration of the transaction.
+    const locked = await tx.execute(
+      sql`SELECT id, status, outstanding_balance FROM loans WHERE id = ${id} FOR UPDATE`,
+    );
+    const lockedRow = (locked as any).rows?.[0];
+    if (!lockedRow) return { ok: false as const, code: 404, error: "Loan not found" };
+    if (lockedRow.status !== "super_admin_approved") {
+      return { ok: false as const, code: 409, error: `Loan is in status "${lockedRow.status}" and cannot be disbursed` };
+    }
+
+    const outstanding = parseFloat(lockedRow.outstanding_balance);
+
+    const [u] = await tx
+      .update(loansTable)
+      .set({ status: "disbursed", disbursedAt: new Date(), disbursedBy: actorId })
+      .where(and(eq(loansTable.id, id), eq(loansTable.status, "super_admin_approved")))
+      .returning();
+
+    if (!u) return { ok: false as const, code: 409, error: "Loan was modified concurrently. Please refresh." };
+
+    await tx
+      .update(membersTable)
+      .set({
+        totalLoanBalance: sql`${membersTable.totalLoanBalance} + ${outstanding}`,
+      })
+      .where(eq(membersTable.id, result.loan.memberId));
+
+    return { ok: true as const, loan: u };
+  });
+
+  if (!txResult.ok) {
+    res.status(txResult.code).json({ error: txResult.error });
+    return;
+  }
+  const updated = txResult.loan;
 
   await logAudit({
     actorId: req.memberId,

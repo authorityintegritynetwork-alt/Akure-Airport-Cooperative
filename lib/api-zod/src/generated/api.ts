@@ -652,6 +652,10 @@ export const ApproveLoanParams = zod.object({
 
 export const ApproveLoanBody = zod.object({
   notes: zod.string().optional(),
+  confirmationPhrase: zod
+    .string()
+    .optional()
+    .describe('For disburse — must equal \"DISBURSE-{loanId}\"'),
 });
 
 export const ApproveLoanResponse = zod.object({
@@ -698,6 +702,10 @@ export const RejectLoanParams = zod.object({
 
 export const RejectLoanBody = zod.object({
   notes: zod.string().optional(),
+  confirmationPhrase: zod
+    .string()
+    .optional()
+    .describe('For disburse — must equal \"DISBURSE-{loanId}\"'),
 });
 
 export const RejectLoanResponse = zod.object({
@@ -744,6 +752,10 @@ export const DisburseLoanParams = zod.object({
 
 export const DisburseLoanBody = zod.object({
   notes: zod.string().optional(),
+  confirmationPhrase: zod
+    .string()
+    .optional()
+    .describe('For disburse — must equal \"DISBURSE-{loanId}\"'),
 });
 
 export const DisburseLoanResponse = zod.object({

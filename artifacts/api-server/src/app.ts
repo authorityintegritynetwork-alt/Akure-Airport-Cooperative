@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import rateLimit from "express-rate-limit";
 import { clerkMiddleware } from "@clerk/express";
 import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
@@ -36,9 +37,42 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(cors({ credentials: true, origin: true }));
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 app.use(clerkMiddleware());
+
+app.set("trust proxy", 1);
+
+const globalLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 200,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 5 * 60_000,
+  limit: 15,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many upload requests, please wait a few minutes." },
+});
+
+const writeLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many write requests, please slow down." },
+});
+
+app.use("/api", globalLimiter);
+app.use("/api/uploads", uploadLimiter);
+app.use("/api/loans", (req, res, next) => {
+  if (req.method === "GET") return next();
+  return writeLimiter(req, res, next);
+});
 
 app.use("/api", router);
 

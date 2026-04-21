@@ -1534,6 +1534,9 @@ components:
       properties:
         notes:
           type: string
+        confirmationPhrase:
+          type: string
+          description: For disburse — must equal "DISBURSE-{loanId}"
 
     LoanCalculateBody:
       type: object

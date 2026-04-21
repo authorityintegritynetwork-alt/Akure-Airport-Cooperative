@@ -382,6 +382,8 @@ export interface CreateLoanBody {
 
 export interface LoanActionBody {
   notes?: string;
+  /** For disburse — must equal "DISBURSE-{loanId}" */
+  confirmationPhrase?: string;
 }
 
 export interface LoanCalculateBody {
