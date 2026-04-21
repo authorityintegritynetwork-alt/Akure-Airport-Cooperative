@@ -62,7 +62,7 @@ export function LandingPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-primary" />
-                10% flat-rate loans
+                Member-approved loans
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-primary" />
@@ -92,9 +92,9 @@ export function LandingPage() {
                 <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/15 transition-colors">
                   <ShieldCheck className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="font-semibold text-lg mb-2 tracking-tight">Fair-Rate Loans</h3>
+                <h3 className="font-semibold text-lg mb-2 tracking-tight">Transparent Loans</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Apply in minutes. Multi-stage approval ensures fairness, while flat 10% interest keeps it simple and honest.
+                  Apply in minutes and track every step. A multi-stage approval workflow keeps the process fair, accountable, and member-focused.
                 </p>
               </CardContent>
             </Card>
