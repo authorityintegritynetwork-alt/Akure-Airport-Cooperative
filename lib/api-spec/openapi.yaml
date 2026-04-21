@@ -854,9 +854,32 @@ paths:
           schema:
             type: string
         - in: query
+          name: entity
+          schema:
+            type: string
+        - in: query
           name: actorId
           schema:
             type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: dateFrom
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: dateTo
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [json, csv]
         - in: query
           name: limit
           schema:

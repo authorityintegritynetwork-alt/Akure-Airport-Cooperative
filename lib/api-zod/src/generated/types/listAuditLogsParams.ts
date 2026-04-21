@@ -5,10 +5,16 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListAuditLogsFormat } from "./listAuditLogsFormat";
 
 export type ListAuditLogsParams = {
   action?: string;
+  entity?: string;
   actorId?: number;
+  search?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  format?: ListAuditLogsFormat;
   limit?: number;
   offset?: number;
 };

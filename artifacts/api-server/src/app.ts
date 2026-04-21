@@ -67,9 +67,22 @@ const writeLimiter = rateLimit({
   message: { error: "Too many write requests, please slow down." },
 });
 
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many registration attempts. Please try again later." },
+});
+
 app.use("/api", globalLimiter);
 app.use("/api/uploads", uploadLimiter);
+app.use("/api/auth/register", registerLimiter);
 app.use("/api/loans", (req, res, next) => {
+  if (req.method === "GET") return next();
+  return writeLimiter(req, res, next);
+});
+app.use("/api/members", (req, res, next) => {
   if (req.method === "GET") return next();
   return writeLimiter(req, res, next);
 });

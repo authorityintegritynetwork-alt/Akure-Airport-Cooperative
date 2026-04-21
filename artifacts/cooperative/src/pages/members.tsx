@@ -416,15 +416,35 @@ export function MembersPage() {
           {isLoading ? (
             <div className="p-4 space-y-3">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
           ) : !members || members.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No members found.</div>
+            <div className="text-center py-16 text-muted-foreground">
+              <PlusCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">
+                {search || statusFilter || orgFilter ? "No members match your filters" : "No members yet"}
+              </p>
+              <p className="text-sm mt-1 mb-4">
+                {search || statusFilter || orgFilter
+                  ? "Try adjusting or clearing your filters."
+                  : "Add your first member to get started."}
+              </p>
+              {!(search || statusFilter || orgFilter) && (
+                <Button onClick={() => setDialogOpen(true)} data-testid="button-empty-add-member">
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Add Member
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="divide-y">
               {members.map((member: any) => (
-                <div key={member.id} className="flex items-center justify-between px-4 py-3" data-testid={`member-row-${member.id}`}>
-                  <div className="flex items-center gap-3">
+                <div
+                  key={member.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3"
+                  data-testid={`member-row-${member.id}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 cursor-pointer"
+                      className="w-4 h-4 cursor-pointer shrink-0"
                       checked={selectedIds.has(member.id)}
                       onChange={(e) => {
                         const next = new Set(selectedIds);
@@ -434,21 +454,30 @@ export function MembersPage() {
                       }}
                       data-testid={`checkbox-member-${member.id}`}
                     />
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
                       {member.fullName.charAt(0)}
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{member.fullName}</p>
-                      <p className="text-xs text-muted-foreground">{member.email}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{member.fullName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                      <div className="flex flex-wrap gap-1 mt-1 sm:hidden">
+                        {memberStatusBadge(member.status)}
+                        <Badge variant="outline" className="text-xs uppercase">
+                          {member.organization || "faan"}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {memberStatusBadge(member.status)}
-                    <Badge variant="outline" className="text-xs uppercase" data-testid={`member-org-${member.id}`}>
-                      {member.organization || "faan"}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
-                    <div className="text-right hidden md:block">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+                    <div className="hidden sm:flex items-center gap-2">
+                      {memberStatusBadge(member.status)}
+                      <Badge variant="outline" className="text-xs uppercase" data-testid={`member-org-${member.id}`}>
+                        {member.organization || "faan"}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
+                    </div>
+                    <div className="text-right hidden lg:block">
                       <p className="text-xs text-muted-foreground">Savings</p>
                       <p className="text-sm font-medium">{formatCurrency(member.savingsBalance)}</p>
                     </div>

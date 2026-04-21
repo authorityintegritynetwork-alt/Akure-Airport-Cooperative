@@ -1082,7 +1082,12 @@ export const listAuditLogsQueryOffsetDefault = 0;
 
 export const ListAuditLogsQueryParams = zod.object({
   action: zod.coerce.string().optional(),
+  entity: zod.coerce.string().optional(),
   actorId: zod.coerce.number().optional(),
+  search: zod.coerce.string().optional(),
+  dateFrom: zod.date().optional(),
+  dateTo: zod.date().optional(),
+  format: zod.enum(["json", "csv"]).optional(),
   limit: zod.coerce.number().default(listAuditLogsQueryLimitDefault),
   offset: zod.coerce.number().default(listAuditLogsQueryOffsetDefault),
 });

@@ -779,10 +779,23 @@ export type ListNotificationsParams = {
 
 export type ListAuditLogsParams = {
   action?: string;
+  entity?: string;
   actorId?: number;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  format?: ListAuditLogsFormat;
   limit?: number;
   offset?: number;
 };
+
+export type ListAuditLogsFormat =
+  (typeof ListAuditLogsFormat)[keyof typeof ListAuditLogsFormat];
+
+export const ListAuditLogsFormat = {
+  json: "json",
+  csv: "csv",
+} as const;
 
 export type GetRecentActivityParams = {
   limit?: number;

@@ -18,13 +18,26 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, ShieldAlert } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
+import { useTheme } from "@/lib/theme";
+import { useUser } from "@clerk/react";
+import { useState } from "react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: profile } = useGetProfile();
-  const { signOut } = useClerk();
+  const { signOut, openUserProfile } = useClerk();
+  const { user } = useUser();
   const [location] = useLocation();
+  const { theme, toggleTheme } = useTheme();
+  const [twoFaDismissed, setTwoFaDismissed] = useState(
+    () => typeof window !== "undefined" && window.sessionStorage.getItem("aacs-2fa-dismissed") === "1",
+  );
+
+  function dismissTwoFa() {
+    window.sessionStorage.setItem("aacs-2fa-dismissed", "1");
+    setTwoFaDismissed(true);
+  }
 
   const { data: notifications } = useListNotifications({ unread: true }, {
     query: {
@@ -126,7 +139,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <Badge variant="secondary" className="text-xs w-fit">{profile.role}</Badge>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => signOut()}>Sign Out</Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={toggleTheme}
+                  data-testid="button-toggle-theme"
+                  title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => signOut()}>
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </SidebarFooter>
         </Sidebar>
@@ -148,6 +175,36 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">
+            {isAdmin && !twoFaDismissed && user && !user.twoFactorEnabled && (
+              <div
+                className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 p-3"
+                data-testid="banner-2fa-reminder"
+              >
+                <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div className="flex-1 text-sm">
+                  <p className="font-medium text-amber-900 dark:text-amber-200">
+                    Protect your admin account with two-factor authentication
+                  </p>
+                  <p className="text-amber-800 dark:text-amber-300/80 mt-0.5">
+                    Your role can move money and change member data. Enable 2FA from your account
+                    security settings — it takes under a minute.
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openUserProfile?.()}
+                    data-testid="button-open-2fa-settings"
+                  >
+                    Enable 2FA
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={dismissTwoFa} data-testid="button-dismiss-2fa">
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            )}
             {children}
           </main>
         </div>

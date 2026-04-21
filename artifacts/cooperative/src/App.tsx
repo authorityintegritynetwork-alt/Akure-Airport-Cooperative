@@ -6,6 +6,7 @@ import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/lib/theme";
 
 import { LandingPage, PendingApproval } from "./pages/landing";
 import { AppLayout } from "./components/layout";
@@ -263,10 +264,12 @@ function ClerkProviderWithRoutes() {
 function App() {
   return (
     <WouterRouter base={basePath}>
-      <TooltipProvider>
-        <ClerkProviderWithRoutes />
-        <Toaster />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <ClerkProviderWithRoutes />
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
     </WouterRouter>
   );
 }
