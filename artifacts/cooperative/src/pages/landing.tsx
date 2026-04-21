@@ -32,8 +32,8 @@ export function LandingPage() {
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-foreground mb-6 leading-[1.05]">
-              Modern banking for<br />
-              <span className="text-primary">a stronger community.</span>
+              One society. One purpose.<br />
+              <span className="text-primary">Shared prosperity.</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed">
               Secure savings, transparent loans, and cooperative commerce — all in one platform built exclusively for the Akure Airport Staff Cooperative Society.
