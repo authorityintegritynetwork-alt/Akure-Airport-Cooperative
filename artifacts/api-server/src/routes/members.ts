@@ -8,6 +8,7 @@ import {
   AuthRequest,
 } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
+import { createClerkInvitation } from "../lib/clerk";
 import {
   ListMembersQueryParams,
   GetMemberParams,
@@ -89,7 +90,14 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
     details: `Created member: ${member.fullName}`,
   });
 
-  res.status(201).json(formatMember(member));
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  const invite = await createClerkInvitation({
+    emailAddress: member.email,
+    redirectUrl: `${appUrl}/sign-up`,
+    publicMetadata: { memberId: member.id, fullName: member.fullName },
+  });
+
+  res.status(201).json({ ...formatMember(member), invitationSent: invite.ok });
 });
 
 router.get("/members/:id", requireAuth, async (req: AuthRequest, res): Promise<void> => {
