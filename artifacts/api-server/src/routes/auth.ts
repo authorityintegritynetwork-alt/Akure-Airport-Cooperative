@@ -59,6 +59,9 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
   const clerkUser = auth as any;
   const email = clerkUser?.sessionClaims?.email || "";
 
+  const memberCount = await db.select().from(membersTable);
+  const isFirstUser = memberCount.length === 0;
+
   const [member] = await db
     .insert(membersTable)
     .values({
@@ -67,8 +70,8 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
       email,
       phone: parsed.data.phone ?? undefined,
       staffId: parsed.data.staffId ?? undefined,
-      role: "member",
-      status: "pending",
+      role: isFirstUser ? "super_admin" : "member",
+      status: isFirstUser ? "active" : "pending",
     })
     .returning();
 
