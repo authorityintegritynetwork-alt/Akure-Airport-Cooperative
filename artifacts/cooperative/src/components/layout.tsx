@@ -59,8 +59,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2">
               <img src={logoUrl} alt="AASCMS" className="w-9 h-9 object-contain" />
 
-              <span className="font-semibold text-sm leading-tight tracking-tight">
-                AAS Cooperative
+              <span className="font-semibold text-xs leading-tight tracking-tight">
+                Akure Airport Staff Corporative Multipurpose Society Limited
               </span>
             </div>
           </SidebarHeader>

@@ -10,7 +10,9 @@ export function LandingPage() {
       <header className="px-6 lg:px-12 py-5 flex items-center justify-between border-b border-border/60 backdrop-blur-sm sticky top-0 bg-background/80 z-10">
         <div className="flex items-center gap-2.5">
           <img src={logoUrl} alt="AASCMS Logo" className="w-10 h-10 object-contain" />
-          <span className="font-semibold text-lg tracking-tight text-foreground">AAS Cooperative</span>
+          <span className="font-semibold text-sm md:text-base tracking-tight text-foreground leading-tight max-w-[14rem] md:max-w-none">
+            Akure Airport Staff Corporative Multipurpose Society Limited
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <SignInButton mode="modal">
