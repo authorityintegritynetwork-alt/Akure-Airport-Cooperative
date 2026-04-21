@@ -50,6 +50,7 @@ export interface Member {
   furnitureDebt: number;
   commodityDebt: number;
   ghlFormDebt: number;
+  fireFundBalance: number;
   totalStoreDebt: number;
   createdAt: string;
   updatedAt: string;
@@ -97,6 +98,7 @@ export interface MemberProfile {
   furnitureDebt: number;
   commodityDebt: number;
   ghlFormDebt: number;
+  fireFundBalance: number;
   totalStoreDebt: number;
   createdAt: string;
 }
@@ -263,6 +265,7 @@ export interface ExcelRowPreview {
   furniture: number;
   commodity: number;
   ghlForm: number;
+  fire: number;
   total: number;
   computedTotal: number;
   totalMismatch: boolean;

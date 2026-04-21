@@ -38,7 +38,8 @@ interface CategoryConfig {
     | "s_electronics_repayment"
     | "furniture_repayment"
     | "commodity_repayment"
-    | "ghl_form_repayment";
+    | "ghl_form_repayment"
+    | "fire";
   balanceField: keyof typeof membersTable.$inferSelect;
   direction: "credit" | "debit";
   label: string;
@@ -107,6 +108,12 @@ const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
     balanceField: "ghlFormDebt",
     direction: "debit",
     label: "GHL Form Repayment",
+  },
+  fire: {
+    txType: "fire",
+    balanceField: "fireFundBalance",
+    direction: "credit",
+    label: "Fire Fund Contribution",
   },
 };
 
@@ -214,6 +221,7 @@ router.post(
           furniture: row.amounts.furniture,
           commodity: row.amounts.commodity,
           ghlForm: row.amounts.ghlForm,
+          fire: row.amounts.fire,
           total: row.total,
           computedTotal: row.computedTotal,
           totalMismatch: row.totalMismatch,

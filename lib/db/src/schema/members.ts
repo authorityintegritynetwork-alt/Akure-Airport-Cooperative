@@ -50,6 +50,9 @@ export const membersTable = pgTable("members", {
   ghlFormDebt: numeric("ghl_form_debt", { precision: 15, scale: 2 })
     .notNull()
     .default("0"),
+  fireFundBalance: numeric("fire_fund_balance", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
   totalStoreDebt: numeric("total_store_debt", { precision: 15, scale: 2 })
     .notNull()
     .default("0"),

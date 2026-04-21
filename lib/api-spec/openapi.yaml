@@ -991,6 +991,8 @@ components:
           type: number
         ghlFormDebt:
           type: number
+        fireFundBalance:
+          type: number
         totalStoreDebt:
           type: number
         createdAt:
@@ -1016,6 +1018,7 @@ components:
         - furnitureDebt
         - commodityDebt
         - ghlFormDebt
+        - fireFundBalance
         - totalStoreDebt
         - createdAt
         - updatedAt
@@ -1063,6 +1066,8 @@ components:
           type: number
         ghlFormDebt:
           type: number
+        fireFundBalance:
+          type: number
         totalStoreDebt:
           type: number
         createdAt:
@@ -1086,6 +1091,7 @@ components:
         - furnitureDebt
         - commodityDebt
         - ghlFormDebt
+        - fireFundBalance
         - totalStoreDebt
         - createdAt
 
@@ -1302,6 +1308,8 @@ components:
           type: number
         ghlForm:
           type: number
+        fire:
+          type: number
         total:
           type: number
         computedTotal:
@@ -1330,6 +1338,7 @@ components:
         - furniture
         - commodity
         - ghlForm
+        - fire
         - total
         - computedTotal
         - totalMismatch

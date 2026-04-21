@@ -42,6 +42,7 @@ const CATEGORY_COLUMNS = [
   { key: "furniture", label: "Furniture" },
   { key: "commodity", label: "Commodity" },
   { key: "ghlForm", label: "GHL Form" },
+  { key: "fire", label: "Fire" },
 ] as const;
 
 type Stage = "select" | "pickSheet" | "preview";

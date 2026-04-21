@@ -10,6 +10,7 @@ type MemberRow = {
   furnitureDebt: string;
   commodityDebt: string;
   ghlFormDebt: string;
+  fireFundBalance: string;
   totalStoreDebt: string;
   [k: string]: any;
 };
@@ -28,6 +29,7 @@ export function formatMember<T extends MemberRow>(m: T) {
     furnitureDebt: parseFloat(m.furnitureDebt),
     commodityDebt: parseFloat(m.commodityDebt),
     ghlFormDebt: parseFloat(m.ghlFormDebt),
+    fireFundBalance: parseFloat(m.fireFundBalance),
     totalStoreDebt: parseFloat(m.totalStoreDebt),
   };
 }

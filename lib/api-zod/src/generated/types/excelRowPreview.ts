@@ -25,6 +25,7 @@ export interface ExcelRowPreview {
   furniture: number;
   commodity: number;
   ghlForm: number;
+  fire: number;
   total: number;
   computedTotal: number;
   totalMismatch: boolean;

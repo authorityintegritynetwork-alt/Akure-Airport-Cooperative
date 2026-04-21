@@ -36,6 +36,7 @@ const BALANCE_CARDS = [
   { key: "furnitureDebt", label: "Furniture", direction: "debit" },
   { key: "commodityDebt", label: "Commodity", direction: "debit" },
   { key: "ghlFormDebt", label: "GHL Form", direction: "debit" },
+  { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
 ] as const;
 
 function AdminDashboard() {

@@ -11,7 +11,8 @@ export type DeductionCategory =
   | "sElectronics"
   | "furniture"
   | "commodity"
-  | "ghlForm";
+  | "ghlForm"
+  | "fire";
 
 export const ALL_CATEGORIES: DeductionCategory[] = [
   "savings",
@@ -24,14 +25,30 @@ export const ALL_CATEGORIES: DeductionCategory[] = [
   "furniture",
   "commodity",
   "ghlForm",
+  "fire",
 ];
 
 const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
   savings: ["savings", "saving"],
   provident: ["prov", "provident"],
   christmas: ["xmass", "xmas", "christmas"],
-  realLoan: ["real loan", "real-loan", "realloan", "loan"],
-  emergencyLoan: ["emer loan", "emergency loan", "emergency", "emer"],
+  realLoan: [
+    "real loan",
+    "real-loan",
+    "realloan",
+    "loan",
+    "r/loan",
+    "r /loan",
+    "r loan",
+    "r.loan",
+  ],
+  emergencyLoan: [
+    "emer loan",
+    "emergency loan",
+    "emergency",
+    "emer",
+    "emer.",
+  ],
   electronics: ["elect", "electronics", "electric", "electricity"],
   sElectronics: [
     "s/elect",
@@ -42,6 +59,10 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
     "s electronics",
     "s.electronics",
     "small elect",
+    "s/e/land",
+    "s e land",
+    "se/land",
+    "s/eland",
   ],
   furniture: ["f/vent", "f vent", "fvent", "furniture", "furn"],
   commodity: ["comm", "commodity", "commodities"],
@@ -53,7 +74,11 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
     "ghl",
     "g/h&l",
     "g h l",
+    "g/h&l/f",
+    "g h l f",
+    "g/hl/f",
   ],
+  fire: ["fire", "fire fund", "fire contribution", "fire/fund"],
 };
 
 const NAME_HEADERS = ["name", "names", "member name", "full name"];

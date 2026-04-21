@@ -31,6 +31,7 @@ export interface Member {
   furnitureDebt: number;
   commodityDebt: number;
   ghlFormDebt: number;
+  fireFundBalance: number;
   totalStoreDebt: number;
   createdAt: Date;
   updatedAt: Date;
