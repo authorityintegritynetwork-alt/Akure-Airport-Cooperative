@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { AuthRequest } from "../middlewares/auth";
 import { RegisterMemberBody } from "@workspace/api-zod";
 import { getClerkUser } from "../lib/clerk";
+import { formatMember } from "../lib/formatMember";
 
 const router: IRouter = Router();
 
@@ -26,12 +27,7 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
-  res.json({
-    ...member,
-    savingsBalance: parseFloat(member.savingsBalance),
-    totalLoanBalance: parseFloat(member.totalLoanBalance),
-    totalStoreDebt: parseFloat(member.totalStoreDebt),
-  });
+  res.json(formatMember(member));
 });
 
 router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
@@ -99,12 +95,7 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
       .returning();
   }
 
-  res.status(201).json({
-    ...member,
-    savingsBalance: parseFloat(member.savingsBalance),
-    totalLoanBalance: parseFloat(member.totalLoanBalance),
-    totalStoreDebt: parseFloat(member.totalStoreDebt),
-  });
+  res.status(201).json(formatMember(member));
 });
 
 export default router;

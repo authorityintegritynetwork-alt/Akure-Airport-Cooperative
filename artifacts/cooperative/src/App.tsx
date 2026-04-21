@@ -130,7 +130,7 @@ function ClerkQueryClientCacheInvalidator() {
 
 function SignedInRouter({ children }: { children: React.ReactNode }) {
   const { data: profile, isLoading, error } = useGetProfile({
-    query: { retry: false, staleTime: 0 },
+    query: { retry: false, staleTime: 0, queryKey: ["getProfile"] },
   });
   const [location] = useLocation();
 

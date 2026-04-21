@@ -40,7 +40,16 @@ export interface Member {
   role: MemberRole;
   status: MemberStatus;
   savingsBalance: number;
+  providentBalance: number;
+  christmasBalance: number;
+  realLoanBalance: number;
+  emergencyLoanBalance: number;
   totalLoanBalance: number;
+  electronicsDebt: number;
+  sElectronicsDebt: number;
+  furnitureDebt: number;
+  commodityDebt: number;
+  ghlFormDebt: number;
   totalStoreDebt: number;
   createdAt: string;
   updatedAt: string;
@@ -78,7 +87,16 @@ export interface MemberProfile {
   role: MemberProfileRole;
   status: MemberProfileStatus;
   savingsBalance: number;
+  providentBalance: number;
+  christmasBalance: number;
+  realLoanBalance: number;
+  emergencyLoanBalance: number;
   totalLoanBalance: number;
+  electronicsDebt: number;
+  sElectronicsDebt: number;
+  furnitureDebt: number;
+  commodityDebt: number;
+  ghlFormDebt: number;
   totalStoreDebt: number;
   createdAt: string;
 }
@@ -190,11 +208,42 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface ExcelSheetsBody {
+  fileObjectPath: string;
+}
+
+export interface ExcelSheetInfo {
+  name: string;
+  rowCount: number;
+  looksValid: boolean;
+}
+
+export interface ExcelSheetsResult {
+  sheets: ExcelSheetInfo[];
+}
+
+export interface ManualMatch {
+  rowNumber: number;
+  memberId: number;
+}
+
 export interface ExcelUploadPreviewBody {
   fileObjectPath: string;
+  sheetName?: string;
   month: string;
   year: number;
+  manualMatches?: ManualMatch[];
 }
+
+export type ExcelRowPreviewMatchConfidence =
+  (typeof ExcelRowPreviewMatchConfidence)[keyof typeof ExcelRowPreviewMatchConfidence];
+
+export const ExcelRowPreviewMatchConfidence = {
+  exact: "exact",
+  fuzzy: "fuzzy",
+  manual: "manual",
+  none: "none",
+} as const;
 
 export interface ExcelRowPreview {
   rowNumber: number;
@@ -203,34 +252,43 @@ export interface ExcelRowPreview {
   matchedMemberId?: number | null;
   /** @nullable */
   matchedMemberName?: string | null;
+  matchConfidence: ExcelRowPreviewMatchConfidence;
   savings: number;
+  provident: number;
+  christmas: number;
   realLoan: number;
-  provisionalLoan: number;
-  electricity: number;
-  furnitureVentilation: number;
   emergencyLoan: number;
+  electronics: number;
+  sElectronics: number;
+  furniture: number;
   commodity: number;
-  land: number;
-  otherDeductions: number;
+  ghlForm: number;
   total: number;
+  computedTotal: number;
+  totalMismatch: boolean;
   errors: string[];
-  hasErrors: boolean;
+  warnings: string[];
 }
 
 export interface ExcelUploadPreview {
+  sheetName: string;
   month: string;
   year: number;
   totalRows: number;
-  validRows: number;
+  matchedRows: number;
+  unmatchedRows: number;
   errorRows: number;
+  duplicateMonth: boolean;
   rows: ExcelRowPreview[];
 }
 
 export interface ExcelUploadProcessBody {
   fileObjectPath: string;
+  sheetName?: string;
   month: string;
   year: number;
   skipErrors?: boolean;
+  manualMatches?: ManualMatch[];
 }
 
 export interface ExcelUploadResult {

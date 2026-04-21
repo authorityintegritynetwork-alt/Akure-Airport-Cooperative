@@ -20,7 +20,16 @@ export interface MemberProfile {
   role: MemberProfileRole;
   status: MemberProfileStatus;
   savingsBalance: number;
+  providentBalance: number;
+  christmasBalance: number;
+  realLoanBalance: number;
+  emergencyLoanBalance: number;
   totalLoanBalance: number;
+  electronicsDebt: number;
+  sElectronicsDebt: number;
+  furnitureDebt: number;
+  commodityDebt: number;
+  ghlFormDebt: number;
   totalStoreDebt: number;
   createdAt: Date;
 }

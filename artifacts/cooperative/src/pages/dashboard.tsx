@@ -20,10 +20,23 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
-      {isAdmin ? <AdminDashboard /> : <MemberDashboard />}
+      {isAdmin ? <AdminDashboard /> : <MemberDashboard profile={profile} />}
     </div>
   );
 }
+
+const BALANCE_CARDS = [
+  { key: "savingsBalance", label: "Savings", direction: "credit" },
+  { key: "providentBalance", label: "Provident", direction: "credit" },
+  { key: "christmasBalance", label: "Christmas", direction: "credit" },
+  { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
+  { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
+  { key: "electronicsDebt", label: "Electronics", direction: "debit" },
+  { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit" },
+  { key: "furnitureDebt", label: "Furniture", direction: "debit" },
+  { key: "commodityDebt", label: "Commodity", direction: "debit" },
+  { key: "ghlFormDebt", label: "GHL Form", direction: "debit" },
+] as const;
 
 function AdminDashboard() {
   const { data: summary, isLoading } = useGetAdminDashboardSummary();
@@ -100,7 +113,7 @@ function AdminDashboard() {
   );
 }
 
-function MemberDashboard() {
+function MemberDashboard({ profile }: { profile: any }) {
   const { data: summary, isLoading } = useGetMemberDashboardSummary();
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
@@ -111,11 +124,12 @@ function MemberDashboard() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Savings Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Savings</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">{formatCurrency(summary.savingsBalance)}</div>
+            <p className="text-xs text-muted-foreground">Savings + Provident + Christmas</p>
           </CardContent>
         </Card>
         <Card>
@@ -138,6 +152,41 @@ function MemberDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Balance Breakdown</CardTitle>
+          <p className="text-sm text-muted-foreground">All individual savings and outstanding deductions.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {BALANCE_CARDS.map((b) => {
+              const value = Number(profile[b.key] ?? 0);
+              return (
+                <div
+                  key={b.key}
+                  className="border rounded-md p-3 flex flex-col gap-1"
+                  data-testid={`balance-${b.key}`}
+                >
+                  <span className="text-xs text-muted-foreground font-medium">{b.label}</span>
+                  <span
+                    className={
+                      "text-lg font-semibold tabular-nums " +
+                      (value === 0
+                        ? "text-muted-foreground"
+                        : b.direction === "credit"
+                        ? "text-primary"
+                        : "text-destructive")
+                    }
+                  >
+                    {formatCurrency(value)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

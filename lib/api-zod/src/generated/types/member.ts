@@ -21,7 +21,16 @@ export interface Member {
   role: MemberRole;
   status: MemberStatus;
   savingsBalance: number;
+  providentBalance: number;
+  christmasBalance: number;
+  realLoanBalance: number;
+  emergencyLoanBalance: number;
   totalLoanBalance: number;
+  electronicsDebt: number;
+  sElectronicsDebt: number;
+  furnitureDebt: number;
+  commodityDebt: number;
+  ghlFormDebt: number;
   totalStoreDebt: number;
   createdAt: Date;
   updatedAt: Date;

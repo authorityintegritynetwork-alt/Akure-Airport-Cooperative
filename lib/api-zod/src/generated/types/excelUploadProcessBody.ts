@@ -5,10 +5,13 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
+import type { ManualMatch } from "./manualMatch";
 
 export interface ExcelUploadProcessBody {
   fileObjectPath: string;
+  sheetName?: string;
   month: string;
   year: number;
   skipErrors?: boolean;
+  manualMatches?: ManualMatch[];
 }

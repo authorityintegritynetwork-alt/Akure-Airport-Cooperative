@@ -5,6 +5,7 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExcelRowPreviewMatchConfidence } from "./excelRowPreviewMatchConfidence";
 
 export interface ExcelRowPreview {
   rowNumber: number;
@@ -13,16 +14,20 @@ export interface ExcelRowPreview {
   matchedMemberId?: number | null;
   /** @nullable */
   matchedMemberName?: string | null;
+  matchConfidence: ExcelRowPreviewMatchConfidence;
   savings: number;
+  provident: number;
+  christmas: number;
   realLoan: number;
-  provisionalLoan: number;
-  electricity: number;
-  furnitureVentilation: number;
   emergencyLoan: number;
+  electronics: number;
+  sElectronics: number;
+  furniture: number;
   commodity: number;
-  land: number;
-  otherDeductions: number;
+  ghlForm: number;
   total: number;
+  computedTotal: number;
+  totalMismatch: boolean;
   errors: string[];
-  hasErrors: boolean;
+  warnings: string[];
 }

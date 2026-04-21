@@ -24,6 +24,8 @@ import type {
   CreateMemberBody,
   CreateStoreItemBody,
   CreateStorePurchaseBody,
+  ExcelSheetsBody,
+  ExcelSheetsResult,
   ExcelUploadPreview,
   ExcelUploadPreviewBody,
   ExcelUploadProcessBody,
@@ -1271,6 +1273,92 @@ export function useListMyTransactions<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List sheet names in an uploaded Excel file (Admin)
+ */
+export const getListExcelSheetsUrl = () => {
+  return `/api/uploads/excel/sheets`;
+};
+
+export const listExcelSheets = async (
+  excelSheetsBody: ExcelSheetsBody,
+  options?: RequestInit,
+): Promise<ExcelSheetsResult> => {
+  return customFetch<ExcelSheetsResult>(getListExcelSheetsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(excelSheetsBody),
+  });
+};
+
+export const getListExcelSheetsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof listExcelSheets>>,
+    TError,
+    { data: BodyType<ExcelSheetsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof listExcelSheets>>,
+  TError,
+  { data: BodyType<ExcelSheetsBody> },
+  TContext
+> => {
+  const mutationKey = ["listExcelSheets"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof listExcelSheets>>,
+    { data: BodyType<ExcelSheetsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return listExcelSheets(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ListExcelSheetsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof listExcelSheets>>
+>;
+export type ListExcelSheetsMutationBody = BodyType<ExcelSheetsBody>;
+export type ListExcelSheetsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary List sheet names in an uploaded Excel file (Admin)
+ */
+export const useListExcelSheets = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof listExcelSheets>>,
+    TError,
+    { data: BodyType<ExcelSheetsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof listExcelSheets>>,
+  TError,
+  { data: BodyType<ExcelSheetsBody> },
+  TContext
+> => {
+  return useMutation(getListExcelSheetsMutationOptions(options));
+};
 
 /**
  * @summary Preview an Excel upload before processing (Admin)

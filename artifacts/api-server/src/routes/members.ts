@@ -22,14 +22,7 @@ import {
 
 const router: IRouter = Router();
 
-function formatMember(m: any) {
-  return {
-    ...m,
-    savingsBalance: parseFloat(m.savingsBalance),
-    totalLoanBalance: parseFloat(m.totalLoanBalance),
-    totalStoreDebt: parseFloat(m.totalStoreDebt),
-  };
-}
+import { formatMember } from "../lib/formatMember";
 
 router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = ListMembersQueryParams.safeParse(req.query);

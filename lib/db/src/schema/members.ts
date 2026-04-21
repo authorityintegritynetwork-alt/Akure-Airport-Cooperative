@@ -20,7 +20,34 @@ export const membersTable = pgTable("members", {
   savingsBalance: numeric("savings_balance", { precision: 15, scale: 2 })
     .notNull()
     .default("0"),
+  providentBalance: numeric("provident_balance", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  christmasBalance: numeric("christmas_balance", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  realLoanBalance: numeric("real_loan_balance", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  emergencyLoanBalance: numeric("emergency_loan_balance", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
   totalLoanBalance: numeric("total_loan_balance", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  electronicsDebt: numeric("electronics_debt", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  sElectronicsDebt: numeric("s_electronics_debt", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  furnitureDebt: numeric("furniture_debt", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  commodityDebt: numeric("commodity_debt", { precision: 15, scale: 2 })
+    .notNull()
+    .default("0"),
+  ghlFormDebt: numeric("ghl_form_debt", { precision: 15, scale: 2 })
     .notNull()
     .default("0"),
   totalStoreDebt: numeric("total_store_debt", { precision: 15, scale: 2 })

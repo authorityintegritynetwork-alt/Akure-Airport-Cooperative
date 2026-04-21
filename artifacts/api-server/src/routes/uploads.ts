@@ -1,270 +1,476 @@
 import { Router, type IRouter } from "express";
-import { db, membersTable, transactionsTable, uploadRecordsTable, loansTable, notificationsTable } from "@workspace/db";
-import { eq, ilike, and } from "drizzle-orm";
+import {
+  db,
+  membersTable,
+  transactionsTable,
+  uploadRecordsTable,
+  loansTable,
+} from "@workspace/db";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
-import { PreviewExcelUploadBody, ProcessExcelUploadBody } from "@workspace/api-zod";
-import xlsx from "xlsx";
+import {
+  ListExcelSheetsBody as ExcelSheetsBody,
+  PreviewExcelUploadBody,
+  ProcessExcelUploadBody,
+} from "@workspace/api-zod";
+import {
+  ALL_CATEGORIES,
+  DeductionCategory,
+  downloadWorkbook,
+  parseSheet,
+  ParsedRow,
+  summarizeSheets,
+} from "../lib/excelParser";
+import { NameMatcher, MatchResult } from "../lib/nameMatcher";
 
 const router: IRouter = Router();
 
-interface ExcelRow {
-  rowIndex: number;
-  name: string;
-  savings: number;
-  loanRepayment: number;
-  errors: string[];
-  matched: boolean;
-  memberId?: number;
-  memberName?: string;
+interface CategoryConfig {
+  txType:
+    | "savings"
+    | "provident"
+    | "christmas"
+    | "real_loan_repayment"
+    | "emergency_loan_repayment"
+    | "electronics_repayment"
+    | "s_electronics_repayment"
+    | "furniture_repayment"
+    | "commodity_repayment"
+    | "ghl_form_repayment";
+  balanceField: keyof typeof membersTable.$inferSelect;
+  direction: "credit" | "debit";
+  label: string;
+  loanStatus?: "real" | "emergency";
 }
 
-async function parseExcelFromPath(fileObjectPath: string): Promise<ExcelRow[]> {
-  const objectStorageUrl = process.env.OBJECT_STORAGE_URL || "http://localhost:3000/api/storage/objects";
-  const normalizedPath = fileObjectPath.startsWith("/objects/")
-    ? fileObjectPath
-    : `/objects/${fileObjectPath}`;
+const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
+  savings: {
+    txType: "savings",
+    balanceField: "savingsBalance",
+    direction: "credit",
+    label: "Savings",
+  },
+  provident: {
+    txType: "provident",
+    balanceField: "providentBalance",
+    direction: "credit",
+    label: "Provident",
+  },
+  christmas: {
+    txType: "christmas",
+    balanceField: "christmasBalance",
+    direction: "credit",
+    label: "Christmas Savings",
+  },
+  realLoan: {
+    txType: "real_loan_repayment",
+    balanceField: "realLoanBalance",
+    direction: "debit",
+    label: "Real Loan Repayment",
+    loanStatus: "real",
+  },
+  emergencyLoan: {
+    txType: "emergency_loan_repayment",
+    balanceField: "emergencyLoanBalance",
+    direction: "debit",
+    label: "Emergency Loan Repayment",
+    loanStatus: "emergency",
+  },
+  electronics: {
+    txType: "electronics_repayment",
+    balanceField: "electronicsDebt",
+    direction: "debit",
+    label: "Electronics Repayment",
+  },
+  sElectronics: {
+    txType: "s_electronics_repayment",
+    balanceField: "sElectronicsDebt",
+    direction: "debit",
+    label: "Small Electronics Repayment",
+  },
+  furniture: {
+    txType: "furniture_repayment",
+    balanceField: "furnitureDebt",
+    direction: "debit",
+    label: "Furniture Repayment",
+  },
+  commodity: {
+    txType: "commodity_repayment",
+    balanceField: "commodityDebt",
+    direction: "debit",
+    label: "Commodity Repayment",
+  },
+  ghlForm: {
+    txType: "ghl_form_repayment",
+    balanceField: "ghlFormDebt",
+    direction: "debit",
+    label: "GHL Form Repayment",
+  },
+};
 
-  const resp = await fetch(`${objectStorageUrl}${normalizedPath}`);
-  if (!resp.ok) {
-    throw new Error(`Failed to fetch Excel file: ${resp.status}`);
-  }
-
-  const buffer = Buffer.from(await resp.arrayBuffer());
-  const workbook = xlsx.read(buffer, { type: "buffer" });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rawRows: any[][] = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: null });
-
-  const rows: ExcelRow[] = [];
-
-  for (let i = 0; i < rawRows.length; i++) {
-    const row = rawRows[i];
-    if (!row || row.length < 3) continue;
-
-    const nameRaw = row[1];
-    if (!nameRaw || typeof nameRaw !== "string" || nameRaw.trim() === "") continue;
-
-    const name = nameRaw.trim();
-    if (name.toLowerCase().includes("name") || name.toLowerCase().includes("s/n")) continue;
-
-    const savings = parseFloat(row[2]) || 0;
-    const loanRepayment = [row[3], row[4], row[5], row[6], row[7], row[8], row[9]]
-      .map((v) => parseFloat(v) || 0)
-      .reduce((a, b) => a + b, 0);
-
-    if (savings === 0 && loanRepayment === 0) continue;
-
-    rows.push({
-      rowIndex: i + 1,
-      name,
-      savings,
-      loanRepayment,
-      errors: [],
-      matched: false,
-    });
-  }
-
-  return rows;
+async function loadMatcher(): Promise<NameMatcher> {
+  const all = await db
+    .select({ id: membersTable.id, fullName: membersTable.fullName })
+    .from(membersTable);
+  return new NameMatcher(all);
 }
 
-async function matchMembersToRows(rows: ExcelRow[]): Promise<ExcelRow[]> {
-  const allMembers = await db.select().from(membersTable);
-
-  return rows.map((row) => {
-    const normalizedName = row.name.toLowerCase().replace(/\s+/g, " ").trim();
-    const match = allMembers.find(
-      (m) => m.fullName.toLowerCase().replace(/\s+/g, " ").trim() === normalizedName,
-    );
-
-    if (match) {
-      return { ...row, matched: true, memberId: match.id, memberName: match.fullName };
-    } else {
-      return { ...row, matched: false, errors: [`No member found with name: "${row.name}"`] };
+function applyManualMatches(
+  row: ParsedRow,
+  matchResult: MatchResult,
+  manualMap: Map<number, number>,
+  membersById: Map<number, { id: number; fullName: string }>,
+): MatchResult {
+  const manual = manualMap.get(row.rowNumber);
+  if (manual !== undefined) {
+    const m = membersById.get(manual);
+    if (m) {
+      return { memberId: m.id, memberName: m.fullName, confidence: "manual" };
     }
-  });
+  }
+  return matchResult;
 }
 
-router.post("/uploads/preview", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const parsed = PreviewExcelUploadBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+router.post(
+  "/uploads/excel/sheets",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const parsed = ExcelSheetsBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    try {
+      const wb = await downloadWorkbook(parsed.data.fileObjectPath);
+      res.json({ sheets: summarizeSheets(wb) });
+    } catch (err: any) {
+      res.status(400).json({ error: `Failed to read Excel file: ${err.message}` });
+    }
+  },
+);
 
-  try {
-    const rows = await parseExcelFromPath(parsed.data.fileObjectPath);
-    const matchedRows = await matchMembersToRows(rows);
+router.post(
+  "/uploads/excel/preview",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const parsed = PreviewExcelUploadBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
 
-    const matched = matchedRows.filter((r) => r.matched).length;
-    const unmatched = matchedRows.filter((r) => !r.matched).length;
-
-    res.json({
-      rows: matchedRows,
-      summary: {
-        totalRows: matchedRows.length,
-        matched,
-        unmatched,
-        month: parsed.data.month,
-        year: parsed.data.year,
-      },
-    });
-  } catch (err: any) {
-    res.status(400).json({ error: `Failed to parse Excel file: ${err.message}` });
-  }
-});
-
-router.post("/uploads/process", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const parsed = ProcessExcelUploadBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  try {
-    const rows = await parseExcelFromPath(parsed.data.fileObjectPath);
-    const matchedRows = await matchMembersToRows(rows);
-
-    const [uploadRecord] = await db
-      .insert(uploadRecordsTable)
-      .values({
-        uploadedBy: req.memberId!,
-        month: parsed.data.month,
-        year: parsed.data.year,
-        fileObjectPath: parsed.data.fileObjectPath,
-        status: "pending",
-      })
-      .returning();
-
-    let processed = 0;
-    let skipped = 0;
-
-    for (const row of matchedRows) {
-      if (!row.matched || !row.memberId) {
-        if (!parsed.data.skipErrors) {
-          skipped++;
-          continue;
-        }
-        skipped++;
-        continue;
+    try {
+      const wb = await downloadWorkbook(parsed.data.fileObjectPath);
+      const sheetName = parsed.data.sheetName || wb.SheetNames[0];
+      if (!wb.SheetNames.includes(sheetName)) {
+        res.status(400).json({ error: `Sheet "${sheetName}" not found in workbook` });
+        return;
       }
 
-      const [member] = await db.select().from(membersTable).where(eq(membersTable.id, row.memberId));
-      if (!member) {
-        skipped++;
-        continue;
+      const sheet = parseSheet(wb, sheetName);
+      const matcher = await loadMatcher();
+
+      const allMembers = await db
+        .select({ id: membersTable.id, fullName: membersTable.fullName })
+        .from(membersTable);
+      const membersById = new Map(allMembers.map((m) => [m.id, m]));
+
+      const manualMap = new Map<number, number>();
+      for (const m of parsed.data.manualMatches || []) {
+        manualMap.set(m.rowNumber, m.memberId);
       }
 
-      if (row.savings > 0) {
-        await db.insert(transactionsTable).values({
-          memberId: row.memberId,
-          type: "savings",
-          amount: row.savings.toString(),
-          description: `Monthly savings deduction - ${parsed.data.month} ${parsed.data.year}`,
-          uploadRecordId: uploadRecord.id,
-          month: parsed.data.month,
-          year: parsed.data.year,
-        });
+      const dup = await db
+        .select({ id: uploadRecordsTable.id })
+        .from(uploadRecordsTable)
+        .where(
+          and(
+            eq(uploadRecordsTable.month, parsed.data.month),
+            eq(uploadRecordsTable.year, parsed.data.year),
+            eq(uploadRecordsTable.status, "processed"),
+          ),
+        );
 
-        await db
-          .update(membersTable)
-          .set({
-            savingsBalance: (parseFloat(member.savingsBalance) + row.savings).toString(),
+      const previewRows = sheet.rows.map((row) => {
+        const baseMatch = matcher.match(row.rawName);
+        const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
+        return {
+          rowNumber: row.rowNumber,
+          rawName: row.rawName,
+          matchedMemberId: finalMatch.memberId,
+          matchedMemberName: finalMatch.memberName,
+          matchConfidence: finalMatch.confidence,
+          savings: row.amounts.savings,
+          provident: row.amounts.provident,
+          christmas: row.amounts.christmas,
+          realLoan: row.amounts.realLoan,
+          emergencyLoan: row.amounts.emergencyLoan,
+          electronics: row.amounts.electronics,
+          sElectronics: row.amounts.sElectronics,
+          furniture: row.amounts.furniture,
+          commodity: row.amounts.commodity,
+          ghlForm: row.amounts.ghlForm,
+          total: row.total,
+          computedTotal: row.computedTotal,
+          totalMismatch: row.totalMismatch,
+          errors: row.errors,
+          warnings: row.warnings,
+        };
+      });
+
+      const matched = previewRows.filter((r) => r.matchedMemberId != null).length;
+      const unmatched = previewRows.length - matched;
+      const errorRows = previewRows.filter((r) => r.errors.length > 0).length;
+
+      res.json({
+        sheetName,
+        month: parsed.data.month,
+        year: parsed.data.year,
+        totalRows: previewRows.length,
+        matchedRows: matched,
+        unmatchedRows: unmatched,
+        errorRows,
+        duplicateMonth: dup.length > 0,
+        rows: previewRows,
+      });
+    } catch (err: any) {
+      console.error("Preview error", err);
+      res.status(400).json({ error: `Failed to preview Excel file: ${err.message}` });
+    }
+  },
+);
+
+router.post(
+  "/uploads/excel/process",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const parsed = ProcessExcelUploadBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    try {
+      const wb = await downloadWorkbook(parsed.data.fileObjectPath);
+      const sheetName = parsed.data.sheetName || wb.SheetNames[0];
+      if (!wb.SheetNames.includes(sheetName)) {
+        res.status(400).json({ error: `Sheet "${sheetName}" not found in workbook` });
+        return;
+      }
+
+      const sheet = parseSheet(wb, sheetName);
+      const matcher = await loadMatcher();
+
+      const allMembers = await db
+        .select({ id: membersTable.id, fullName: membersTable.fullName })
+        .from(membersTable);
+      const membersById = new Map(allMembers.map((m) => [m.id, m]));
+
+      const manualMap = new Map<number, number>();
+      for (const m of parsed.data.manualMatches || []) {
+        manualMap.set(m.rowNumber, m.memberId);
+      }
+
+      // Run the entire processing in a single DB transaction so that any
+      // failure rolls back all transaction inserts and balance/loan mutations.
+      // Use SQL arithmetic (col = col + amt) for race-safe updates and
+      // SELECT ... FOR UPDATE to lock member rows during the batch.
+      const result = await db.transaction(async (tx) => {
+        const [uploadRecord] = await tx
+          .insert(uploadRecordsTable)
+          .values({
+            uploadedBy: req.memberId!,
+            month: parsed.data.month,
+            year: parsed.data.year,
+            fileObjectPath: parsed.data.fileObjectPath,
+            status: "pending",
           })
-          .where(eq(membersTable.id, row.memberId));
+          .returning();
 
-        await sendNotification({
-          memberId: row.memberId,
-          type: "transaction",
-          title: "Savings Deduction Recorded",
-          message: `₦${row.savings.toLocaleString()} has been credited to your savings for ${parsed.data.month} ${parsed.data.year}.`,
-        });
-      }
+        let processed = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+        const notifications: Array<{ memberId: number; total: number }> = [];
 
-      if (row.loanRepayment > 0) {
-        await db.insert(transactionsTable).values({
-          memberId: row.memberId,
-          type: "loan_repayment",
-          amount: row.loanRepayment.toString(),
-          description: `Monthly loan repayment deduction - ${parsed.data.month} ${parsed.data.year}`,
-          uploadRecordId: uploadRecord.id,
-          month: parsed.data.month,
-          year: parsed.data.year,
-        });
+        for (const row of sheet.rows) {
+          const baseMatch = matcher.match(row.rawName);
+          const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
 
-        const disbursedLoans = await db
-          .select()
-          .from(loansTable)
-          .where(and(eq(loansTable.memberId, row.memberId), eq(loansTable.status, "disbursed")));
+          if (finalMatch.memberId == null) {
+            skipped++;
+            if (!parsed.data.skipErrors) {
+              errors.push(`Row ${row.rowNumber}: no member matched for "${row.rawName}"`);
+            }
+            continue;
+          }
 
-        if (disbursedLoans.length > 0) {
-          const loan = disbursedLoans[0];
-          const newBalance = Math.max(0, parseFloat(loan.outstandingBalance) - row.loanRepayment);
-          await db
-            .update(loansTable)
-            .set({ outstandingBalance: newBalance.toString() })
-            .where(eq(loansTable.id, loan.id));
+          const memberId = finalMatch.memberId;
+
+          // Lock the member row for the duration of this row's processing.
+          const lockedRows = await tx.execute<{ id: number }>(
+            sql`SELECT id FROM ${membersTable} WHERE id = ${memberId} FOR UPDATE`,
+          );
+          if (!lockedRows.rows || lockedRows.rows.length === 0) {
+            skipped++;
+            continue;
+          }
+
+          const balanceDeltas: Record<string, number> = {};
+          let rowTouched = false;
+
+          for (const cat of ALL_CATEGORIES) {
+            const amt = row.amounts[cat];
+            if (!amt || amt <= 0) continue;
+            const cfg = CATEGORY_CONFIG[cat];
+
+            await tx.insert(transactionsTable).values({
+              memberId,
+              type: cfg.txType,
+              category: cat,
+              amount: amt.toString(),
+              description: `${cfg.label} - ${parsed.data.month} ${parsed.data.year}`,
+              uploadRecordId: uploadRecord.id,
+              month: parsed.data.month,
+              year: parsed.data.year,
+            });
+
+            const signed = cfg.direction === "credit" ? amt : -amt;
+            balanceDeltas[cfg.balanceField as string] =
+              (balanceDeltas[cfg.balanceField as string] || 0) + signed;
+            rowTouched = true;
+
+            // Apply loan repayment FIFO: oldest disbursed loan with outstanding > 0.
+            // NOTE: schema does not yet distinguish real vs emergency loans;
+            // when added, filter by loan type here.
+            if (cfg.loanStatus) {
+              const loans = await tx
+                .select()
+                .from(loansTable)
+                .where(
+                  and(
+                    eq(loansTable.memberId, memberId),
+                    eq(loansTable.status, "disbursed"),
+                  ),
+                )
+                .orderBy(asc(loansTable.disbursedAt), asc(loansTable.id));
+
+              let remaining = amt;
+              for (const loan of loans) {
+                if (remaining <= 0) break;
+                const out = parseFloat(loan.outstandingBalance);
+                if (out <= 0) continue;
+                const pay = Math.min(out, remaining);
+                await tx
+                  .update(loansTable)
+                  .set({
+                    outstandingBalance: sql`GREATEST(0, ${loansTable.outstandingBalance} - ${pay.toString()}::numeric)`,
+                  })
+                  .where(eq(loansTable.id, loan.id));
+                remaining -= pay;
+              }
+            }
+          }
+
+          if (rowTouched) {
+            // Build atomic SQL update applying all deltas at once and recomputing aggregates.
+            const setClauses: Record<string, any> = {};
+            for (const [field, delta] of Object.entries(balanceDeltas)) {
+              const col = (membersTable as any)[field];
+              if (delta >= 0) {
+                setClauses[field] = sql`${col} + ${delta.toString()}::numeric`;
+              } else {
+                setClauses[field] = sql`GREATEST(0, ${col} - ${Math.abs(delta).toString()}::numeric)`;
+              }
+            }
+            // Recompute aggregates from the new column values in the same UPDATE.
+            setClauses.totalLoanBalance = sql`${membersTable.realLoanBalance} + ${membersTable.emergencyLoanBalance}`;
+            setClauses.totalStoreDebt = sql`${membersTable.electronicsDebt} + ${membersTable.sElectronicsDebt} + ${membersTable.furnitureDebt} + ${membersTable.commodityDebt} + ${membersTable.ghlFormDebt}`;
+
+            await tx
+              .update(membersTable)
+              .set(setClauses)
+              .where(eq(membersTable.id, memberId));
+
+            notifications.push({ memberId, total: row.computedTotal });
+            processed++;
+          } else {
+            skipped++;
+          }
         }
 
-        const [refreshedMember] = await db.select().from(membersTable).where(eq(membersTable.id, row.memberId));
-        const newLoanBalance = Math.max(0, parseFloat(refreshedMember.totalLoanBalance) - row.loanRepayment);
-        await db
-          .update(membersTable)
-          .set({ totalLoanBalance: newLoanBalance.toString() })
-          .where(eq(membersTable.id, row.memberId));
+        await tx
+          .update(uploadRecordsTable)
+          .set({
+            rowsProcessed: processed,
+            rowsSkipped: skipped,
+            status: "processed",
+          })
+          .where(eq(uploadRecordsTable.id, uploadRecord.id));
 
+        return { uploadRecord, processed, skipped, errors, notifications };
+      });
+
+      const { uploadRecord, processed, skipped, errors, notifications } = result;
+
+      // Notifications are sent post-commit so that a rollback never leaves
+      // members notified about transactions that did not actually persist.
+      for (const n of notifications) {
         await sendNotification({
-          memberId: row.memberId,
+          memberId: n.memberId,
           type: "transaction",
-          title: "Loan Repayment Recorded",
-          message: `₦${row.loanRepayment.toLocaleString()} has been applied to your loan repayment for ${parsed.data.month} ${parsed.data.year}.`,
+          title: `Monthly Deductions Recorded - ${parsed.data.month} ${parsed.data.year}`,
+          message: `Your deductions of ₦${n.total.toLocaleString()} have been processed.`,
         });
       }
 
-      processed++;
+      await logAudit({
+        actorId: req.memberId,
+        action: "PROCESS_EXCEL_UPLOAD",
+        entity: "upload_record",
+        entityId: uploadRecord.id,
+        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year}: ${processed} processed, ${skipped} skipped`,
+      });
+
+      res.json({
+        uploadRecordId: uploadRecord.id,
+        processed,
+        skipped,
+        errors,
+      });
+    } catch (err: any) {
+      console.error("Process error", err);
+      res.status(400).json({ error: `Failed to process Excel file: ${err.message}` });
     }
+  },
+);
 
-    await db
-      .update(uploadRecordsTable)
-      .set({ rowsProcessed: processed, rowsSkipped: skipped, status: "processed" })
-      .where(eq(uploadRecordsTable.id, uploadRecord.id));
+router.get(
+  "/uploads/history",
+  requireAuth,
+  requireAdmin,
+  async (_req: AuthRequest, res): Promise<void> => {
+    const records = await db
+      .select()
+      .from(uploadRecordsTable)
+      .orderBy(uploadRecordsTable.createdAt);
 
-    await logAudit({
-      actorId: req.memberId,
-      action: "PROCESS_EXCEL_UPLOAD",
-      entity: "upload_record",
-      entityId: uploadRecord.id,
-      details: `Processed Excel upload: ${processed} rows processed, ${skipped} skipped for ${parsed.data.month} ${parsed.data.year}`,
-    });
+    const members = await db
+      .select({ id: membersTable.id, fullName: membersTable.fullName })
+      .from(membersTable);
+    const memberMap = Object.fromEntries(members.map((m) => [m.id, m.fullName]));
 
-    res.json({
-      uploadId: uploadRecord.id,
-      rowsProcessed: processed,
-      rowsSkipped: skipped,
-      month: parsed.data.month,
-      year: parsed.data.year,
-    });
-  } catch (err: any) {
-    res.status(400).json({ error: `Failed to process Excel file: ${err.message}` });
-  }
-});
-
-router.get("/uploads/history", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const records = await db
-    .select()
-    .from(uploadRecordsTable)
-    .orderBy(uploadRecordsTable.createdAt);
-
-  const members = await db.select({ id: membersTable.id, fullName: membersTable.fullName }).from(membersTable);
-  const memberMap = Object.fromEntries(members.map((m) => [m.id, m.fullName]));
-
-  res.json(
-    records.map((r) => ({
-      ...r,
-      uploadedByName: memberMap[r.uploadedBy] || "Unknown",
-    })),
-  );
-});
+    res.json(
+      records.map((r) => ({
+        ...r,
+        uploaderName: memberMap[r.uploadedBy] || "Unknown",
+      })),
+    );
+  },
+);
 
 export default router;

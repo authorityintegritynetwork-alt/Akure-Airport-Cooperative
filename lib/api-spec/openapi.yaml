@@ -310,6 +310,25 @@ paths:
                   $ref: "#/components/schemas/Transaction"
 
   # ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
+  /uploads/excel/sheets:
+    post:
+      operationId: listExcelSheets
+      tags: [uploads]
+      summary: List sheet names in an uploaded Excel file (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExcelSheetsBody"
+      responses:
+        "200":
+          description: Sheet listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExcelSheetsResult"
+
   /uploads/excel/preview:
     post:
       operationId: previewExcelUpload
@@ -952,7 +971,25 @@ components:
           enum: [pending, active, inactive]
         savingsBalance:
           type: number
+        providentBalance:
+          type: number
+        christmasBalance:
+          type: number
+        realLoanBalance:
+          type: number
+        emergencyLoanBalance:
+          type: number
         totalLoanBalance:
+          type: number
+        electronicsDebt:
+          type: number
+        sElectronicsDebt:
+          type: number
+        furnitureDebt:
+          type: number
+        commodityDebt:
+          type: number
+        ghlFormDebt:
           type: number
         totalStoreDebt:
           type: number
@@ -969,7 +1006,16 @@ components:
         - role
         - status
         - savingsBalance
+        - providentBalance
+        - christmasBalance
+        - realLoanBalance
+        - emergencyLoanBalance
         - totalLoanBalance
+        - electronicsDebt
+        - sElectronicsDebt
+        - furnitureDebt
+        - commodityDebt
+        - ghlFormDebt
         - totalStoreDebt
         - createdAt
         - updatedAt
@@ -997,7 +1043,25 @@ components:
           enum: [pending, active, inactive]
         savingsBalance:
           type: number
+        providentBalance:
+          type: number
+        christmasBalance:
+          type: number
+        realLoanBalance:
+          type: number
+        emergencyLoanBalance:
+          type: number
         totalLoanBalance:
+          type: number
+        electronicsDebt:
+          type: number
+        sElectronicsDebt:
+          type: number
+        furnitureDebt:
+          type: number
+        commodityDebt:
+          type: number
+        ghlFormDebt:
           type: number
         totalStoreDebt:
           type: number
@@ -1012,7 +1076,16 @@ components:
         - role
         - status
         - savingsBalance
+        - providentBalance
+        - christmasBalance
+        - realLoanBalance
+        - emergencyLoanBalance
         - totalLoanBalance
+        - electronicsDebt
+        - sElectronicsDebt
+        - furnitureDebt
+        - commodityDebt
+        - ghlFormDebt
         - totalStoreDebt
         - createdAt
 
@@ -1142,15 +1215,57 @@ components:
         - createdAt
 
     # ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
+    ExcelSheetsBody:
+      type: object
+      properties:
+        fileObjectPath:
+          type: string
+      required: [fileObjectPath]
+
+    ExcelSheetInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        rowCount:
+          type: integer
+        looksValid:
+          type: boolean
+      required: [name, rowCount, looksValid]
+
+    ExcelSheetsResult:
+      type: object
+      properties:
+        sheets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExcelSheetInfo"
+      required: [sheets]
+
+    ManualMatch:
+      type: object
+      properties:
+        rowNumber:
+          type: integer
+        memberId:
+          type: integer
+      required: [rowNumber, memberId]
+
     ExcelUploadPreviewBody:
       type: object
       properties:
         fileObjectPath:
           type: string
+        sheetName:
+          type: string
         month:
           type: string
         year:
           type: integer
+        manualMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/ManualMatch"
       required: [fileObjectPath, month, year]
 
     ExcelRowPreview:
@@ -1164,71 +1279,94 @@ components:
           type: ["integer", "null"]
         matchedMemberName:
           type: ["string", "null"]
+        matchConfidence:
+          type: string
+          enum: [exact, fuzzy, manual, none]
         savings:
+          type: number
+        provident:
+          type: number
+        christmas:
           type: number
         realLoan:
           type: number
-        provisionalLoan:
-          type: number
-        electricity:
-          type: number
-        furnitureVentilation:
-          type: number
         emergencyLoan:
+          type: number
+        electronics:
+          type: number
+        sElectronics:
+          type: number
+        furniture:
           type: number
         commodity:
           type: number
-        land:
-          type: number
-        otherDeductions:
+        ghlForm:
           type: number
         total:
           type: number
+        computedTotal:
+          type: number
+        totalMismatch:
+          type: boolean
         errors:
           type: array
           items:
             type: string
-        hasErrors:
-          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
       required:
         - rowNumber
         - rawName
+        - matchConfidence
         - savings
+        - provident
+        - christmas
         - realLoan
-        - provisionalLoan
-        - electricity
-        - furnitureVentilation
         - emergencyLoan
+        - electronics
+        - sElectronics
+        - furniture
         - commodity
-        - land
-        - otherDeductions
+        - ghlForm
         - total
+        - computedTotal
+        - totalMismatch
         - errors
-        - hasErrors
+        - warnings
 
     ExcelUploadPreview:
       type: object
       properties:
+        sheetName:
+          type: string
         month:
           type: string
         year:
           type: integer
         totalRows:
           type: integer
-        validRows:
+        matchedRows:
+          type: integer
+        unmatchedRows:
           type: integer
         errorRows:
           type: integer
+        duplicateMonth:
+          type: boolean
         rows:
           type: array
           items:
             $ref: "#/components/schemas/ExcelRowPreview"
-      required: [month, year, totalRows, validRows, errorRows, rows]
+      required: [sheetName, month, year, totalRows, matchedRows, unmatchedRows, errorRows, duplicateMonth, rows]
 
     ExcelUploadProcessBody:
       type: object
       properties:
         fileObjectPath:
+          type: string
+        sheetName:
           type: string
         month:
           type: string
@@ -1236,6 +1374,10 @@ components:
           type: integer
         skipErrors:
           type: boolean
+        manualMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/ManualMatch"
       required: [fileObjectPath, month, year]
 
     ExcelUploadResult:

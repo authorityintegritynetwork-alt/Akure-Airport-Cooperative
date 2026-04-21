@@ -33,7 +33,16 @@ export const GetProfileResponse = zod.object({
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
   savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
 });
@@ -71,7 +80,16 @@ export const ListMembersResponseItem = zod.object({
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
   savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -115,7 +133,16 @@ export const GetMemberResponse = zod.object({
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
   savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -154,7 +181,16 @@ export const UpdateMemberResponse = zod.object({
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
   savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -183,7 +219,16 @@ export const ActivateMemberResponse = zod.object({
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
   savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -212,7 +257,16 @@ export const DeactivateMemberResponse = zod.object({
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
   savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
   totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -308,38 +362,71 @@ export const ListMyTransactionsResponse = zod.array(
 );
 
 /**
+ * @summary List sheet names in an uploaded Excel file (Admin)
+ */
+export const ListExcelSheetsBody = zod.object({
+  fileObjectPath: zod.string(),
+});
+
+export const ListExcelSheetsResponse = zod.object({
+  sheets: zod.array(
+    zod.object({
+      name: zod.string(),
+      rowCount: zod.number(),
+      looksValid: zod.boolean(),
+    }),
+  ),
+});
+
+/**
  * @summary Preview an Excel upload before processing (Admin)
  */
 export const PreviewExcelUploadBody = zod.object({
   fileObjectPath: zod.string(),
+  sheetName: zod.string().optional(),
   month: zod.string(),
   year: zod.number(),
+  manualMatches: zod
+    .array(
+      zod.object({
+        rowNumber: zod.number(),
+        memberId: zod.number(),
+      }),
+    )
+    .optional(),
 });
 
 export const PreviewExcelUploadResponse = zod.object({
+  sheetName: zod.string(),
   month: zod.string(),
   year: zod.number(),
   totalRows: zod.number(),
-  validRows: zod.number(),
+  matchedRows: zod.number(),
+  unmatchedRows: zod.number(),
   errorRows: zod.number(),
+  duplicateMonth: zod.boolean(),
   rows: zod.array(
     zod.object({
       rowNumber: zod.number(),
       rawName: zod.string(),
       matchedMemberId: zod.number().nullish(),
       matchedMemberName: zod.string().nullish(),
+      matchConfidence: zod.enum(["exact", "fuzzy", "manual", "none"]),
       savings: zod.number(),
+      provident: zod.number(),
+      christmas: zod.number(),
       realLoan: zod.number(),
-      provisionalLoan: zod.number(),
-      electricity: zod.number(),
-      furnitureVentilation: zod.number(),
       emergencyLoan: zod.number(),
+      electronics: zod.number(),
+      sElectronics: zod.number(),
+      furniture: zod.number(),
       commodity: zod.number(),
-      land: zod.number(),
-      otherDeductions: zod.number(),
+      ghlForm: zod.number(),
       total: zod.number(),
+      computedTotal: zod.number(),
+      totalMismatch: zod.boolean(),
       errors: zod.array(zod.string()),
-      hasErrors: zod.boolean(),
+      warnings: zod.array(zod.string()),
     }),
   ),
 });
@@ -349,9 +436,18 @@ export const PreviewExcelUploadResponse = zod.object({
  */
 export const ProcessExcelUploadBody = zod.object({
   fileObjectPath: zod.string(),
+  sheetName: zod.string().optional(),
   month: zod.string(),
   year: zod.number(),
   skipErrors: zod.boolean().optional(),
+  manualMatches: zod
+    .array(
+      zod.object({
+        rowNumber: zod.number(),
+        memberId: zod.number(),
+      }),
+    )
+    .optional(),
 });
 
 export const ProcessExcelUploadResponse = zod.object({

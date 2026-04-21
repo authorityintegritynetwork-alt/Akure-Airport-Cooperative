@@ -9,8 +9,22 @@ export const transactionsTable = pgTable("transactions", {
     .notNull()
     .references(() => membersTable.id),
   type: text("type", {
-    enum: ["savings", "loan_repayment", "store_repayment"],
+    enum: [
+      "savings",
+      "provident",
+      "christmas",
+      "real_loan_repayment",
+      "emergency_loan_repayment",
+      "loan_repayment",
+      "electronics_repayment",
+      "s_electronics_repayment",
+      "furniture_repayment",
+      "commodity_repayment",
+      "ghl_form_repayment",
+      "store_repayment",
+    ],
   }).notNull(),
+  category: text("category"),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   description: text("description"),
   uploadRecordId: integer("upload_record_id"),

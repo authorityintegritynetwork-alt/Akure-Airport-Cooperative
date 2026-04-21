@@ -8,10 +8,13 @@
 import type { ExcelRowPreview } from "./excelRowPreview";
 
 export interface ExcelUploadPreview {
+  sheetName: string;
   month: string;
   year: number;
   totalRows: number;
-  validRows: number;
+  matchedRows: number;
+  unmatchedRows: number;
   errorRows: number;
+  duplicateMonth: boolean;
   rows: ExcelRowPreview[];
 }
