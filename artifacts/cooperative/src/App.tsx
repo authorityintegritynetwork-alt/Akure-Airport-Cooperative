@@ -23,6 +23,8 @@ import { StoreAdminPage } from "./pages/store-admin";
 import { AuditLogsPage } from "./pages/audit-logs";
 import { SettingsPage } from "./pages/settings";
 import { RolesPage } from "./pages/roles";
+import { CompleteProfilePage } from "./pages/complete-profile";
+import { useGetProfile } from "@workspace/api-client-react";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -126,6 +128,31 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function SignedInRouter({ children }: { children: React.ReactNode }) {
+  const { data: profile, isLoading, error } = useGetProfile({
+    query: { retry: false, staleTime: 0 },
+  });
+  const [location] = useLocation();
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  }
+
+  const profileMissing = !profile && (error as any);
+
+  if (profileMissing && location !== "/complete-profile") {
+    return <Redirect to="/complete-profile" />;
+  }
+  if (profile && location === "/complete-profile") {
+    return <Redirect to="/dashboard" />;
+  }
+  if (profile && profile.status === "pending" && location !== "/pending-approval") {
+    return <Redirect to="/pending-approval" />;
+  }
+
+  return <>{children}</>;
+}
+
 function HomeRedirect() {
   return (
     <>
@@ -139,13 +166,13 @@ function HomeRedirect() {
   );
 }
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component, bare }: { component: React.ComponentType; bare?: boolean }) {
   return (
     <>
       <Show when="signed-in">
-        <AppLayout>
-          <Component />
-        </AppLayout>
+        <SignedInRouter>
+          {bare ? <Component /> : <AppLayout><Component /></AppLayout>}
+        </SignedInRouter>
       </Show>
       <Show when="signed-out">
         <Redirect to="/" />
@@ -172,6 +199,9 @@ function ClerkProviderWithRoutes() {
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/pending-approval" component={PendingApproval} />
+          <Route path="/complete-profile">
+            <ProtectedRoute component={CompleteProfilePage} bare />
+          </Route>
 
           <Route path="/dashboard">
             <ProtectedRoute component={Dashboard} />
