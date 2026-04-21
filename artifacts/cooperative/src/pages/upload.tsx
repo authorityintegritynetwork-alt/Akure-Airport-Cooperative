@@ -36,7 +36,7 @@ type Org = "faan" | "nama";
 const CATEGORY_COLUMNS_BY_ORG: Record<Org, { key: string; label: string }[]> = {
   faan: [
     { key: "savings", label: "Savings" },
-    { key: "provident", label: "Provident" },
+    { key: "provident", label: "Provision" },
     { key: "christmas", label: "Christmas" },
     { key: "realLoan", label: "Real Loan" },
     { key: "emergencyLoan", label: "Emer. Loan" },
@@ -224,7 +224,7 @@ export function UploadPage() {
         <div>
           <h1 className="text-2xl font-bold">Upload Monthly Deductions</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Upload the monthly NAMA deduction Excel file. Members are matched by full name.
+            Upload the monthly deduction Excel file ({organization.toUpperCase()}). Members are matched by full name.
           </p>
         </div>
         {stage !== "select" && (

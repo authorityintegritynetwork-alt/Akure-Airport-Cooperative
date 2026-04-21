@@ -30,7 +30,7 @@ type BalanceCard = { key: string; label: string; direction: "credit" | "debit" }
 const BALANCE_CARDS_BY_ORG: Record<"faan" | "nama", BalanceCard[]> = {
   faan: [
     { key: "savingsBalance", label: "Savings", direction: "credit" },
-    { key: "providentBalance", label: "Provident", direction: "credit" },
+    { key: "providentBalance", label: "Provision", direction: "credit" },
     { key: "christmasBalance", label: "Christmas", direction: "credit" },
     { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
     { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
@@ -157,7 +157,9 @@ function MemberDashboard({ profile }: { profile: any }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">{formatCurrency(summary.savingsBalance)}</div>
-            <p className="text-xs text-muted-foreground">Savings + Provident + Christmas</p>
+            <p className="text-xs text-muted-foreground">
+              {org === "faan" ? "Savings + Provision + Christmas" : "Savings + Provident"}
+            </p>
           </CardContent>
         </Card>
         <Card>
