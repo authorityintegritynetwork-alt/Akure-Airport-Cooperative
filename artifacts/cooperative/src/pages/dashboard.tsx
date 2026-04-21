@@ -35,7 +35,7 @@ const BALANCE_CARDS = [
   { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit" },
   { key: "furnitureDebt", label: "Furniture", direction: "debit" },
   { key: "commodityDebt", label: "Commodity", direction: "debit" },
-  { key: "ghlFormDebt", label: "GHL Form", direction: "debit" },
+  { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
   { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
 ] as const;
 

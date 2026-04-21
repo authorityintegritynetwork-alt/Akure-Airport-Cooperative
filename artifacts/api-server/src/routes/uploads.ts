@@ -107,7 +107,7 @@ const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
     txType: "ghl_form_repayment",
     balanceField: "ghlFormDebt",
     direction: "debit",
-    label: "GHL Form Repayment",
+    label: "Loan Form Cost Repayment",
   },
   fire: {
     txType: "fire",

@@ -41,7 +41,7 @@ const CATEGORY_COLUMNS = [
   { key: "sElectronics", label: "S/Elect" },
   { key: "furniture", label: "Furniture" },
   { key: "commodity", label: "Commodity" },
-  { key: "ghlForm", label: "GHL Form" },
+  { key: "ghlForm", label: "Loan Form" },
   { key: "fire", label: "Fire" },
 ] as const;
 
