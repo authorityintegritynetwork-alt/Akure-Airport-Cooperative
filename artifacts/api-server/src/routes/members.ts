@@ -268,7 +268,7 @@ router.post("/members/:id/deactivate", requireAuth, requireAdmin, async (req: Au
 router.delete(
   "/members/:id",
   requireAuth,
-  requireSuperAdmin,
+  requireAdmin,
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);

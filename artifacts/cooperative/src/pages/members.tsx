@@ -98,6 +98,7 @@ export function MembersPage() {
   const { toast } = useToast();
   const { data: profile } = useGetProfile();
   const isSuperAdmin = profile?.role === "super_admin";
+  const canManage = profile?.role === "admin" || profile?.role === "super_admin";
 
   const params: any = {};
   if (search) params.search = search;
@@ -477,7 +478,7 @@ export function MembersPage() {
                           <UserX className="w-4 h-4 text-destructive" />
                         </Button>
                       )}
-                      {isSuperAdmin && (
+                      {canManage && (
                         <>
                           <Button
                             variant="ghost"
