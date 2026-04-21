@@ -60,7 +60,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <img src={logoUrl} alt="AASCMS" className="w-9 h-9 object-contain" />
 
               <span className="font-semibold text-xs leading-tight tracking-tight">
-                Akure Airport Staff Corporative Multipurpose Society Limited
+                Akure Airport Staff Co-operative Multipurpose Society Limited
               </span>
             </div>
           </SidebarHeader>

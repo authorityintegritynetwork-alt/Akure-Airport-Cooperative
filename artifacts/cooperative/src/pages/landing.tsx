@@ -11,7 +11,7 @@ export function LandingPage() {
         <div className="flex items-center gap-2.5">
           <img src={logoUrl} alt="AASCMS Logo" className="w-10 h-10 object-contain" />
           <span className="font-semibold text-sm md:text-base tracking-tight text-foreground leading-tight max-w-[14rem] md:max-w-none">
-            Akure Airport Staff Corporative Multipurpose Society Limited
+            Akure Airport Staff Co-operative Multipurpose Society Limited
           </span>
         </div>
         <div className="flex items-center gap-2">
