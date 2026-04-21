@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -108,6 +108,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <SidebarMenu>
                     {navItem("/settings", <Settings className="w-4 h-4" />, "Settings")}
                     {navItem("/roles", <UserCog className="w-4 h-4" />, "Roles")}
+                    {navItem("/audit-logs", <Shield className="w-4 h-4" />, "Audit Logs")}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>

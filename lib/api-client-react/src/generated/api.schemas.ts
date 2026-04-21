@@ -709,6 +709,10 @@ export const ListMembersOrganization = {
   nama: "nama",
 } as const;
 
+export type DeleteMember200 = {
+  deleted: boolean;
+};
+
 export type BulkAssignOrganization200 = {
   updated: number;
 };

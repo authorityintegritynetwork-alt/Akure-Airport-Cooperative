@@ -216,6 +216,17 @@ export const UpdateMemberResponse = zod.object({
 });
 
 /**
+ * @summary Delete a member (Super Admin only)
+ */
+export const DeleteMemberParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteMemberResponse = zod.object({
+  deleted: zod.boolean(),
+});
+
+/**
  * @summary Bulk assign organization tag to members (Admin+)
  */
 

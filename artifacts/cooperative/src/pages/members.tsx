@@ -5,7 +5,10 @@ import {
   useActivateMember,
   useDeactivateMember,
   useCreateMember,
+  useUpdateMember,
+  useDeleteMember,
   useBulkAssignOrganization,
+  useGetProfile,
   getListMembersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -41,7 +44,17 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Search, UserCheck, UserX, Eye } from "lucide-react";
+import { PlusCircle, Search, UserCheck, UserX, Eye, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const createMemberSchema = z.object({
   fullName: z.string().min(2, "Full name required"),
@@ -53,6 +66,16 @@ const createMemberSchema = z.object({
   organization: z.enum(["faan", "nama"]).optional(),
 });
 type CreateMemberForm = z.infer<typeof createMemberSchema>;
+
+const editMemberSchema = z.object({
+  fullName: z.string().min(2, "Full name required"),
+  phone: z.string().optional(),
+  staffId: z.string().optional(),
+  role: z.enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"]),
+  status: z.enum(["pending", "active", "inactive"]),
+  organization: z.enum(["faan", "nama"]),
+});
+type EditMemberForm = z.infer<typeof editMemberSchema>;
 
 function memberStatusBadge(status: string) {
   const map: Record<string, "default" | "secondary" | "destructive"> = {
@@ -68,9 +91,13 @@ export function MembersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [orgFilter, setOrgFilter] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<any | null>(null);
+  const [deletingMember, setDeletingMember] = useState<any | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: profile } = useGetProfile();
+  const isSuperAdmin = profile?.role === "super_admin";
 
   const params: any = {};
   if (search) params.search = search;
@@ -84,7 +111,70 @@ export function MembersPage() {
   const activateMember = useActivateMember();
   const deactivateMember = useDeactivateMember();
   const createMember = useCreateMember();
+  const updateMember = useUpdateMember();
+  const deleteMember = useDeleteMember();
   const bulkAssign = useBulkAssignOrganization();
+
+  const editForm = useForm<EditMemberForm>({
+    resolver: zodResolver(editMemberSchema),
+    defaultValues: { fullName: "", phone: "", staffId: "", role: "member", status: "active", organization: "faan" },
+  });
+
+  function openEdit(member: any) {
+    editForm.reset({
+      fullName: member.fullName ?? "",
+      phone: member.phone ?? "",
+      staffId: member.staffId ?? "",
+      role: member.role,
+      status: member.status,
+      organization: member.organization ?? "faan",
+    });
+    setEditingMember(member);
+  }
+
+  function onEditSubmit(data: EditMemberForm) {
+    if (!editingMember) return;
+    updateMember.mutate(
+      {
+        id: editingMember.id,
+        data: {
+          fullName: data.fullName,
+          phone: data.phone || undefined,
+          staffId: data.staffId || undefined,
+          role: data.role,
+          status: data.status,
+          organization: data.organization,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Member updated" });
+          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
+          setEditingMember(null);
+        },
+        onError: (err: any) => {
+          toast({ title: "Update failed", description: err.message, variant: "destructive" });
+        },
+      },
+    );
+  }
+
+  function confirmDelete() {
+    if (!deletingMember) return;
+    deleteMember.mutate(
+      { id: deletingMember.id },
+      {
+        onSuccess: () => {
+          toast({ title: "Member deleted", description: deletingMember.fullName });
+          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
+          setDeletingMember(null);
+        },
+        onError: (err: any) => {
+          toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+        },
+      },
+    );
+  }
 
   const form = useForm<CreateMemberForm>({
     resolver: zodResolver(createMemberSchema),
@@ -97,7 +187,7 @@ export function MembersPage() {
       {
         onSuccess: () => {
           toast({ title: "Member activated" });
-          queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
+          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
         },
       },
     );
@@ -109,7 +199,7 @@ export function MembersPage() {
       {
         onSuccess: () => {
           toast({ title: "Member deactivated" });
-          queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
+          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
         },
       },
     );
@@ -131,7 +221,7 @@ export function MembersPage() {
       {
         onSuccess: () => {
           toast({ title: "Member created successfully" });
-          queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
+          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
           setDialogOpen(false);
           form.reset();
         },
@@ -291,7 +381,7 @@ export function MembersPage() {
                           description: `${r.updated} member(s) updated.`,
                         });
                         setSelectedIds(new Set());
-                        queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
+                        queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
                       },
                       onError: (err: any) => {
                         toast({
@@ -387,6 +477,28 @@ export function MembersPage() {
                           <UserX className="w-4 h-4 text-destructive" />
                         </Button>
                       )}
+                      {isSuperAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit(member)}
+                            data-testid={`button-edit-${member.id}`}
+                            title="Edit member"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingMember(member)}
+                            data-testid={`button-delete-${member.id}`}
+                            title="Delete member"
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -395,6 +507,108 @@ export function MembersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingMember} onOpenChange={(o) => !o && setEditingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Member</DialogTitle>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField control={editForm.control} name="fullName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl><Input data-testid="input-edit-fullname" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={editForm.control} name="phone" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl><Input data-testid="input-edit-phone" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={editForm.control} name="staffId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Staff ID</FormLabel>
+                  <FormControl><Input data-testid="input-edit-staffid" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={editForm.control} name="role" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger data-testid="select-edit-role"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="financial_auditor">Financial Auditor</SelectItem>
+                      <SelectItem value="treasurer">Treasurer</SelectItem>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={editForm.control} name="status" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger data-testid="select-edit-status"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={editForm.control} name="organization" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Organization</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger data-testid="select-edit-organization"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="faan">FAAN</SelectItem>
+                      <SelectItem value="nama">NAMA</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <Button type="submit" className="w-full" disabled={updateMember.isPending} data-testid="button-submit-edit-member">
+                {updateMember.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deletingMember} onOpenChange={(o) => !o && setDeletingMember(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deletingMember?.fullName}</strong> along with all their
+              transactions, loans, and store purchases. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMember.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMember.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

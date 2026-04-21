@@ -1,5 +1,13 @@
 import { Router, type IRouter } from "express";
-import { db, membersTable, transactionsTable, loansTable, storePurchasesTable } from "@workspace/db";
+import {
+  db,
+  membersTable,
+  transactionsTable,
+  loansTable,
+  storePurchasesTable,
+  notificationsTable,
+  uploadRecordsTable,
+} from "@workspace/db";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import {
   requireAuth,
@@ -133,10 +141,21 @@ router.patch("/members/:id", requireAuth, requireAdmin, async (req: AuthRequest,
   if (parsed.data.fullName != null) updateData.fullName = parsed.data.fullName;
   if (parsed.data.phone != null) updateData.phone = parsed.data.phone;
   if (parsed.data.staffId != null) updateData.staffId = parsed.data.staffId;
-  if (parsed.data.role != null) updateData.role = parsed.data.role;
   if (parsed.data.status != null) updateData.status = parsed.data.status;
   if ((parsed.data as any).organization != null)
     updateData.organization = (parsed.data as any).organization;
+
+  if (parsed.data.role != null) {
+    if (req.memberRole !== "super_admin") {
+      res.status(403).json({ error: "Only Super Admin can change member roles." });
+      return;
+    }
+    if (req.memberId === id && parsed.data.role !== "super_admin") {
+      res.status(409).json({ error: "You cannot demote your own super-admin role." });
+      return;
+    }
+    updateData.role = parsed.data.role;
+  }
 
   const [member] = await db
     .update(membersTable)
@@ -245,6 +264,58 @@ router.post("/members/:id/deactivate", requireAuth, requireAdmin, async (req: Au
 
   res.json(formatMember(member));
 });
+
+router.delete(
+  "/members/:id",
+  requireAuth,
+  requireSuperAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+
+    if (req.memberId === id) {
+      res.status(409).json({ error: "You cannot delete your own account." });
+      return;
+    }
+
+    const [member] = await db.select().from(membersTable).where(eq(membersTable.id, id));
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+
+    try {
+      await db.transaction(async (tx) => {
+        await tx.delete(notificationsTable).where(eq(notificationsTable.memberId, id));
+        await tx.delete(transactionsTable).where(eq(transactionsTable.memberId, id));
+        await tx.delete(loansTable).where(eq(loansTable.memberId, id));
+        await tx.delete(storePurchasesTable).where(eq(storePurchasesTable.memberId, id));
+        await tx.delete(uploadRecordsTable).where(eq(uploadRecordsTable.uploadedBy, id));
+        await tx.delete(membersTable).where(eq(membersTable.id, id));
+      });
+    } catch (err: any) {
+      await logAudit({
+        actorId: req.memberId,
+        action: "DELETE_MEMBER_FAILED",
+        entity: "member",
+        entityId: id,
+        details: `Failed to delete member ${member.fullName}: ${err.message}`,
+      });
+      res.status(409).json({ error: err.message || "Cannot delete member" });
+      return;
+    }
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "DELETE_MEMBER",
+      entity: "member",
+      entityId: id,
+      details: `Deleted member: ${member.fullName} (${member.email})`,
+    });
+
+    res.json({ deleted: true });
+  },
+);
 
 router.get("/members/:id/summary", requireAuth, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;

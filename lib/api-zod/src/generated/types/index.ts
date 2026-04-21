@@ -19,6 +19,7 @@ export * from "./createMemberBodyRole";
 export * from "./createMemberBodyStatus";
 export * from "./createStoreItemBody";
 export * from "./createStorePurchaseBody";
+export * from "./deleteMember200";
 export * from "./excelRowPreview";
 export * from "./excelRowPreviewMatchConfidence";
 export * from "./excelRowPreviewMemberOrganization";

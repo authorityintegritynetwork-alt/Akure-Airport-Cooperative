@@ -164,6 +164,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Member"
+    delete:
+      operationId: deleteMember
+      tags: [members]
+      summary: Delete a member (Super Admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                required: [deleted]
+        "404":
+          description: Not found
+        "409":
+          description: Cannot delete (has related records)
 
   /members/bulk-organization:
     post:
