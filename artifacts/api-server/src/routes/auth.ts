@@ -4,6 +4,7 @@ import { db, membersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { AuthRequest } from "../middlewares/auth";
 import { RegisterMemberBody } from "@workspace/api-zod";
+import { getClerkUser } from "../lib/clerk";
 
 const router: IRouter = Router();
 
@@ -56,24 +57,47 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
-  const clerkUser = auth as any;
-  const email = clerkUser?.sessionClaims?.email || "";
+  const clerkUser = await getClerkUser(userId);
+  const email = clerkUser?.emailAddress;
+  if (!email) {
+    res.status(400).json({ error: "Could not retrieve email from Clerk account" });
+    return;
+  }
 
   const memberCount = await db.select().from(membersTable);
   const isFirstUser = memberCount.length === 0;
 
-  const [member] = await db
-    .insert(membersTable)
-    .values({
-      clerkUserId: userId,
-      fullName: parsed.data.fullName,
-      email,
-      phone: parsed.data.phone ?? undefined,
-      staffId: parsed.data.staffId ?? undefined,
-      role: isFirstUser ? "super_admin" : "member",
-      status: isFirstUser ? "active" : "pending",
-    })
-    .returning();
+  const existingByEmail = await db
+    .select()
+    .from(membersTable)
+    .where(eq(membersTable.email, email));
+
+  let member;
+  if (existingByEmail.length > 0) {
+    [member] = await db
+      .update(membersTable)
+      .set({
+        clerkUserId: userId,
+        fullName: parsed.data.fullName,
+        phone: parsed.data.phone ?? existingByEmail[0].phone ?? undefined,
+        staffId: parsed.data.staffId ?? existingByEmail[0].staffId ?? undefined,
+      })
+      .where(eq(membersTable.email, email))
+      .returning();
+  } else {
+    [member] = await db
+      .insert(membersTable)
+      .values({
+        clerkUserId: userId,
+        fullName: parsed.data.fullName,
+        email,
+        phone: parsed.data.phone ?? undefined,
+        staffId: parsed.data.staffId ?? undefined,
+        role: isFirstUser ? "super_admin" : "member",
+        status: isFirstUser ? "active" : "pending",
+      })
+      .returning();
+  }
 
   res.status(201).json({
     ...member,
