@@ -87,6 +87,14 @@ export const MemberProfileStatus = {
   inactive: "inactive",
 } as const;
 
+export type MemberProfileOrganization =
+  (typeof MemberProfileOrganization)[keyof typeof MemberProfileOrganization];
+
+export const MemberProfileOrganization = {
+  faan: "faan",
+  nama: "nama",
+} as const;
+
 export interface MemberProfile {
   id: number;
   clerkUserId: string;
@@ -111,6 +119,9 @@ export interface MemberProfile {
   ghlFormDebt: number;
   fireFundBalance: number;
   totalStoreDebt: number;
+  fuelVentureBalance?: number;
+  landLoanBalance?: number;
+  organization?: MemberProfileOrganization;
   createdAt: string;
 }
 
@@ -209,6 +220,14 @@ export interface BulkOrganizationBody {
   organization: BulkOrganizationBodyOrganization;
 }
 
+export type MemberSummaryOrganization =
+  (typeof MemberSummaryOrganization)[keyof typeof MemberSummaryOrganization];
+
+export const MemberSummaryOrganization = {
+  faan: "faan",
+  nama: "nama",
+} as const;
+
 export interface MemberSummary {
   memberId: number;
   fullName: string;
@@ -219,6 +238,9 @@ export interface MemberSummary {
   totalLoansRepaid: number;
   activeLoansCount: number;
   pendingStoreDebt: number;
+  organization?: MemberSummaryOrganization;
+  fuelVentureBalance?: number;
+  landLoanBalance?: number;
 }
 
 export interface SavingsBalance {

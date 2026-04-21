@@ -45,6 +45,9 @@ export const GetProfileResponse = zod.object({
   ghlFormDebt: zod.number(),
   fireFundBalance: zod.number(),
   totalStoreDebt: zod.number(),
+  fuelVentureBalance: zod.number().optional(),
+  landLoanBalance: zod.number().optional(),
+  organization: zod.enum(["faan", "nama"]).optional(),
   createdAt: zod.coerce.date(),
 });
 
@@ -326,6 +329,9 @@ export const GetMemberSummaryResponse = zod.object({
   totalLoansRepaid: zod.number(),
   activeLoansCount: zod.number(),
   pendingStoreDebt: zod.number(),
+  organization: zod.enum(["faan", "nama"]).optional(),
+  fuelVentureBalance: zod.number().optional(),
+  landLoanBalance: zod.number().optional(),
 });
 
 /**

@@ -207,6 +207,23 @@ export function MembersPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+                <FormField control={form.control} name="organization" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organization</FormLabel>
+                    <Select value={field.value || "faan"} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-member-organization">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="faan">FAAN</SelectItem>
+                        <SelectItem value="nama">NAMA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <Button type="submit" className="w-full" disabled={createMember.isPending} data-testid="button-submit-create-member">
                   {createMember.isPending ? "Creating..." : "Create Member"}
                 </Button>
