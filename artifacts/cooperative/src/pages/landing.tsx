@@ -1,7 +1,7 @@
-import { SignInButton, SignUpButton } from "@clerk/react";
+import { SignInButton, SignUpButton, useClerk } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, ShieldCheck, TrendingUp, Users, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowRight, ShieldCheck, TrendingUp, Users, CheckCircle2, Sparkles, LogOut } from "lucide-react";
 import logoUrl from "@assets/aacs-logo_1776751208467.png";
 
 export function LandingPage() {
@@ -143,6 +143,7 @@ export function LandingPage() {
 }
 
 export function PendingApproval() {
+  const { signOut } = useClerk();
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="max-w-md w-full text-center shadow-lg border-border/70">
@@ -152,10 +153,16 @@ export function PendingApproval() {
           </div>
           <h2 className="text-2xl font-bold tracking-tight mb-2">Account Under Review</h2>
           <p className="text-muted-foreground mb-6 leading-relaxed">
-            Your registration has been received. An administrator will verify your staff details and activate your account shortly.
+            Your registration has been received. An administrator will verify your staff details and activate your account shortly. You'll be able to sign back in once your account is approved.
           </p>
-          <Button variant="outline" className="w-full" onClick={() => window.location.href = '/'}>
-            Return Home
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => signOut({ redirectUrl: "/" })}
+            data-testid="button-pending-signout"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign out
           </Button>
         </CardContent>
       </Card>
