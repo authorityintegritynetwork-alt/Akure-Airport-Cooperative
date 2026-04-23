@@ -6,3 +6,4 @@ export * from "./notifications";
 export * from "./audit";
 export * from "./settings";
 export * from "./uploads";
+export * from "./stepUp";

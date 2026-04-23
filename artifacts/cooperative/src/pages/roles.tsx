@@ -45,6 +45,7 @@ export function RolesPage() {
       toast({ title: "Role updated" });
       queryClient.invalidateQueries({ queryKey: getListMembersQueryKey({}) });
     } catch (err: any) {
+      if (err?.cancelled) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   }

@@ -83,15 +83,21 @@ Store repayments tracked only via Excel upload.
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
 - `lib/db/src/schema.ts` — Database schema (Drizzle ORM)
 
-## Clerk Dashboard Setup (Required for 2FA)
+## Step-Up Verification (custom email OTP)
 
-Email two-step verification is enforced through Clerk:
-1. **Clerk Dashboard → User & Authentication → Multi-factor**: enable **Email verification code** as a second factor (set to "Required" or "Optional" per policy).
-2. **Clerk Dashboard → Sessions → Reverification**: ensure reverification is enabled (the app calls `auth.has({ reverification: 'strict' })` for sensitive actions, with a 10-minute window).
-3. No code changes are needed when toggling these settings — middleware in `artifacts/api-server/src/middlewares/auth.ts` (`requireReverification`, `requireReverificationIf`) and the frontend hook `artifacts/cooperative/src/lib/step-up.tsx` (`useStepUpAction`) handle it automatically.
+Sensitive actions require a fresh email-OTP step-up within a 10-minute window. Built in-house because Clerk's MFA is paid-tier only.
 
-Sensitive actions that trigger step-up reverification:
+**How it works:**
+1. Frontend calls a sensitive endpoint — backend `requireReverification` middleware checks `step_up_grants` for the user.
+2. If no fresh grant, returns `403 { step_up_required: true }`.
+3. Frontend `useStepUpAction` hook (`artifacts/cooperative/src/lib/step-up.tsx`) catches that, opens the modal in `StepUpProvider`, calls `POST /auth/step-up/request` (emails a 6-digit code via Gmail SMTP), then `POST /auth/step-up/verify` on submit. On success a 10-minute `step_up_grants` row is inserted and the original mutation is retried.
+
+**Required secrets:** `SMTP_USER` (Gmail address) and `SMTP_APP_PASSWORD` (16-character Google App Password).
+
+**Tables:** `otp_codes` (hashed codes, 10-min TTL, max 5 attempts) and `step_up_grants` (memberId + expiresAt).
+
+**Sensitive actions:**
 - Loan approve / reject / disburse
-- Settings updates (interest rate, etc.)
-- Member role/status changes, deletions, bulk org assignment
+- Settings updates
+- Member role/status changes, deletions, bulk org assignment, activate/deactivate
 - Excel deduction file processing

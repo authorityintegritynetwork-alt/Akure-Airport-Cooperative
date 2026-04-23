@@ -159,6 +159,7 @@ export function MembersPage() {
       queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
       setEditingMember(null);
     } catch (err: any) {
+      if (err?.cancelled) return;
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
     }
   }
@@ -171,6 +172,7 @@ export function MembersPage() {
       queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
       setDeletingMember(null);
     } catch (err: any) {
+      if (err?.cancelled) return;
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
     }
   }
@@ -378,6 +380,7 @@ export function MembersPage() {
                     setSelectedIds(new Set());
                     queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
                   } catch (err: any) {
+                    if (err?.cancelled) return;
                     toast({ title: "Bulk assign failed", description: err.message, variant: "destructive" });
                   }
                 }}

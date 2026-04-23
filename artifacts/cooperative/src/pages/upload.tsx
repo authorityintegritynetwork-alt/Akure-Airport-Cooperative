@@ -209,6 +209,7 @@ export function UploadPage() {
       queryClient.invalidateQueries({ queryKey: getListUploadHistoryQueryKey() });
       reset();
     } catch (err: any) {
+      if (err?.cancelled) return;
       toast({ title: "Processing failed", description: err.message, variant: "destructive" });
     }
   }

@@ -54,6 +54,7 @@ import type {
   MemberSummary,
   Notification,
   RegisterMemberBody,
+  RequestStepUpCode200,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
   SavingsBalance,
@@ -66,6 +67,8 @@ import type {
   UpdateSettingsBody,
   UpdateStoreItemBody,
   UploadRecord,
+  VerifyStepUpCode200,
+  VerifyStepUpCodeBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -226,6 +229,173 @@ export function useGetProfile<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Email a 6-digit verification code to the current user for step-up auth
+ */
+export const getRequestStepUpCodeUrl = () => {
+  return `/api/auth/step-up/request`;
+};
+
+export const requestStepUpCode = async (
+  options?: RequestInit,
+): Promise<RequestStepUpCode200> => {
+  return customFetch<RequestStepUpCode200>(getRequestStepUpCodeUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRequestStepUpCodeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestStepUpCode>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestStepUpCode>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["requestStepUpCode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestStepUpCode>>,
+    void
+  > = () => {
+    return requestStepUpCode(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestStepUpCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestStepUpCode>>
+>;
+
+export type RequestStepUpCodeMutationError = ErrorType<void>;
+
+/**
+ * @summary Email a 6-digit verification code to the current user for step-up auth
+ */
+export const useRequestStepUpCode = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestStepUpCode>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestStepUpCode>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRequestStepUpCodeMutationOptions(options));
+};
+
+/**
+ * @summary Verify a 6-digit step-up code; on success grants a 10-minute step-up window
+ */
+export const getVerifyStepUpCodeUrl = () => {
+  return `/api/auth/step-up/verify`;
+};
+
+export const verifyStepUpCode = async (
+  verifyStepUpCodeBody: VerifyStepUpCodeBody,
+  options?: RequestInit,
+): Promise<VerifyStepUpCode200> => {
+  return customFetch<VerifyStepUpCode200>(getVerifyStepUpCodeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(verifyStepUpCodeBody),
+  });
+};
+
+export const getVerifyStepUpCodeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyStepUpCode>>,
+    TError,
+    { data: BodyType<VerifyStepUpCodeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof verifyStepUpCode>>,
+  TError,
+  { data: BodyType<VerifyStepUpCodeBody> },
+  TContext
+> => {
+  const mutationKey = ["verifyStepUpCode"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof verifyStepUpCode>>,
+    { data: BodyType<VerifyStepUpCodeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return verifyStepUpCode(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VerifyStepUpCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof verifyStepUpCode>>
+>;
+export type VerifyStepUpCodeMutationBody = BodyType<VerifyStepUpCodeBody>;
+export type VerifyStepUpCodeMutationError = ErrorType<void>;
+
+/**
+ * @summary Verify a 6-digit step-up code; on success grants a 10-minute step-up window
+ */
+export const useVerifyStepUpCode = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyStepUpCode>>,
+    TError,
+    { data: BodyType<VerifyStepUpCodeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof verifyStepUpCode>>,
+  TError,
+  { data: BodyType<VerifyStepUpCodeBody> },
+  TContext
+> => {
+  return useMutation(getVerifyStepUpCodeMutationOptions(options));
+};
 
 /**
  * @summary Self-register a new member (locked until admin activates)

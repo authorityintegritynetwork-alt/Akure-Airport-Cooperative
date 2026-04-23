@@ -686,6 +686,19 @@ export interface RequestUploadUrlResponse {
   objectPath: string;
 }
 
+export type RequestStepUpCode200 = {
+  sentTo: string;
+};
+
+export type VerifyStepUpCodeBody = {
+  /** @pattern ^[0-9]{6}$ */
+  code: string;
+};
+
+export type VerifyStepUpCode200 = {
+  ok: boolean;
+};
+
 export type ListMembersParams = {
   status?: ListMembersStatus;
   organization?: ListMembersOrganization;

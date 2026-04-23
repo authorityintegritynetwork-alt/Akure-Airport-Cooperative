@@ -52,6 +52,55 @@ paths:
         "404":
           description: Not found
 
+  /auth/step-up/request:
+    post:
+      operationId: requestStepUpCode
+      tags: [auth]
+      summary: Email a 6-digit verification code to the current user for step-up auth
+      responses:
+        "200":
+          description: Code emailed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sentTo:
+                    type: string
+                required: [sentTo]
+        "429":
+          description: Rate limited
+
+  /auth/step-up/verify:
+    post:
+      operationId: verifyStepUpCode
+      tags: [auth]
+      summary: Verify a 6-digit step-up code; on success grants a 10-minute step-up window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  pattern: "^[0-9]{6}$"
+              required: [code]
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "400":
+          description: Invalid or expired code
+
   /auth/register:
     post:
       operationId: registerMember

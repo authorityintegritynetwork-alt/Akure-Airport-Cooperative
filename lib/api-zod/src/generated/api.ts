@@ -52,6 +52,26 @@ export const GetProfileResponse = zod.object({
 });
 
 /**
+ * @summary Email a 6-digit verification code to the current user for step-up auth
+ */
+export const RequestStepUpCodeResponse = zod.object({
+  sentTo: zod.string(),
+});
+
+/**
+ * @summary Verify a 6-digit step-up code; on success grants a 10-minute step-up window
+ */
+export const verifyStepUpCodeBodyCodeRegExp = new RegExp("^[0-9]{6}$");
+
+export const VerifyStepUpCodeBody = zod.object({
+  code: zod.string().regex(verifyStepUpCodeBodyCodeRegExp),
+});
+
+export const VerifyStepUpCodeResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
  * @summary Self-register a new member (locked until admin activates)
  */
 export const RegisterMemberBody = zod.object({

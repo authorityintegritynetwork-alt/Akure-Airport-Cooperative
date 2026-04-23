@@ -7,6 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
+import { StepUpProvider } from "@/lib/step-up";
 
 import { LandingPage, PendingApproval } from "./pages/landing";
 import { AppLayout } from "./components/layout";
@@ -195,6 +196,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
+        <StepUpProvider>
         <Switch>
           <Route path="/" component={HomeRedirect} />
           <Route path="/sign-in/*?" component={SignInPage} />
@@ -256,6 +258,7 @@ function ClerkProviderWithRoutes() {
             </div>
           </Route>
         </Switch>
+        </StepUpProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );
