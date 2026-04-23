@@ -699,6 +699,10 @@ export type VerifyStepUpCode200 = {
   ok: boolean;
 };
 
+export type GetStepUpStatus200 = {
+  active: boolean;
+};
+
 export type ListMembersParams = {
   status?: ListMembersStatus;
   organization?: ListMembersOrganization;

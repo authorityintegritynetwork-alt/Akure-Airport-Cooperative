@@ -7,7 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
-import { StepUpProvider } from "@/lib/step-up";
+import { StepUpProvider, StepUpGate } from "@/lib/step-up";
 
 import { LandingPage, PendingApproval } from "./pages/landing";
 import { AppLayout } from "./components/layout";
@@ -152,7 +152,14 @@ function SignedInRouter({ children }: { children: React.ReactNode }) {
     return <Redirect to="/pending-approval" />;
   }
 
-  return <>{children}</>;
+  // Force email-OTP step-up once per Clerk session, before any app page.
+  // Bypass for the profile-completion and pending-approval screens — those
+  // are part of the sign-up flow and the user has nothing sensitive to access yet.
+  if (!profile || location === "/complete-profile" || location === "/pending-approval") {
+    return <>{children}</>;
+  }
+
+  return <StepUpGate>{children}</StepUpGate>;
 }
 
 function HomeRedirect() {

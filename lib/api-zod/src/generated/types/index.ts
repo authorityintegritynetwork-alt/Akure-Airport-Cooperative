@@ -34,6 +34,7 @@ export * from "./excelUploadProcessBody";
 export * from "./excelUploadProcessBodyOrganization";
 export * from "./excelUploadResult";
 export * from "./getRecentActivityParams";
+export * from "./getStepUpStatus200";
 export * from "./healthStatus";
 export * from "./listAuditLogsFormat";
 export * from "./listAuditLogsParams";

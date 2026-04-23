@@ -9,6 +9,7 @@ export type AuthRequest = Request & {
   memberRole?: string;
   memberStatus?: string;
   clerkUserId?: string;
+  clerkSessionId?: string;
 };
 
 export async function requireAuth(
@@ -25,6 +26,7 @@ export async function requireAuth(
   }
 
   req.clerkUserId = userId;
+  req.clerkSessionId = auth?.sessionId ?? undefined;
 
   const [member] = await db
     .select()
@@ -74,7 +76,7 @@ export async function requireReverification(
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const ok = await hasActiveStepUpGrant(req.memberId);
+  const ok = await hasActiveStepUpGrant(req.memberId, req.clerkSessionId);
   if (!ok) {
     res.status(403).json({
       error: "Step-up verification required",

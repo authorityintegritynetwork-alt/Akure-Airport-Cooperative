@@ -34,6 +34,7 @@ import type {
   ExcelUploadProcessBody,
   ExcelUploadResult,
   GetRecentActivityParams,
+  GetStepUpStatus200,
   HealthStatus,
   ListAuditLogsParams,
   ListLoansParams,
@@ -396,6 +397,81 @@ export const useVerifyStepUpCode = <
 > => {
   return useMutation(getVerifyStepUpCodeMutationOptions(options));
 };
+
+/**
+ * @summary Check whether the current Clerk session has an active step-up grant
+ */
+export const getGetStepUpStatusUrl = () => {
+  return `/api/auth/step-up/status`;
+};
+
+export const getStepUpStatus = async (
+  options?: RequestInit,
+): Promise<GetStepUpStatus200> => {
+  return customFetch<GetStepUpStatus200>(getGetStepUpStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStepUpStatusQueryKey = () => {
+  return [`/api/auth/step-up/status`] as const;
+};
+
+export const getGetStepUpStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStepUpStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStepUpStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetStepUpStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getStepUpStatus>>> = ({
+    signal,
+  }) => getStepUpStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStepUpStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStepUpStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStepUpStatus>>
+>;
+export type GetStepUpStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check whether the current Clerk session has an active step-up grant
+ */
+
+export function useGetStepUpStatus<
+  TData = Awaited<ReturnType<typeof getStepUpStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStepUpStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStepUpStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Self-register a new member (locked until admin activates)

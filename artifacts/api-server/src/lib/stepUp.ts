@@ -57,7 +57,11 @@ export async function requestStepUpCode(memberId: number): Promise<{ sentTo: str
   return { sentTo: `${masked}@${domain}` };
 }
 
-export async function verifyStepUpCode(memberId: number, code: string): Promise<boolean> {
+export async function verifyStepUpCode(
+  memberId: number,
+  code: string,
+  clerkSessionId?: string,
+): Promise<boolean> {
   const now = new Date();
   const [latest] = await db
     .select()
@@ -88,18 +92,30 @@ export async function verifyStepUpCode(memberId: number, code: string): Promise<
   if (!ok) return false;
 
   const grantExpiresAt = new Date(Date.now() + GRANT_TTL_MIN * 60_000);
-  await db.insert(stepUpGrantsTable).values({ memberId, expiresAt: grantExpiresAt });
+  await db.insert(stepUpGrantsTable).values({
+    memberId,
+    clerkSessionId: clerkSessionId ?? null,
+    expiresAt: grantExpiresAt,
+  });
   return true;
 }
 
-export async function hasActiveStepUpGrant(memberId: number): Promise<boolean> {
+export async function hasActiveStepUpGrant(
+  memberId: number,
+  clerkSessionId?: string,
+): Promise<boolean> {
   const now = new Date();
+  const conds = [
+    eq(stepUpGrantsTable.memberId, memberId),
+    gt(stepUpGrantsTable.expiresAt, now),
+  ];
+  if (clerkSessionId) {
+    conds.push(eq(stepUpGrantsTable.clerkSessionId, clerkSessionId));
+  }
   const [grant] = await db
     .select({ id: stepUpGrantsTable.id })
     .from(stepUpGrantsTable)
-    .where(
-      and(eq(stepUpGrantsTable.memberId, memberId), gt(stepUpGrantsTable.expiresAt, now)),
-    )
+    .where(and(...conds))
     .orderBy(desc(stepUpGrantsTable.createdAt))
     .limit(1);
   return !!grant;

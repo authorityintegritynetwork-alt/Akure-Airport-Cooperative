@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
 import { AuthRequest, requireAuth } from "../middlewares/auth";
-import { requestStepUpCode, verifyStepUpCode } from "../lib/stepUp";
+import { requestStepUpCode, verifyStepUpCode, hasActiveStepUpGrant } from "../lib/stepUp";
 
 const router: IRouter = Router();
 
@@ -55,12 +55,25 @@ router.post(
       res.status(400).json({ error: "Invalid code format" });
       return;
     }
-    const ok = await verifyStepUpCode(req.memberId, code);
+    const ok = await verifyStepUpCode(req.memberId, code, req.clerkSessionId);
     if (!ok) {
       res.status(400).json({ error: "Invalid or expired code" });
       return;
     }
     res.json({ ok: true });
+  },
+);
+
+router.get(
+  "/auth/step-up/status",
+  requireAuth,
+  async (req: AuthRequest, res): Promise<void> => {
+    if (!req.memberId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const active = await hasActiveStepUpGrant(req.memberId, req.clerkSessionId);
+    res.json({ active });
   },
 );
 

@@ -101,6 +101,23 @@ paths:
         "400":
           description: Invalid or expired code
 
+  /auth/step-up/status:
+    get:
+      operationId: getStepUpStatus
+      tags: [auth]
+      summary: Check whether the current Clerk session has an active step-up grant
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                required: [active]
+
   /auth/register:
     post:
       operationId: registerMember

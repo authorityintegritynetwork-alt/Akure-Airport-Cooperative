@@ -29,6 +29,7 @@ export const stepUpGrantsTable = pgTable(
     memberId: integer("member_id")
       .notNull()
       .references(() => membersTable.id),
+    clerkSessionId: text("clerk_session_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

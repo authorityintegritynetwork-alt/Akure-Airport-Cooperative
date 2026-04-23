@@ -72,6 +72,13 @@ export const VerifyStepUpCodeResponse = zod.object({
 });
 
 /**
+ * @summary Check whether the current Clerk session has an active step-up grant
+ */
+export const GetStepUpStatusResponse = zod.object({
+  active: zod.boolean(),
+});
+
+/**
  * @summary Self-register a new member (locked until admin activates)
  */
 export const RegisterMemberBody = zod.object({
