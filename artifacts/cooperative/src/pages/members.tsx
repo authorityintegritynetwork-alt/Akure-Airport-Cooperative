@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import {
   useListMembers,
   useActivateMember,
@@ -88,8 +88,14 @@ function memberStatusBadge(status: string) {
 }
 
 export function MembersPage() {
+  const searchString = useSearch();
+  const initialStatus = (() => {
+    const sp = new URLSearchParams(searchString);
+    const s = sp.get("status");
+    return s === "pending" || s === "active" || s === "inactive" ? s : "";
+  })();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [orgFilter, setOrgFilter] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<any | null>(null);
