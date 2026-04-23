@@ -23,8 +23,8 @@ export function MemberDetailPage() {
   const [, params] = useRoute("/members/:id");
   const memberId = parseInt(params?.id || "0", 10);
 
-  const { data: member, isLoading } = useGetMember(memberId, {
-    query: { enabled: !!memberId, queryKey: getGetMemberQueryKey(memberId) },
+  const { data: member, isLoading, error } = useGetMember(memberId, {
+    query: { enabled: !!memberId, queryKey: getGetMemberQueryKey(memberId), retry: false },
   });
   const { data: summary } = useGetMemberSummary(memberId, {
     query: { enabled: !!memberId, queryKey: getGetMemberSummaryQueryKey(memberId) },
@@ -39,8 +39,38 @@ export function MemberDetailPage() {
     query: { enabled: !!memberId, queryKey: getListStorePurchasesQueryKey({ memberId }) },
   });
 
+  if (!memberId) {
+    return (
+      <div className="space-y-4 max-w-md">
+        <div className="text-muted-foreground">Invalid member ID in the URL.</div>
+        <Link href="/members"><Button variant="outline" size="sm"><ArrowLeft className="w-4 h-4 mr-2"/>Back to members</Button></Link>
+      </div>
+    );
+  }
   if (isLoading) return <Skeleton className="h-64 w-full" />;
-  if (!member) return <div className="text-muted-foreground">Member not found.</div>;
+  if (!member) {
+    const status = (error as any)?.response?.status ?? (error as any)?.status;
+    const msg =
+      (error as any)?.response?.data?.error ??
+      (error as any)?.data?.error ??
+      (error as any)?.message ??
+      "We couldn't load this member.";
+    return (
+      <div className="space-y-4 max-w-md">
+        <div>
+          <h1 className="text-xl font-semibold">Member unavailable</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            {status ? `(${status}) ` : ""}{msg}
+          </p>
+        </div>
+        <Link href="/members">
+          <Button variant="outline" size="sm">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to members
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">

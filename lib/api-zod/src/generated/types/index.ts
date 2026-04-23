@@ -71,6 +71,7 @@ export * from "./memberSummaryOrganization";
 export * from "./notification";
 export * from "./notificationType";
 export * from "./registerMemberBody";
+export * from "./registerMemberBodyOrganization";
 export * from "./requestStepUpCode200";
 export * from "./requestUploadUrlBody";
 export * from "./requestUploadUrlResponse";

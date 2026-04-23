@@ -125,10 +125,19 @@ export interface MemberProfile {
   createdAt: string;
 }
 
+export type RegisterMemberBodyOrganization =
+  (typeof RegisterMemberBodyOrganization)[keyof typeof RegisterMemberBodyOrganization];
+
+export const RegisterMemberBodyOrganization = {
+  faan: "faan",
+  nama: "nama",
+} as const;
+
 export interface RegisterMemberBody {
   fullName: string;
   phone?: string;
   staffId?: string;
+  organization: RegisterMemberBodyOrganization;
 }
 
 export type CreateMemberBodyRole =

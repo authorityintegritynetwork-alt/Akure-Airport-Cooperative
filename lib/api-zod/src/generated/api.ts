@@ -85,6 +85,7 @@ export const RegisterMemberBody = zod.object({
   fullName: zod.string(),
   phone: zod.string().optional(),
   staffId: zod.string().optional(),
+  organization: zod.enum(["faan", "nama"]),
 });
 
 /**

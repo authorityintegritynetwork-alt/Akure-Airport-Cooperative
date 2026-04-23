@@ -1263,7 +1263,10 @@ components:
           type: string
         staffId:
           type: string
-      required: [fullName]
+        organization:
+          type: string
+          enum: [faan, nama]
+      required: [fullName, organization]
 
     CreateMemberBody:
       type: object

@@ -20,6 +20,7 @@ export function CompleteProfilePage() {
   const [fullName, setFullName] = useState(defaultName);
   const [phone, setPhone] = useState("");
   const [staffId, setStaffId] = useState("");
+  const [organization, setOrganization] = useState<"faan" | "nama" | "">("");
 
   const register = useRegisterMember({
     mutation: {
@@ -44,11 +45,16 @@ export function CompleteProfilePage() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
+    if (organization !== "faan" && organization !== "nama") {
+      toast({ title: "Please select your employer (FAAN or NAMA)", variant: "destructive" });
+      return;
+    }
     register.mutate({
       data: {
         fullName: fullName.trim(),
         phone: phone.trim() || undefined,
         staffId: staffId.trim() || undefined,
+        organization,
       },
     });
   };
@@ -92,6 +98,40 @@ export function CompleteProfilePage() {
                 onChange={(e) => setStaffId(e.target.value)}
                 placeholder="Optional"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Employer *</Label>
+              <p className="text-xs text-muted-foreground">
+                Select the organization that employs you. This determines which deduction format and balance categories apply to your account.
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  data-testid="org-faan"
+                  onClick={() => setOrganization("faan")}
+                  className={`border rounded-lg px-3 py-3 text-left transition ${
+                    organization === "faan"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">FAAN</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Federal Airports Authority of Nigeria</div>
+                </button>
+                <button
+                  type="button"
+                  data-testid="org-nama"
+                  onClick={() => setOrganization("nama")}
+                  className={`border rounded-lg px-3 py-3 text-left transition ${
+                    organization === "nama"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">NAMA</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Nigerian Airspace Management Agency</div>
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full mt-2" disabled={register.isPending}>
               {register.isPending ? "Creating account..." : "Create account"}

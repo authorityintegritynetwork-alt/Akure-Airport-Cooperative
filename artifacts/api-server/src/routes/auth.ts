@@ -89,6 +89,7 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
         email,
         phone: parsed.data.phone ?? undefined,
         staffId: parsed.data.staffId ?? undefined,
+        organization: ((parsed.data as any).organization as any) ?? "faan",
         role: isFirstUser ? "super_admin" : "member",
         status: isFirstUser ? "active" : "pending",
       })
