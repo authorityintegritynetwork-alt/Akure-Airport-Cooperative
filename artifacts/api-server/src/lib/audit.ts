@@ -1,4 +1,5 @@
-import { db, auditLogsTable } from "@workspace/db";
+import { db, auditLogsTable, membersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 export async function logAudit(params: {
   actorId?: number;
@@ -8,5 +9,14 @@ export async function logAudit(params: {
   entityId?: number;
   details?: string;
 }) {
-  await db.insert(auditLogsTable).values(params);
+  let actorName = params.actorName;
+  if (!actorName && params.actorId) {
+    const [m] = await db
+      .select({ fullName: membersTable.fullName })
+      .from(membersTable)
+      .where(eq(membersTable.id, params.actorId))
+      .limit(1);
+    if (m?.fullName) actorName = m.fullName;
+  }
+  await db.insert(auditLogsTable).values({ ...params, actorName: actorName ?? null });
 }

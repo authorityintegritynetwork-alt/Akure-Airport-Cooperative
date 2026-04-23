@@ -94,6 +94,7 @@ export function MembersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<any | null>(null);
   const [deletingMember, setDeletingMember] = useState<any | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -167,10 +168,15 @@ export function MembersPage() {
   async function confirmDelete() {
     if (!deletingMember) return;
     try {
+      const name = deletingMember.fullName;
       await deleteMemberWithStepUp(deletingMember.id);
-      toast({ title: "Member deleted", description: deletingMember.fullName });
+      toast({
+        title: "Member permanently deleted",
+        description: `${name} and all of their savings, loans and purchases have been removed.`,
+      });
       queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
       setDeletingMember(null);
+      setDeleteConfirmText("");
     } catch (err: any) {
       if (err?.cancelled) return;
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
@@ -607,24 +613,44 @@ export function MembersPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deletingMember} onOpenChange={(o) => !o && setDeletingMember(null)}>
+      <AlertDialog
+        open={!!deletingMember}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeletingMember(null);
+            setDeleteConfirmText("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this member?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{deletingMember?.fullName}</strong> along with all their
-              transactions, loans, and store purchases. This action cannot be undone.
+              This will <strong>permanently delete</strong> <strong>{deletingMember?.fullName}</strong> along with all of
+              their savings, transactions, loans, and store purchases. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">
+              Type <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{deletingMember?.fullName}</span> below to confirm.
+            </label>
+            <Input
+              autoFocus
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={deletingMember?.fullName}
+              data-testid="input-delete-confirm"
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              disabled={deleteMember.isPending}
+              disabled={deleteMember.isPending || deleteConfirmText.trim() !== (deletingMember?.fullName ?? "")}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
-              {deleteMember.isPending ? "Deleting..." : "Delete"}
+              {deleteMember.isPending ? "Deleting..." : "Yes, permanently delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
