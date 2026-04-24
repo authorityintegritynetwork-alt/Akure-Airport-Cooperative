@@ -45,6 +45,41 @@ export async function requireAuth(
   next();
 }
 
+/**
+ * Like requireAuth but does NOT require the Clerk user to already have a
+ * member row. Used by endpoints that pre-member users need during sign-up
+ * (e.g. listing active organizations on the complete-profile page).
+ */
+export async function requireClerkUser(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const auth = getAuth(req);
+  const userId = auth?.userId;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  req.clerkUserId = userId;
+  req.clerkSessionId = auth?.sessionId ?? undefined;
+
+  const [member] = await db
+    .select()
+    .from(membersTable)
+    .where(eq(membersTable.clerkUserId, userId));
+
+  if (member) {
+    req.memberId = member.id;
+    req.memberRole = member.role;
+    req.memberStatus = member.status;
+  }
+
+  next();
+}
+
 export function requireRole(...roles: string[]) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     if (!req.memberRole) {

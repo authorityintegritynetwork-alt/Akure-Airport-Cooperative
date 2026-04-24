@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useUser, useClerk } from "@clerk/react";
-import { useRegisterMember } from "@workspace/api-client-react";
+import { useRegisterMember, useListOrganizations } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,9 @@ export function CompleteProfilePage() {
   const [fullName, setFullName] = useState(defaultName);
   const [phone, setPhone] = useState("");
   const [staffId, setStaffId] = useState("");
-  const [organization, setOrganization] = useState<"faan" | "nama" | "">("");
+  const [organization, setOrganization] = useState<string>("");
+
+  const { data: organizations, isLoading: orgsLoading } = useListOrganizations();
 
   const register = useRegisterMember({
     mutation: {
@@ -45,8 +47,8 @@ export function CompleteProfilePage() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
-    if (organization !== "faan" && organization !== "nama") {
-      toast({ title: "Please select your employer (FAAN or NAMA)", variant: "destructive" });
+    if (!organization) {
+      toast({ title: "Please select your employer", variant: "destructive" });
       return;
     }
     register.mutate({
@@ -105,32 +107,34 @@ export function CompleteProfilePage() {
                 Select the organization that employs you. This determines which deduction format and balance categories apply to your account.
               </p>
               <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  data-testid="org-faan"
-                  onClick={() => setOrganization("faan")}
-                  className={`border rounded-lg px-3 py-3 text-left transition ${
-                    organization === "faan"
-                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="font-semibold text-sm">FAAN</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Federal Airports Authority of Nigeria</div>
-                </button>
-                <button
-                  type="button"
-                  data-testid="org-nama"
-                  onClick={() => setOrganization("nama")}
-                  className={`border rounded-lg px-3 py-3 text-left transition ${
-                    organization === "nama"
-                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="font-semibold text-sm">NAMA</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Nigerian Airspace Management Agency</div>
-                </button>
+                {orgsLoading && (
+                  <div className="col-span-2 text-sm text-muted-foreground py-3">
+                    Loading organizations...
+                  </div>
+                )}
+                {!orgsLoading && (!organizations || organizations.length === 0) && (
+                  <div className="col-span-2 text-sm text-destructive py-3">
+                    No organizations have been set up yet. Please contact an administrator.
+                  </div>
+                )}
+                {organizations?.map((org) => (
+                  <button
+                    key={org.code}
+                    type="button"
+                    data-testid={`org-${org.code.toLowerCase()}`}
+                    onClick={() => setOrganization(org.code)}
+                    className={`border rounded-lg px-3 py-3 text-left transition ${
+                      organization === org.code
+                        ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">{org.code}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {org.description || org.name}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
             <Button type="submit" className="w-full mt-2" disabled={register.isPending}>

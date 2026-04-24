@@ -27,14 +27,6 @@ export const MemberStatus = {
   inactive: "inactive",
 } as const;
 
-export type MemberOrganization =
-  (typeof MemberOrganization)[keyof typeof MemberOrganization];
-
-export const MemberOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface Member {
   id: number;
   /** @nullable */
@@ -47,7 +39,7 @@ export interface Member {
   staffId?: string | null;
   role: MemberRole;
   status: MemberStatus;
-  organization: MemberOrganization;
+  organization: string;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;
@@ -87,14 +79,6 @@ export const MemberProfileStatus = {
   inactive: "inactive",
 } as const;
 
-export type MemberProfileOrganization =
-  (typeof MemberProfileOrganization)[keyof typeof MemberProfileOrganization];
-
-export const MemberProfileOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface MemberProfile {
   id: number;
   clerkUserId: string;
@@ -121,23 +105,15 @@ export interface MemberProfile {
   totalStoreDebt: number;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
-  organization?: MemberProfileOrganization;
+  organization?: string;
   createdAt: string;
 }
-
-export type RegisterMemberBodyOrganization =
-  (typeof RegisterMemberBodyOrganization)[keyof typeof RegisterMemberBodyOrganization];
-
-export const RegisterMemberBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
 
 export interface RegisterMemberBody {
   fullName: string;
   phone?: string;
   staffId?: string;
-  organization: RegisterMemberBodyOrganization;
+  organization: string;
 }
 
 export type CreateMemberBodyRole =
@@ -160,14 +136,6 @@ export const CreateMemberBodyStatus = {
   inactive: "inactive",
 } as const;
 
-export type CreateMemberBodyOrganization =
-  (typeof CreateMemberBodyOrganization)[keyof typeof CreateMemberBodyOrganization];
-
-export const CreateMemberBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface CreateMemberBody {
   fullName: string;
   email: string;
@@ -175,7 +143,7 @@ export interface CreateMemberBody {
   staffId?: string;
   role?: CreateMemberBodyRole;
   status?: CreateMemberBodyStatus;
-  organization?: CreateMemberBodyOrganization;
+  organization?: string;
 }
 
 export type UpdateMemberBodyRole =
@@ -198,44 +166,77 @@ export const UpdateMemberBodyStatus = {
   inactive: "inactive",
 } as const;
 
-export type UpdateMemberBodyOrganization =
-  (typeof UpdateMemberBodyOrganization)[keyof typeof UpdateMemberBodyOrganization];
-
-export const UpdateMemberBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface UpdateMemberBody {
   fullName?: string;
   phone?: string;
   staffId?: string;
   role?: UpdateMemberBodyRole;
   status?: UpdateMemberBodyStatus;
-  organization?: UpdateMemberBodyOrganization;
+  organization?: string;
 }
-
-export type BulkOrganizationBodyOrganization =
-  (typeof BulkOrganizationBodyOrganization)[keyof typeof BulkOrganizationBodyOrganization];
-
-export const BulkOrganizationBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
 
 export interface BulkOrganizationBody {
   /** @minItems 1 */
   memberIds: number[];
-  organization: BulkOrganizationBodyOrganization;
+  organization: string;
 }
 
-export type MemberSummaryOrganization =
-  (typeof MemberSummaryOrganization)[keyof typeof MemberSummaryOrganization];
+export type OrganizationExcelFormat =
+  (typeof OrganizationExcelFormat)[keyof typeof OrganizationExcelFormat];
 
-export const MemberSummaryOrganization = {
+export const OrganizationExcelFormat = {
   faan: "faan",
   nama: "nama",
 } as const;
+
+export interface Organization {
+  id: number;
+  code: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  excelFormat: OrganizationExcelFormat;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Which Excel column layout this organization's monthly deduction file uses.
+ */
+export type CreateOrganizationBodyExcelFormat =
+  (typeof CreateOrganizationBodyExcelFormat)[keyof typeof CreateOrganizationBodyExcelFormat];
+
+export const CreateOrganizationBodyExcelFormat = {
+  faan: "faan",
+  nama: "nama",
+} as const;
+
+export interface CreateOrganizationBody {
+  /** Short uppercase identifier, 2-16 chars, e.g. 'FAAN'. */
+  code: string;
+  /** Full display name shown to members. */
+  name: string;
+  /** Optional one-line description shown on the sign-up screen. */
+  description?: string;
+  /** Which Excel column layout this organization's monthly deduction file uses. */
+  excelFormat: CreateOrganizationBodyExcelFormat;
+}
+
+export type UpdateOrganizationBodyExcelFormat =
+  (typeof UpdateOrganizationBodyExcelFormat)[keyof typeof UpdateOrganizationBodyExcelFormat];
+
+export const UpdateOrganizationBodyExcelFormat = {
+  faan: "faan",
+  nama: "nama",
+} as const;
+
+export interface UpdateOrganizationBody {
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+  excelFormat?: UpdateOrganizationBodyExcelFormat;
+}
 
 export interface MemberSummary {
   memberId: number;
@@ -247,7 +248,7 @@ export interface MemberSummary {
   totalLoansRepaid: number;
   activeLoansCount: number;
   pendingStoreDebt: number;
-  organization?: MemberSummaryOrganization;
+  organization?: string;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
 }
@@ -284,17 +285,9 @@ export interface Transaction {
   createdAt: string;
 }
 
-export type ExcelSheetsBodyOrganization =
-  (typeof ExcelSheetsBodyOrganization)[keyof typeof ExcelSheetsBodyOrganization];
-
-export const ExcelSheetsBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface ExcelSheetsBody {
   fileObjectPath: string;
-  organization: ExcelSheetsBodyOrganization;
+  organization: string;
 }
 
 export interface ExcelSheetInfo {
@@ -312,20 +305,12 @@ export interface ManualMatch {
   memberId: number;
 }
 
-export type ExcelUploadPreviewBodyOrganization =
-  (typeof ExcelUploadPreviewBodyOrganization)[keyof typeof ExcelUploadPreviewBodyOrganization];
-
-export const ExcelUploadPreviewBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface ExcelUploadPreviewBody {
   fileObjectPath: string;
   sheetName?: string;
   month: string;
   year: number;
-  organization: ExcelUploadPreviewBodyOrganization;
+  organization: string;
   manualMatches?: ManualMatch[];
 }
 
@@ -337,18 +322,6 @@ export const ExcelRowPreviewMatchConfidence = {
   fuzzy: "fuzzy",
   manual: "manual",
   none: "none",
-} as const;
-
-/**
- * @nullable
- */
-export type ExcelRowPreviewMemberOrganization =
-  | (typeof ExcelRowPreviewMemberOrganization)[keyof typeof ExcelRowPreviewMemberOrganization]
-  | null;
-
-export const ExcelRowPreviewMemberOrganization = {
-  faan: "faan",
-  nama: "nama",
 } as const;
 
 export interface ExcelRowPreview {
@@ -373,7 +346,7 @@ export interface ExcelRowPreview {
   fuelVenture: number;
   landLoan: number;
   /** @nullable */
-  memberOrganization?: ExcelRowPreviewMemberOrganization;
+  memberOrganization?: string | null;
   orgMismatch: boolean;
   total: number;
   computedTotal: number;
@@ -394,20 +367,12 @@ export interface ExcelUploadPreview {
   rows: ExcelRowPreview[];
 }
 
-export type ExcelUploadProcessBodyOrganization =
-  (typeof ExcelUploadProcessBodyOrganization)[keyof typeof ExcelUploadProcessBodyOrganization];
-
-export const ExcelUploadProcessBodyOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface ExcelUploadProcessBody {
   fileObjectPath: string;
   sheetName?: string;
   month: string;
   year: number;
-  organization: ExcelUploadProcessBodyOrganization;
+  organization: string;
   skipErrors?: boolean;
   autoTagOrganization?: boolean;
   manualMatches?: ManualMatch[];
@@ -419,14 +384,6 @@ export interface ExcelUploadResult {
   skipped: number;
   errors: string[];
 }
-
-export type UploadRecordOrganization =
-  (typeof UploadRecordOrganization)[keyof typeof UploadRecordOrganization];
-
-export const UploadRecordOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
 
 export type UploadRecordStatus =
   (typeof UploadRecordStatus)[keyof typeof UploadRecordStatus];
@@ -443,7 +400,7 @@ export interface UploadRecord {
   uploaderName: string;
   month: string;
   year: number;
-  organization: UploadRecordOrganization;
+  organization: string;
   fileObjectPath: string;
   rowsProcessed: number;
   rowsSkipped: number;
@@ -714,7 +671,7 @@ export type GetStepUpStatus200 = {
 
 export type ListMembersParams = {
   status?: ListMembersStatus;
-  organization?: ListMembersOrganization;
+  organization?: string;
   search?: string;
 };
 
@@ -727,16 +684,12 @@ export const ListMembersStatus = {
   inactive: "inactive",
 } as const;
 
-export type ListMembersOrganization =
-  (typeof ListMembersOrganization)[keyof typeof ListMembersOrganization];
-
-export const ListMembersOrganization = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export type DeleteMember200 = {
   deleted: boolean;
+};
+
+export type ListOrganizationsParams = {
+  includeInactive?: boolean;
 };
 
 export type BulkAssignOrganization200 = {

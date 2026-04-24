@@ -5,10 +5,9 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { BulkOrganizationBodyOrganization } from "./bulkOrganizationBodyOrganization";
 
 export interface BulkOrganizationBody {
   /** @minItems 1 */
   memberIds: number[];
-  organization: BulkOrganizationBodyOrganization;
+  organization: string;
 }

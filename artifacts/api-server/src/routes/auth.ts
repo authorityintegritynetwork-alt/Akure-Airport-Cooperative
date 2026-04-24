@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
-import { db, membersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, membersTable, organizationsTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { AuthRequest } from "../middlewares/auth";
 import { RegisterMemberBody } from "@workspace/api-zod";
 import { getClerkUser } from "../lib/clerk";
@@ -53,6 +53,29 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
+  const requestedOrg = String((parsed.data as any).organization || "")
+    .trim()
+    .toUpperCase();
+  if (!requestedOrg) {
+    res.status(400).json({ error: "Please select an organization." });
+    return;
+  }
+  const [orgRow] = await db
+    .select({ code: organizationsTable.code })
+    .from(organizationsTable)
+    .where(
+      and(
+        eq(organizationsTable.code, requestedOrg),
+        eq(organizationsTable.isActive, true),
+      ),
+    );
+  if (!orgRow) {
+    res.status(400).json({
+      error: `Organization "${requestedOrg}" is not available. Please pick from the list.`,
+    });
+    return;
+  }
+
   const clerkUser = await getClerkUser(userId);
   const email = clerkUser?.emailAddress;
   if (!email) {
@@ -89,7 +112,7 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
         email,
         phone: parsed.data.phone ?? undefined,
         staffId: parsed.data.staffId ?? undefined,
-        organization: ((parsed.data as any).organization as any) ?? "faan",
+        organization: orgRow.code,
         role: isFirstUser ? "super_admin" : "member",
         status: isFirstUser ? "active" : "pending",
       })

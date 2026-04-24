@@ -73,6 +73,16 @@ Treasurer/Admin uploads monthly deduction Excel file.
 System matches by full name → credits member savings accounts.
 Store repayments tracked only via Excel upload.
 
+## Organizations (Employers)
+
+Employers (e.g. FAAN, NAMA) are configured at runtime by admins via `/organizations`.
+- Stored in the `organizations` table with `code` (uppercase, unique, immutable), `name`, `description`, `excelFormat` (`faan` or `nama` — controls Excel parser), `isActive`.
+- `members.organization` is plain text holding an org `code`. Members are tagged with their employer.
+- Sign-up (`/complete-profile`) lists active organizations dynamically; `GET /api/organizations` is open to any signed-in Clerk user (pre-members included). `?includeInactive=true` is admin-only.
+- Create/Update/Activate/Deactivate require admin role + step-up. The last active organization cannot be deactivated.
+- Excel upload picks the parser based on the chosen organization's `excelFormat`. Duplicate guard keys on `(month, year, organization code)`.
+- FAAN and NAMA are seeded on first server boot if no organizations exist.
+
 ## Key Files
 
 - `artifacts/api-server/src/app.ts` — Express app with frontend proxy

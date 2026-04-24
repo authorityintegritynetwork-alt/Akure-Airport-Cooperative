@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListMembersOrganization =
-  (typeof ListMembersOrganization)[keyof typeof ListMembersOrganization];
+export type OrganizationExcelFormat =
+  (typeof OrganizationExcelFormat)[keyof typeof OrganizationExcelFormat];
 
-export const ListMembersOrganization = {
+export const OrganizationExcelFormat = {
   faan: "faan",
   nama: "nama",
 } as const;

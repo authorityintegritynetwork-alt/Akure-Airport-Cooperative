@@ -5,7 +5,6 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { MemberSummaryOrganization } from "./memberSummaryOrganization";
 
 export interface MemberSummary {
   memberId: number;
@@ -17,7 +16,7 @@ export interface MemberSummary {
   totalLoansRepaid: number;
   activeLoansCount: number;
   pendingStoreDebt: number;
-  organization?: MemberSummaryOrganization;
+  organization?: string;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
 }

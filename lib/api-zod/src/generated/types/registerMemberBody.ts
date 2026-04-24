@@ -5,11 +5,10 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { RegisterMemberBodyOrganization } from "./registerMemberBodyOrganization";
 
 export interface RegisterMemberBody {
   fullName: string;
   phone?: string;
   staffId?: string;
-  organization: RegisterMemberBodyOrganization;
+  organization: string;
 }

@@ -5,8 +5,10 @@ import {
   transactionsTable,
   uploadRecordsTable,
   loansTable,
+  organizationsTable,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
+import type { Organization as ExcelFormat } from "../lib/excelParser";
 import { requireAuth, requireAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
@@ -131,6 +133,31 @@ const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
   },
 };
 
+async function loadOrgOrFail(
+  code: string,
+  res: import("express").Response,
+): Promise<{ id: number; code: string; excelFormat: ExcelFormat; isActive: boolean } | null> {
+  const normalised = code.trim().toUpperCase();
+  const [org] = await db
+    .select({
+      id: organizationsTable.id,
+      code: organizationsTable.code,
+      excelFormat: organizationsTable.excelFormat,
+      isActive: organizationsTable.isActive,
+    })
+    .from(organizationsTable)
+    .where(eq(organizationsTable.code, normalised));
+  if (!org) {
+    res.status(400).json({ error: `Unknown organization "${code}".` });
+    return null;
+  }
+  if (!org.isActive) {
+    res.status(400).json({ error: `Organization "${org.code}" is currently deactivated.` });
+    return null;
+  }
+  return { ...org, excelFormat: org.excelFormat as ExcelFormat };
+}
+
 async function loadMatcher(): Promise<NameMatcher> {
   const all = await db
     .select({ id: membersTable.id, fullName: membersTable.fullName })
@@ -164,9 +191,11 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
+    const org = await loadOrgOrFail(parsed.data.organization, res);
+    if (!org) return;
     try {
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
-      res.json({ sheets: summarizeSheets(wb, parsed.data.organization) });
+      res.json({ sheets: summarizeSheets(wb, org.excelFormat) });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to read Excel file: ${err.message}` });
     }
@@ -185,6 +214,8 @@ router.post(
       return;
     }
 
+    const orgRecord = await loadOrgOrFail(parsed.data.organization, res);
+    if (!orgRecord) return;
     try {
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
@@ -193,7 +224,7 @@ router.post(
         return;
       }
 
-      const sheet = parseSheet(wb, sheetName, parsed.data.organization);
+      const sheet = parseSheet(wb, sheetName, orgRecord.excelFormat);
       const matcher = await loadMatcher();
 
       const allMembers = await db
@@ -210,7 +241,7 @@ router.post(
         manualMap.set(m.rowNumber, m.memberId);
       }
 
-      const uploadOrg = parsed.data.organization;
+      const uploadOrg = orgRecord.code;
       const dup = await db
         .select({ id: uploadRecordsTable.id })
         .from(uploadRecordsTable)
@@ -232,7 +263,7 @@ router.post(
         const warnings = [...row.warnings];
         if (orgMismatch) {
           warnings.push(
-            `Member is tagged as ${memberOrg.toUpperCase()} but this upload is for ${uploadOrg.toUpperCase()}.`,
+            `Member is tagged as ${memberOrg} but this upload is for ${uploadOrg}.`,
           );
         }
         return {
@@ -298,6 +329,8 @@ router.post(
       return;
     }
 
+    const orgRecord = await loadOrgOrFail(parsed.data.organization, res);
+    if (!orgRecord) return;
     try {
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
@@ -306,7 +339,7 @@ router.post(
         return;
       }
 
-      const sheet = parseSheet(wb, sheetName, parsed.data.organization);
+      const sheet = parseSheet(wb, sheetName, orgRecord.excelFormat);
       const matcher = await loadMatcher();
 
       const allMembers = await db
@@ -323,7 +356,7 @@ router.post(
         manualMap.set(m.rowNumber, m.memberId);
       }
 
-      const uploadOrg = parsed.data.organization;
+      const uploadOrg = orgRecord.code;
       const autoTag = parsed.data.autoTagOrganization !== false;
 
       // Run the entire processing in a single DB transaction so that any
@@ -347,7 +380,7 @@ router.post(
             and(
               eq(uploadRecordsTable.month, parsed.data.month),
               eq(uploadRecordsTable.year, parsed.data.year),
-              eq(uploadRecordsTable.organization, parsed.data.organization),
+              eq(uploadRecordsTable.organization, uploadOrg),
               eq(uploadRecordsTable.status, "processed"),
             ),
           );

@@ -5,7 +5,6 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { UploadRecordOrganization } from "./uploadRecordOrganization";
 import type { UploadRecordStatus } from "./uploadRecordStatus";
 
 export interface UploadRecord {
@@ -14,7 +13,7 @@ export interface UploadRecord {
   uploaderName: string;
   month: string;
   year: number;
-  organization: UploadRecordOrganization;
+  organization: string;
   fileObjectPath: string;
   rowsProcessed: number;
   rowsSkipped: number;

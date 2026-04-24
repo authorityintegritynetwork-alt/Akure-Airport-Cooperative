@@ -155,7 +155,6 @@ paths:
           name: organization
           schema:
             type: string
-            enum: [faan, nama]
         - in: query
           name: search
           schema:
@@ -255,6 +254,102 @@ paths:
           description: Not found
         "409":
           description: Cannot delete (has related records)
+
+  # ── ORGANIZATIONS ─────────────────────────────────────────────────────────────
+  /organizations:
+    get:
+      operationId: listOrganizations
+      tags: [organizations]
+      summary: List organizations (active by default)
+      parameters:
+        - in: query
+          name: includeInactive
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Organization" }
+    post:
+      operationId: createOrganization
+      tags: [organizations]
+      summary: Create a new organization (Admin+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrganizationBody" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "400": { description: Bad request }
+        "409": { description: Code already exists }
+
+  /organizations/{id}:
+    patch:
+      operationId: updateOrganization
+      tags: [organizations]
+      summary: Update an organization's name, description or Excel format (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateOrganizationBody" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "404": { description: Not found }
+
+  /organizations/{id}/activate:
+    post:
+      operationId: activateOrganization
+      tags: [organizations]
+      summary: Re-activate a deactivated organization (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "404": { description: Not found }
+
+  /organizations/{id}/deactivate:
+    post:
+      operationId: deactivateOrganization
+      tags: [organizations]
+      summary: Deactivate an organization (it stays in the database but hides from sign-up and assignment)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Organization" }
+        "404": { description: Not found }
+        "409": { description: Cannot deactivate the only active organization }
 
   /members/bulk-organization:
     post:
@@ -1113,7 +1208,6 @@ components:
           enum: [pending, active, inactive]
         organization:
           type: string
-          enum: [faan, nama]
         savingsBalance:
           type: number
         providentBalance:
@@ -1228,7 +1322,6 @@ components:
           type: number
         organization:
           type: string
-          enum: [faan, nama]
         createdAt:
           type: string
           format: date-time
@@ -1265,7 +1358,6 @@ components:
           type: string
         organization:
           type: string
-          enum: [faan, nama]
       required: [fullName, organization]
 
     CreateMemberBody:
@@ -1287,7 +1379,6 @@ components:
           enum: [pending, active, inactive]
         organization:
           type: string
-          enum: [faan, nama]
       required: [fullName, email]
 
     UpdateMemberBody:
@@ -1307,7 +1398,6 @@ components:
           enum: [pending, active, inactive]
         organization:
           type: string
-          enum: [faan, nama]
 
     BulkOrganizationBody:
       type: object
@@ -1319,8 +1409,49 @@ components:
           minItems: 1
         organization:
           type: string
-          enum: [faan, nama]
       required: [memberIds, organization]
+
+    Organization:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        excelFormat:
+          type: string
+          enum: [faan, nama]
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, code, name, excelFormat, isActive, createdAt, updatedAt]
+
+    CreateOrganizationBody:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Short uppercase identifier, 2-16 chars, e.g. 'FAAN'."
+        name:
+          type: string
+          description: "Full display name shown to members."
+        description:
+          type: string
+          description: "Optional one-line description shown on the sign-up screen."
+        excelFormat:
+          type: string
+          enum: [faan, nama]
+          description: "Which Excel column layout this organization's monthly deduction file uses."
+      required: [code, name, excelFormat]
+
+    UpdateOrganizationBody:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        excelFormat:
+          type: string
+          enum: [faan, nama]
 
     MemberSummary:
       type: object
@@ -1345,7 +1476,6 @@ components:
           type: number
         organization:
           type: string
-          enum: [faan, nama]
         fuelVentureBalance:
           type: number
         landLoanBalance:
@@ -1416,7 +1546,6 @@ components:
           type: string
         organization:
           type: string
-          enum: [faan, nama]
       required: [fileObjectPath, organization]
 
     ExcelSheetInfo:
@@ -1461,7 +1590,6 @@ components:
           type: integer
         organization:
           type: string
-          enum: [faan, nama]
         manualMatches:
           type: array
           items:
@@ -1510,7 +1638,6 @@ components:
           type: number
         memberOrganization:
           type: ["string", "null"]
-          enum: [faan, nama, null]
         orgMismatch:
           type: boolean
         total:
@@ -1589,7 +1716,6 @@ components:
           type: integer
         organization:
           type: string
-          enum: [faan, nama]
         skipErrors:
           type: boolean
         autoTagOrganization:
@@ -1630,7 +1756,6 @@ components:
           type: integer
         organization:
           type: string
-          enum: [faan, nama]
         fileObjectPath:
           type: string
         rowsProcessed:

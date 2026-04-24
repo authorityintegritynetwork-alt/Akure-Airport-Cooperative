@@ -7,6 +7,7 @@ import {
   storePurchasesTable,
   notificationsTable,
   uploadRecordsTable,
+  organizationsTable,
 } from "@workspace/db";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import {
@@ -78,6 +79,43 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
     return;
   }
 
+  const requestedOrg = String((parsed.data as any).organization || "")
+    .trim()
+    .toUpperCase();
+  let orgCode: string;
+  if (requestedOrg) {
+    const [orgRow] = await db
+      .select({ code: organizationsTable.code, isActive: organizationsTable.isActive })
+      .from(organizationsTable)
+      .where(eq(organizationsTable.code, requestedOrg));
+    if (!orgRow) {
+      res.status(400).json({ error: `Unknown organization "${requestedOrg}".` });
+      return;
+    }
+    if (!orgRow.isActive) {
+      res
+        .status(400)
+        .json({ error: `Organization "${orgRow.code}" is currently deactivated.` });
+      return;
+    }
+    orgCode = orgRow.code;
+  } else {
+    // Fall back to the first active organization (alphabetical) so admins can
+    // create a member without explicitly picking one when only one exists.
+    const [firstOrg] = await db
+      .select({ code: organizationsTable.code })
+      .from(organizationsTable)
+      .where(eq(organizationsTable.isActive, true))
+      .orderBy(organizationsTable.code);
+    if (!firstOrg) {
+      res.status(400).json({
+        error: "No organizations have been configured yet. Add one before creating members.",
+      });
+      return;
+    }
+    orgCode = firstOrg.code;
+  }
+
   const [member] = await db
     .insert(membersTable)
     .values({
@@ -87,7 +125,7 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
       staffId: parsed.data.staffId ?? undefined,
       role: (parsed.data.role as any) ?? "member",
       status: (parsed.data.status as any) ?? "active",
-      organization: ((parsed.data as any).organization as any) ?? "faan",
+      organization: orgCode,
     })
     .returning();
 
@@ -153,8 +191,37 @@ router.patch(
   if (parsed.data.phone != null) updateData.phone = parsed.data.phone;
   if (parsed.data.staffId != null) updateData.staffId = parsed.data.staffId;
   if (parsed.data.status != null) updateData.status = parsed.data.status;
-  if ((parsed.data as any).organization != null)
-    updateData.organization = (parsed.data as any).organization;
+  if ((parsed.data as any).organization != null) {
+    const requestedOrg = String((parsed.data as any).organization).trim().toUpperCase();
+    if (!requestedOrg) {
+      res.status(400).json({ error: "Organization cannot be empty." });
+      return;
+    }
+    const [orgRow] = await db
+      .select({ code: organizationsTable.code, isActive: organizationsTable.isActive })
+      .from(organizationsTable)
+      .where(eq(organizationsTable.code, requestedOrg));
+    if (!orgRow) {
+      res.status(400).json({ error: `Unknown organization "${requestedOrg}".` });
+      return;
+    }
+    // Allow re-assignment to a deactivated org only if the member is *already*
+    // on that code (so admins can edit other fields without flipping a stale
+    // org). Otherwise reject so deactivated codes can't be newly assigned.
+    if (!orgRow.isActive) {
+      const [currentMember] = await db
+        .select({ organization: membersTable.organization })
+        .from(membersTable)
+        .where(eq(membersTable.id, id));
+      if (!currentMember || currentMember.organization !== orgRow.code) {
+        res.status(400).json({
+          error: `Organization "${orgRow.code}" is currently deactivated.`,
+        });
+        return;
+      }
+    }
+    updateData.organization = orgRow.code;
+  }
 
   if (parsed.data.role != null) {
     if (req.memberRole !== "super_admin") {
@@ -207,9 +274,23 @@ router.post(
       return;
     }
 
+    const orgCode = organization.trim().toUpperCase();
+    const [orgRow] = await db
+      .select({ code: organizationsTable.code, isActive: organizationsTable.isActive })
+      .from(organizationsTable)
+      .where(eq(organizationsTable.code, orgCode));
+    if (!orgRow) {
+      res.status(400).json({ error: `Unknown organization "${organization}".` });
+      return;
+    }
+    if (!orgRow.isActive) {
+      res.status(400).json({ error: `Organization "${orgRow.code}" is currently deactivated.` });
+      return;
+    }
+
     const updated = await db
       .update(membersTable)
-      .set({ organization: organization as any })
+      .set({ organization: orgRow.code })
       .where(inArray(membersTable.id, memberIds))
       .returning({ id: membersTable.id });
 
@@ -218,7 +299,7 @@ router.post(
       action: "BULK_ASSIGN_ORGANIZATION",
       entity: "member",
       entityId: 0,
-      details: `Assigned ${organization.toUpperCase()} to ${updated.length} member(s): ${memberIds.join(",")}`,
+      details: `Assigned ${orgRow.code} to ${updated.length} member(s): ${memberIds.join(",")}`,
     });
 
     res.json({ updated: updated.length });

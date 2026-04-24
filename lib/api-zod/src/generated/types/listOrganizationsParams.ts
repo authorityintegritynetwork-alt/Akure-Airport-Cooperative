@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ExcelSheetsBody {
-  fileObjectPath: string;
-  organization: string;
-}
+export type ListOrganizationsParams = {
+  includeInactive?: boolean;
+};

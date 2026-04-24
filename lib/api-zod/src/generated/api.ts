@@ -47,7 +47,7 @@ export const GetProfileResponse = zod.object({
   totalStoreDebt: zod.number(),
   fuelVentureBalance: zod.number().optional(),
   landLoanBalance: zod.number().optional(),
-  organization: zod.enum(["faan", "nama"]).optional(),
+  organization: zod.string().optional(),
   createdAt: zod.coerce.date(),
 });
 
@@ -85,7 +85,7 @@ export const RegisterMemberBody = zod.object({
   fullName: zod.string(),
   phone: zod.string().optional(),
   staffId: zod.string().optional(),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
 });
 
 /**
@@ -93,7 +93,7 @@ export const RegisterMemberBody = zod.object({
  */
 export const ListMembersQueryParams = zod.object({
   status: zod.enum(["pending", "active", "inactive"]).optional(),
-  organization: zod.enum(["faan", "nama"]).optional(),
+  organization: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
 });
 
@@ -112,7 +112,7 @@ export const ListMembersResponseItem = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
@@ -145,7 +145,7 @@ export const CreateMemberBody = zod.object({
     .enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"])
     .optional(),
   status: zod.enum(["pending", "active", "inactive"]).optional(),
-  organization: zod.enum(["faan", "nama"]).optional(),
+  organization: zod.string().optional(),
 });
 
 /**
@@ -170,7 +170,7 @@ export const GetMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
@@ -205,7 +205,7 @@ export const UpdateMemberBody = zod.object({
     .enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"])
     .optional(),
   status: zod.enum(["pending", "active", "inactive"]).optional(),
-  organization: zod.enum(["faan", "nama"]).optional(),
+  organization: zod.string().optional(),
 });
 
 export const UpdateMemberResponse = zod.object({
@@ -223,7 +223,7 @@ export const UpdateMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
@@ -255,12 +255,112 @@ export const DeleteMemberResponse = zod.object({
 });
 
 /**
+ * @summary List organizations (active by default)
+ */
+export const ListOrganizationsQueryParams = zod.object({
+  includeInactive: zod.coerce.boolean().optional(),
+});
+
+export const ListOrganizationsResponseItem = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  excelFormat: zod.enum(["faan", "nama"]),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListOrganizationsResponse = zod.array(
+  ListOrganizationsResponseItem,
+);
+
+/**
+ * @summary Create a new organization (Admin+)
+ */
+export const CreateOrganizationBody = zod.object({
+  code: zod
+    .string()
+    .describe("Short uppercase identifier, 2-16 chars, e.g. 'FAAN'."),
+  name: zod.string().describe("Full display name shown to members."),
+  description: zod
+    .string()
+    .optional()
+    .describe("Optional one-line description shown on the sign-up screen."),
+  excelFormat: zod
+    .enum(["faan", "nama"])
+    .describe(
+      "Which Excel column layout this organization's monthly deduction file uses.",
+    ),
+});
+
+/**
+ * @summary Update an organization's name, description or Excel format (Admin+)
+ */
+export const UpdateOrganizationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateOrganizationBody = zod.object({
+  name: zod.string().optional(),
+  description: zod.string().nullish(),
+  excelFormat: zod.enum(["faan", "nama"]).optional(),
+});
+
+export const UpdateOrganizationResponse = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  excelFormat: zod.enum(["faan", "nama"]),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Re-activate a deactivated organization (Admin+)
+ */
+export const ActivateOrganizationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ActivateOrganizationResponse = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  excelFormat: zod.enum(["faan", "nama"]),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Deactivate an organization (it stays in the database but hides from sign-up and assignment)
+ */
+export const DeactivateOrganizationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeactivateOrganizationResponse = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  excelFormat: zod.enum(["faan", "nama"]),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Bulk assign organization tag to members (Admin+)
  */
 
 export const BulkAssignOrganizationBody = zod.object({
   memberIds: zod.array(zod.number()).min(1),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
 });
 
 export const BulkAssignOrganizationResponse = zod.object({
@@ -289,7 +389,7 @@ export const ActivateMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
@@ -331,7 +431,7 @@ export const DeactivateMemberResponse = zod.object({
     "super_admin",
   ]),
   status: zod.enum(["pending", "active", "inactive"]),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   savingsBalance: zod.number(),
   providentBalance: zod.number(),
   christmasBalance: zod.number(),
@@ -368,7 +468,7 @@ export const GetMemberSummaryResponse = zod.object({
   totalLoansRepaid: zod.number(),
   activeLoansCount: zod.number(),
   pendingStoreDebt: zod.number(),
-  organization: zod.enum(["faan", "nama"]).optional(),
+  organization: zod.string().optional(),
   fuelVentureBalance: zod.number().optional(),
   landLoanBalance: zod.number().optional(),
 });
@@ -448,7 +548,7 @@ export const ListMyTransactionsResponse = zod.array(
  */
 export const ListExcelSheetsBody = zod.object({
   fileObjectPath: zod.string(),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
 });
 
 export const ListExcelSheetsResponse = zod.object({
@@ -469,7 +569,7 @@ export const PreviewExcelUploadBody = zod.object({
   sheetName: zod.string().optional(),
   month: zod.string(),
   year: zod.number(),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   manualMatches: zod
     .array(
       zod.object({
@@ -509,9 +609,7 @@ export const PreviewExcelUploadResponse = zod.object({
       fire: zod.number(),
       fuelVenture: zod.number(),
       landLoan: zod.number(),
-      memberOrganization: zod
-        .union([zod.literal("faan"), zod.literal("nama"), zod.literal(null)])
-        .nullish(),
+      memberOrganization: zod.string().nullish(),
       orgMismatch: zod.boolean(),
       total: zod.number(),
       computedTotal: zod.number(),
@@ -530,7 +628,7 @@ export const ProcessExcelUploadBody = zod.object({
   sheetName: zod.string().optional(),
   month: zod.string(),
   year: zod.number(),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   skipErrors: zod.boolean().optional(),
   autoTagOrganization: zod.boolean().optional(),
   manualMatches: zod
@@ -559,7 +657,7 @@ export const ListUploadHistoryResponseItem = zod.object({
   uploaderName: zod.string(),
   month: zod.string(),
   year: zod.number(),
-  organization: zod.enum(["faan", "nama"]),
+  organization: zod.string(),
   fileObjectPath: zod.string(),
   rowsProcessed: zod.number(),
   rowsSkipped: zod.number(),

@@ -5,7 +5,6 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateMemberBodyOrganization } from "./createMemberBodyOrganization";
 import type { CreateMemberBodyRole } from "./createMemberBodyRole";
 import type { CreateMemberBodyStatus } from "./createMemberBodyStatus";
 
@@ -16,5 +15,5 @@ export interface CreateMemberBody {
   staffId?: string;
   role?: CreateMemberBodyRole;
   status?: CreateMemberBodyStatus;
-  organization?: CreateMemberBodyOrganization;
+  organization?: string;
 }

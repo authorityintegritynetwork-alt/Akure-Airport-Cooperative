@@ -5,7 +5,6 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { ExcelUploadPreviewBodyOrganization } from "./excelUploadPreviewBodyOrganization";
 import type { ManualMatch } from "./manualMatch";
 
 export interface ExcelUploadPreviewBody {
@@ -13,6 +12,6 @@ export interface ExcelUploadPreviewBody {
   sheetName?: string;
   month: string;
   year: number;
-  organization: ExcelUploadPreviewBodyOrganization;
+  organization: string;
   manualMatches?: ManualMatch[];
 }

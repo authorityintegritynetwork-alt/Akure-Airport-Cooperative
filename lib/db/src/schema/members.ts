@@ -17,9 +17,7 @@ export const membersTable = pgTable("members", {
   status: text("status", { enum: ["pending", "active", "inactive"] })
     .notNull()
     .default("pending"),
-  organization: text("organization", { enum: ["faan", "nama"] })
-    .notNull()
-    .default("faan"),
+  organization: text("organization").notNull().default("faan"),
   savingsBalance: numeric("savings_balance", { precision: 15, scale: 2 })
     .notNull()
     .default("0"),

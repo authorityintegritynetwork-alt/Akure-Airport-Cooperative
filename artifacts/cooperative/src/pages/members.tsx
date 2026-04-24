@@ -9,6 +9,7 @@ import {
   useDeleteMember,
   useBulkAssignOrganization,
   useGetProfile,
+  useListOrganizations,
   getListMembersQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -64,7 +65,7 @@ const createMemberSchema = z.object({
   staffId: z.string().optional(),
   role: z.enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"]).optional(),
   status: z.enum(["pending", "active", "inactive"]).optional(),
-  organization: z.enum(["faan", "nama"]).optional(),
+  organization: z.string().optional(),
 });
 type CreateMemberForm = z.infer<typeof createMemberSchema>;
 
@@ -74,7 +75,7 @@ const editMemberSchema = z.object({
   staffId: z.string().optional(),
   role: z.enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"]),
   status: z.enum(["pending", "active", "inactive"]),
-  organization: z.enum(["faan", "nama"]),
+  organization: z.string().min(1, "Organization required"),
 });
 type EditMemberForm = z.infer<typeof editMemberSchema>;
 
@@ -107,6 +108,9 @@ export function MembersPage() {
   const { data: profile } = useGetProfile();
   const isSuperAdmin = profile?.role === "super_admin";
   const canManage = profile?.role === "admin" || profile?.role === "super_admin";
+  const { data: organizations } = useListOrganizations();
+  const activeOrgs = (organizations ?? []).filter((o: any) => o.isActive);
+  const defaultOrgCode = activeOrgs[0]?.code ?? "";
 
   const params: any = {};
   if (search) params.search = search;
@@ -136,7 +140,7 @@ export function MembersPage() {
 
   const editForm = useForm<EditMemberForm>({
     resolver: zodResolver(editMemberSchema),
-    defaultValues: { fullName: "", phone: "", staffId: "", role: "member", status: "active", organization: "faan" },
+    defaultValues: { fullName: "", phone: "", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
   });
 
   function openEdit(member: any) {
@@ -146,7 +150,7 @@ export function MembersPage() {
       staffId: member.staffId ?? "",
       role: member.role,
       status: member.status,
-      organization: member.organization ?? "faan",
+      organization: member.organization ?? defaultOrgCode,
     });
     setEditingMember(member);
   }
@@ -191,7 +195,7 @@ export function MembersPage() {
 
   const form = useForm<CreateMemberForm>({
     resolver: zodResolver(createMemberSchema),
-    defaultValues: { fullName: "", email: "", phone: "", staffId: "", role: "member", status: "active", organization: "faan" },
+    defaultValues: { fullName: "", email: "", phone: "", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
   });
 
   function handleActivate(id: number) {
@@ -313,15 +317,18 @@ export function MembersPage() {
                 <FormField control={form.control} name="organization" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Organization</FormLabel>
-                    <Select value={field.value || "faan"} onValueChange={field.onChange}>
+                    <Select value={field.value || defaultOrgCode} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger data-testid="select-member-organization">
-                          <SelectValue />
+                          <SelectValue placeholder="Select an organization" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="faan">FAAN</SelectItem>
-                        <SelectItem value="nama">NAMA</SelectItem>
+                        {activeOrgs.map((o: any) => (
+                          <SelectItem key={o.code} value={o.code}>
+                            {o.code} — {o.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -364,18 +371,21 @@ export function MembersPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Orgs</SelectItem>
-            <SelectItem value="faan">FAAN</SelectItem>
-            <SelectItem value="nama">NAMA</SelectItem>
+            {activeOrgs.map((o: any) => (
+              <SelectItem key={o.code} value={o.code}>
+                {o.code}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 ml-auto bg-muted rounded-md px-3 py-1.5">
+          <div className="flex items-center gap-2 ml-auto bg-muted rounded-md px-3 py-1.5 flex-wrap">
             <span className="text-sm font-medium" data-testid="selected-count">
               {selectedIds.size} selected
             </span>
-            {(["faan", "nama"] as const).map((o) => (
+            {activeOrgs.map((o: any) => (
               <Button
-                key={o}
+                key={o.code}
                 size="sm"
                 variant="outline"
                 disabled={bulkAssign.isPending}
@@ -383,10 +393,10 @@ export function MembersPage() {
                   try {
                     const r: any = await bulkAssignWithStepUp({
                       memberIds: Array.from(selectedIds),
-                      organization: o,
+                      organization: o.code,
                     });
                     toast({
-                      title: `Assigned to ${o.toUpperCase()}`,
+                      title: `Assigned to ${o.code}`,
                       description: `${r.updated ?? 0} member(s) updated.`,
                     });
                     setSelectedIds(new Set());
@@ -396,9 +406,9 @@ export function MembersPage() {
                     toast({ title: "Bulk assign failed", description: err.message, variant: "destructive" });
                   }
                 }}
-                data-testid={`button-bulk-${o}`}
+                data-testid={`button-bulk-${o.code.toLowerCase()}`}
               >
-                Assign to {o.toUpperCase()}
+                Assign to {o.code}
               </Button>
             ))}
             <Button
@@ -465,7 +475,7 @@ export function MembersPage() {
                       <div className="flex flex-wrap gap-1 mt-1 sm:hidden">
                         {memberStatusBadge(member.status)}
                         <Badge variant="outline" className="text-xs uppercase">
-                          {member.organization || "faan"}
+                          {member.organization || "—"}
                         </Badge>
                         <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
                       </div>
@@ -475,7 +485,7 @@ export function MembersPage() {
                     <div className="hidden sm:flex items-center gap-2">
                       {memberStatusBadge(member.status)}
                       <Badge variant="outline" className="text-xs uppercase" data-testid={`member-org-${member.id}`}>
-                        {member.organization || "faan"}
+                        {member.organization || "—"}
                       </Badge>
                       <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
                     </div>
@@ -602,10 +612,17 @@ export function MembersPage() {
                 <FormItem>
                   <FormLabel>Organization</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger data-testid="select-edit-organization"><SelectValue /></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger data-testid="select-edit-organization"><SelectValue placeholder="Select an organization" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="faan">FAAN</SelectItem>
-                      <SelectItem value="nama">NAMA</SelectItem>
+                      {activeOrgs.map((o: any) => (
+                        <SelectItem key={o.code} value={o.code}>
+                          {o.code} — {o.name}
+                        </SelectItem>
+                      ))}
+                      {/* Always include the member's current org code, even if it has been deactivated, so the form value remains valid. */}
+                      {field.value && !activeOrgs.some((o: any) => o.code === field.value) && (
+                        <SelectItem value={field.value}>{field.value} (inactive)</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
