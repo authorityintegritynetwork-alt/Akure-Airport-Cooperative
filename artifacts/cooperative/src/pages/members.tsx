@@ -46,7 +46,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useStepUpAction } from "@/lib/step-up";
-import { PlusCircle, Search, UserCheck, UserX, Eye, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Search, UserCheck, UserX, Eye, Pencil, Trash2, SlidersHorizontal, X, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +57,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet";
 
 const createMemberSchema = z.object({
   fullName: z.string().min(2, "Full name required"),
@@ -249,145 +258,306 @@ export function MembersPage() {
     );
   }
 
+  const totalCount = members?.length ?? 0;
+  const hasFilters = !!(search || statusFilter || orgFilter);
+  const activeFilterCount =
+    (statusFilter ? 1 : 0) + (orgFilter ? 1 : 0);
+
+  function clearAllFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setOrgFilter("");
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Members</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-member">
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Add Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Member</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="fullName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl><Input data-testid="input-member-fullname" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl><Input type="email" data-testid="input-member-email" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone (optional)</FormLabel>
-                    <FormControl><Input data-testid="input-member-phone" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="staffId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Staff ID (optional)</FormLabel>
-                    <FormControl><Input data-testid="input-member-staffid" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="role" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-member-role">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="member">Member</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="financial_auditor">Financial Auditor</SelectItem>
-                        <SelectItem value="treasurer">Treasurer</SelectItem>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="organization" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Organization</FormLabel>
-                    <Select value={field.value || defaultOrgCode} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-member-organization">
-                          <SelectValue placeholder="Select an organization" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeOrgs.map((o: any) => (
-                          <SelectItem key={o.code} value={o.code}>
-                            {o.code} — {o.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <Button type="submit" className="w-full" disabled={createMember.isPending} data-testid="button-submit-create-member">
-                  {createMember.isPending ? "Creating..." : "Create Member"}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+    <div className="space-y-5">
+      {/* Hero gradient card */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="members-hero-card"
+      >
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs sm:text-sm text-white/80 font-medium uppercase tracking-wider">
+              Members
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold mt-0.5 tabular-nums">
+              {totalCount}
+            </h1>
+            <p className="text-xs text-white/80 mt-1">
+              {hasFilters ? "Matching current filters" : "Total in cooperative"}
+            </p>
+          </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                className="rounded-full bg-white text-primary hover:bg-white/90 shadow-md gap-1.5 shrink-0"
+                data-testid="button-create-member"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Add</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Create New Member</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField control={form.control} name="fullName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl><Input className="rounded-xl" data-testid="input-member-fullname" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl><Input type="email" className="rounded-xl" data-testid="input-member-email" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="phone" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone (optional)</FormLabel>
+                      <FormControl><Input className="rounded-xl" data-testid="input-member-phone" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="staffId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Staff ID (optional)</FormLabel>
+                      <FormControl><Input className="rounded-xl" data-testid="input-member-staffid" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="role" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="rounded-xl" data-testid="select-member-role">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="financial_auditor">Financial Auditor</SelectItem>
+                          <SelectItem value="treasurer">Treasurer</SelectItem>
+                          <SelectItem value="super_admin">Super Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="organization" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Organization</FormLabel>
+                      <Select value={field.value || defaultOrgCode} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="rounded-xl" data-testid="select-member-organization">
+                            <SelectValue placeholder="Select an organization" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {activeOrgs.map((o: any) => (
+                            <SelectItem key={o.code} value={o.code}>
+                              {o.code} — {o.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <Button type="submit" className="w-full rounded-xl" disabled={createMember.isPending} data-testid="button-submit-create-member">
+                    {createMember.isPending ? "Creating..." : "Create Member"}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 max-w-xs">
+      {/* Toolbar — search always visible, filters on desktop / sheet on mobile */}
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search members..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 rounded-xl"
             data-testid="input-members-search"
           />
         </div>
-        <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-36" data-testid="select-status-filter">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={orgFilter || "all"} onValueChange={(v) => setOrgFilter(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-36" data-testid="select-org-filter">
-            <SelectValue placeholder="Organization" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Orgs</SelectItem>
-            {activeOrgs.map((o: any) => (
-              <SelectItem key={o.code} value={o.code}>
-                {o.code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 ml-auto bg-muted rounded-md px-3 py-1.5 flex-wrap">
-            <span className="text-sm font-medium" data-testid="selected-count">
-              {selectedIds.size} selected
-            </span>
+
+        {/* Mobile filter trigger */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="md:hidden rounded-xl shrink-0 relative"
+              data-testid="button-open-member-filters"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-3xl">
+            <SheetHeader className="text-left">
+              <SheetTitle>Filter members</SheetTitle>
+            </SheetHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
+                <Select
+                  value={statusFilter || "all"}
+                  onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}
+                >
+                  <SelectTrigger className="rounded-xl mt-1.5" data-testid="select-status-filter-mobile">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organization</label>
+                <Select
+                  value={orgFilter || "all"}
+                  onValueChange={(v) => setOrgFilter(v === "all" ? "" : v)}
+                >
+                  <SelectTrigger className="rounded-xl mt-1.5" data-testid="select-org-filter-mobile">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Organizations</SelectItem>
+                    {activeOrgs.map((o: any) => (
+                      <SelectItem key={o.code} value={o.code}>
+                        {o.code} — {o.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <SheetFooter className="mt-6 flex-row gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={clearAllFilters}
+                disabled={!hasFilters}
+              >
+                Clear all
+              </Button>
+              <SheetClose asChild>
+                <Button className="flex-1 rounded-xl">Done</Button>
+              </SheetClose>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
+        {/* Desktop inline filters */}
+        <div className="hidden md:flex gap-2">
+          <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-36 rounded-xl" data-testid="select-status-filter">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={orgFilter || "all"} onValueChange={(v) => setOrgFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-36 rounded-xl" data-testid="select-org-filter">
+              <SelectValue placeholder="Organization" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Orgs</SelectItem>
+              {activeOrgs.map((o: any) => (
+                <SelectItem key={o.code} value={o.code}>
+                  {o.code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Active filter chips */}
+      {hasFilters && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {statusFilter && (
+            <Badge variant="secondary" className="rounded-full gap-1 pr-1">
+              {statusFilter}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("")}
+                className="hover:bg-background/50 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
+          {orgFilter && (
+            <Badge variant="secondary" className="rounded-full gap-1 pr-1 uppercase">
+              {orgFilter}
+              <button
+                type="button"
+                onClick={() => setOrgFilter("")}
+                className="hover:bg-background/50 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Bulk-select bar */}
+      {selectedIds.size > 0 && (
+        <div className="rounded-2xl bg-primary/10 border border-primary/20 p-3 flex flex-wrap items-center gap-2 shadow-sm">
+          <span className="text-sm font-semibold" data-testid="selected-count">
+            {selectedIds.size} selected
+          </span>
+          <span className="text-xs text-muted-foreground hidden sm:inline">·</span>
+          <span className="text-xs text-muted-foreground">Assign to:</span>
+          <div className="flex gap-1.5 flex-wrap">
             {activeOrgs.map((o: any) => (
               <Button
                 key={o.code}
                 size="sm"
                 variant="outline"
+                className="rounded-full bg-card"
                 disabled={bulkAssign.isPending}
                 onClick={async () => {
                   try {
@@ -408,147 +578,179 @@ export function MembersPage() {
                 }}
                 data-testid={`button-bulk-${o.code.toLowerCase()}`}
               >
-                Assign to {o.code}
+                {o.code}
               </Button>
             ))}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setSelectedIds(new Set())}
-              data-testid="button-clear-selection"
-            >
-              Clear
-            </Button>
           </div>
-        )}
-      </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto rounded-full"
+            onClick={() => setSelectedIds(new Set())}
+            data-testid="button-clear-selection"
+          >
+            <X className="w-3.5 h-3.5 mr-1" /> Clear
+          </Button>
+        </div>
+      )}
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4 space-y-3">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-          ) : !members || members.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <PlusCircle className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">
-                {search || statusFilter || orgFilter ? "No members match your filters" : "No members yet"}
-              </p>
-              <p className="text-sm mt-1 mb-4">
-                {search || statusFilter || orgFilter
-                  ? "Try adjusting or clearing your filters."
-                  : "Add your first member to get started."}
-              </p>
-              {!(search || statusFilter || orgFilter) && (
-                <Button onClick={() => setDialogOpen(true)} data-testid="button-empty-add-member">
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  Add Member
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="divide-y">
-              {members.map((member: any) => (
-                <div
-                  key={member.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3"
-                  data-testid={`member-row-${member.id}`}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 cursor-pointer shrink-0"
-                      checked={selectedIds.has(member.id)}
-                      onChange={(e) => {
-                        const next = new Set(selectedIds);
-                        if (e.target.checked) next.add(member.id);
-                        else next.delete(member.id);
-                        setSelectedIds(next);
-                      }}
-                      data-testid={`checkbox-member-${member.id}`}
-                    />
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                      {member.fullName.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{member.fullName}</p>
-                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                      <div className="flex flex-wrap gap-1 mt-1 sm:hidden">
-                        {memberStatusBadge(member.status)}
-                        <Badge variant="outline" className="text-xs uppercase">
-                          {member.organization || "—"}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
-                      </div>
-                    </div>
+      {/* Member cards */}
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}</div>
+      ) : !members || members.length === 0 ? (
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="text-center py-16 text-muted-foreground">
+            <Users className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="font-medium">
+              {hasFilters ? "No members match your filters" : "No members yet"}
+            </p>
+            <p className="text-sm mt-1 mb-4">
+              {hasFilters
+                ? "Try adjusting or clearing your filters."
+                : "Add your first member to get started."}
+            </p>
+            {!hasFilters && (
+              <Button onClick={() => setDialogOpen(true)} className="rounded-full" data-testid="button-empty-add-member">
+                <PlusCircle className="w-4 h-4 mr-2" />
+                Add Member
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2.5">
+          {members.map((member: any) => {
+            const checked = selectedIds.has(member.id);
+            return (
+              <div
+                key={member.id}
+                className={`group rounded-2xl border bg-card p-3 sm:p-4 transition-all hover:shadow-md ${
+                  checked
+                    ? "border-primary/50 ring-1 ring-primary/30 shadow-sm"
+                    : "border-border/70 shadow-sm"
+                }`}
+                data-testid={`member-row-${member.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 cursor-pointer shrink-0 mt-2 accent-primary"
+                    checked={checked}
+                    onChange={(e) => {
+                      const next = new Set(selectedIds);
+                      if (e.target.checked) next.add(member.id);
+                      else next.delete(member.id);
+                      setSelectedIds(next);
+                    }}
+                    data-testid={`checkbox-member-${member.id}`}
+                  />
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-blue-500 text-primary-foreground flex items-center justify-center font-bold shrink-0 shadow-sm">
+                    {member.fullName.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-                    <div className="hidden sm:flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/members/${member.id}`}>
+                      <p className="font-semibold text-sm truncate hover:underline cursor-pointer">
+                        {member.fullName}
+                      </p>
+                    </Link>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {member.email}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
                       {memberStatusBadge(member.status)}
-                      <Badge variant="outline" className="text-xs uppercase" data-testid={`member-org-${member.id}`}>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase rounded-full px-2"
+                        data-testid={`member-org-${member.id}`}
+                      >
                         {member.organization || "—"}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">{member.role.replace("_", " ")}</Badge>
-                    </div>
-                    <div className="text-right hidden lg:block">
-                      <p className="text-xs text-muted-foreground">Savings</p>
-                      <p className="text-sm font-medium">{formatCurrency(member.savingsBalance)}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      <Link href={`/members/${member.id}`}>
-                        <Button variant="ghost" size="icon" data-testid={`button-view-member-${member.id}`}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                      {member.status === "pending" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleActivate(member.id)}
-                          data-testid={`button-activate-${member.id}`}
-                        >
-                          <UserCheck className="w-4 h-4 text-primary" />
-                        </Button>
-                      )}
-                      {member.status === "active" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeactivate(member.id)}
-                          data-testid={`button-deactivate-${member.id}`}
-                        >
-                          <UserX className="w-4 h-4 text-destructive" />
-                        </Button>
-                      )}
-                      {canManage && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(member)}
-                            data-testid={`button-edit-${member.id}`}
-                            title="Edit member"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingMember(member)}
-                            data-testid={`button-delete-${member.id}`}
-                            title="Delete member"
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </>
-                      )}
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] rounded-full px-2"
+                      >
+                        {member.role.replace("_", " ")}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] rounded-full px-2 lg:hidden"
+                      >
+                        {formatCurrency(member.savingsBalance)}
+                      </Badge>
                     </div>
                   </div>
+                  <div className="hidden lg:block text-right shrink-0">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                      Savings
+                    </p>
+                    <p className="text-sm font-bold tabular-nums">
+                      {formatCurrency(member.savingsBalance)}
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border/50 -mx-1">
+                  <Link href={`/members/${member.id}`} className="flex-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full rounded-lg gap-1.5 text-xs h-8"
+                      data-testid={`button-view-member-${member.id}`}
+                    >
+                      <Eye className="w-3.5 h-3.5" /> View
+                    </Button>
+                  </Link>
+                  {member.status === "pending" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 rounded-lg gap-1.5 text-xs h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                      onClick={() => handleActivate(member.id)}
+                      data-testid={`button-activate-${member.id}`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" /> Activate
+                    </Button>
+                  )}
+                  {member.status === "active" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 rounded-lg gap-1.5 text-xs h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeactivate(member.id)}
+                      data-testid={`button-deactivate-${member.id}`}
+                    >
+                      <UserX className="w-3.5 h-3.5" /> Deactivate
+                    </Button>
+                  )}
+                  {canManage && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-lg h-8 px-2.5"
+                        onClick={() => openEdit(member)}
+                        data-testid={`button-edit-${member.id}`}
+                        title="Edit member"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-lg h-8 px-2.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeletingMember(member)}
+                        data-testid={`button-delete-${member.id}`}
+                        title="Delete member"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <Dialog open={!!editingMember} onOpenChange={(o) => !o && setEditingMember(null)}>
         <DialogContent>

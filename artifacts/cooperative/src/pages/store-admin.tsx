@@ -20,7 +20,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -142,54 +141,112 @@ export function StoreAdminPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Store Management</h1>
-        <Button onClick={openCreate} data-testid="button-create-store-item">
-          <PlusCircle className="w-4 h-4 mr-2" />
-          Add Item
-        </Button>
+    <div className="space-y-5">
+      {/* Hero gradient card with embedded Add button */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="store-admin-hero"
+      >
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm text-white/80 font-medium uppercase tracking-wider">
+              Cooperative Store
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold mt-0.5 tabular-nums">
+              {items?.length ?? 0}
+            </h1>
+            <p className="text-xs text-white/80 mt-1">Items in catalog</p>
+          </div>
+          <Button
+            onClick={openCreate}
+            size="sm"
+            className="rounded-full bg-white text-primary hover:bg-white/90 shrink-0 font-semibold shadow-lg"
+            data-testid="button-create-store-item"
+          >
+            <PlusCircle className="w-4 h-4 mr-1.5" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48" />)}
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}
         </div>
       ) : !items || items.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">No store items yet.</div>
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="text-center py-16 text-muted-foreground">
+            <ShoppingCart className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="font-medium">No store items yet.</p>
+            <p className="text-sm mt-1">Add your first item to get started.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
           {items.map((item: any) => (
-            <Card key={item.id} data-testid={`store-admin-item-${item.id}`} className="overflow-hidden">
+            <Card
+              key={item.id}
+              data-testid={`store-admin-item-${item.id}`}
+              className="overflow-hidden rounded-2xl shadow-sm border-border/70 flex flex-col"
+            >
               {item.imageObjectPath ? (
                 <img
                   src={`${basePath}/api/storage/objects${item.imageObjectPath}`}
                   alt={item.name}
-                  className="w-full h-36 object-cover"
+                  className="w-full aspect-square object-cover"
                 />
               ) : (
-                <div className="w-full h-36 bg-muted flex items-center justify-center">
-                  <ShoppingCart className="w-8 h-8 text-muted-foreground/30" />
+                <div className="w-full aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+                  <ShoppingCart className="w-10 h-10 text-muted-foreground/30" />
                 </div>
               )}
-              <CardContent className="pt-3 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">{item.name}</p>
-                    <p className="text-lg font-bold text-primary">{formatCurrency(item.price)}</p>
-                  </div>
-                  <Badge variant={item.isAvailable ? "default" : "secondary"} className="text-xs">
+              <CardContent className="p-3 space-y-2 flex-1 flex flex-col">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate">{item.name}</p>
+                  <p className="text-base font-bold text-primary tabular-nums mt-0.5">
+                    {formatCurrency(item.price)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge
+                    variant="outline"
+                    className={`rounded-full text-[10px] ${
+                      item.isAvailable
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
                     {item.isAvailable ? "Available" : "Hidden"}
                   </Badge>
+                  <span className="text-[10px] text-muted-foreground">
+                    Qty: <span className="font-semibold text-foreground">{item.quantityAvailable}</span>
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground">Qty: {item.quantityAvailable}</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+                <div className="flex gap-1.5 mt-auto pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-lg h-8 text-xs"
+                    onClick={() => openEdit(item)}
+                    data-testid={`button-edit-item-${item.id}`}
+                  >
                     <Edit className="w-3 h-3 mr-1" />
                     Edit
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)} data-testid={`button-delete-item-${item.id}`}>
-                    <Trash2 className="w-3 h-3 text-destructive" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-lg h-8 px-2"
+                    onClick={() => handleDelete(item.id)}
+                    data-testid={`button-delete-item-${item.id}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
                   </Button>
                 </div>
               </CardContent>
@@ -199,7 +256,7 @@ export function StoreAdminPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editItem ? "Edit Store Item" : "Add Store Item"}</DialogTitle>
           </DialogHeader>
@@ -208,35 +265,37 @@ export function StoreAdminPage() {
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Name</FormLabel>
-                  <FormControl><Input data-testid="input-item-name" {...field} /></FormControl>
+                  <FormControl><Input className="rounded-xl" data-testid="input-item-name" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description (optional)</FormLabel>
-                  <FormControl><Input data-testid="input-item-description" {...field} /></FormControl>
+                  <FormControl><Input className="rounded-xl" data-testid="input-item-description" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="price" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Price (₦)</FormLabel>
-                  <FormControl>
-                    <Input type="number" data-testid="input-item-price" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value))} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="quantityAvailable" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantity Available</FormLabel>
-                  <FormControl>
-                    <Input type="number" data-testid="input-item-quantity" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="price" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price (₦)</FormLabel>
+                    <FormControl>
+                      <Input type="number" className="rounded-xl" data-testid="input-item-price" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value))} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="quantityAvailable" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input type="number" className="rounded-xl" data-testid="input-item-quantity" {...field} onChange={(e) => field.onChange(parseInt(e.target.value))} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Product Image (optional)</label>
@@ -244,22 +303,23 @@ export function StoreAdminPage() {
                   <Input
                     type="file"
                     accept="image/*"
+                    className="rounded-xl file:bg-primary/10 file:text-primary file:border-0 file:rounded-lg file:px-3 file:py-1.5 file:mr-3 file:font-semibold cursor-pointer"
                     onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                     data-testid="input-item-image"
                   />
-                  <Button type="button" variant="outline" size="sm" onClick={handleImageUpload} disabled={!imageFile || imageUploading} data-testid="button-upload-image">
+                  <Button type="button" variant="outline" size="sm" className="rounded-xl shrink-0" onClick={handleImageUpload} disabled={!imageFile || imageUploading} data-testid="button-upload-image">
                     <Upload className="w-4 h-4" />
                   </Button>
                 </div>
                 {uploadedImagePath && (
-                  <div className="flex items-center gap-2 text-xs text-primary">
-                    <img src={`${basePath}/api/storage/objects${uploadedImagePath}`} alt="" className="w-10 h-10 object-cover rounded" />
-                    <span>Image uploaded</span>
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-500/10 rounded-xl p-2">
+                    <img src={`${basePath}/api/storage/objects${uploadedImagePath}`} alt="" className="w-10 h-10 object-cover rounded-lg" />
+                    <span className="font-semibold">Image uploaded</span>
                   </div>
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={createItem.isPending || updateItem.isPending} data-testid="button-submit-store-item">
+              <Button type="submit" className="w-full rounded-xl h-11" disabled={createItem.isPending || updateItem.isPending} data-testid="button-submit-store-item">
                 {editItem ? "Update Item" : "Create Item"}
               </Button>
             </form>

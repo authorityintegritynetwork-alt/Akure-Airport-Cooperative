@@ -22,6 +22,7 @@ import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, B
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { AdminMobileBottomNav } from "@/components/admin-mobile-bottom-nav";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: profile } = useGetProfile();
@@ -43,6 +44,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = profile.role === "admin" || profile.role === "super_admin";
   const isSuperAdmin = profile.role === "super_admin";
   const isMember = profile.role === "member";
+  // Roles that have a dedicated mobile bottom nav. Other staff (auditor,
+  // treasurer) keep the sidebar/hamburger as their primary mobile nav.
+  const hasMobileBottomNav = isMember || isAdmin;
 
   const navItem = (href: string, icon: React.ReactNode, label: string) => (
     <SidebarMenuItem key={href}>
@@ -152,22 +156,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 border-b border-border bg-card/80 backdrop-blur flex items-center justify-between px-4 sticky top-0 z-30">
-            {/* Members on mobile use the bottom nav, so hide the hamburger for them on small screens */}
-            <div className={isMember ? "hidden md:block" : ""}>
+            {/* Roles with a dedicated mobile bottom nav hide the hamburger on
+                small screens; everyone else (auditor, treasurer) keeps it. */}
+            <div className={hasMobileBottomNav ? "hidden md:block" : "block"}>
               <SidebarTrigger />
             </div>
 
-            {/* On mobile show a compact brand for members so the header isn't empty */}
-            {isMember && (
-              <Link
-                href="/dashboard"
-                className="md:hidden flex items-center gap-2 min-w-0"
-                data-testid="mobile-header-brand"
-              >
-                <img src={logoUrl} alt="AASCMS" className="w-7 h-7 object-contain shrink-0" />
-                <span className="font-semibold text-sm truncate">AASCMS</span>
-              </Link>
-            )}
+            {/* On mobile show a compact brand for everyone so the header isn't empty */}
+            <Link
+              href="/dashboard"
+              className="md:hidden flex items-center gap-2 min-w-0"
+              data-testid="mobile-header-brand"
+            >
+              <img src={logoUrl} alt="AASCMS" className="w-7 h-7 object-contain shrink-0" />
+              <span className="font-semibold text-sm truncate">AASCMS</span>
+            </Link>
 
             <div className="flex items-center gap-1">
               <Link
@@ -187,15 +190,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main
-            className={`flex-1 overflow-auto p-4 md:p-6 ${
-              isMember ? "pb-24 md:pb-6" : ""
-            }`}
+            className="flex-1 overflow-auto p-4 md:p-6 pb-24 md:pb-6"
           >
             {children}
           </main>
         </div>
 
         {isMember && <MobileBottomNav />}
+        {isAdmin && <AdminMobileBottomNav />}
       </div>
     </SidebarProvider>
   );

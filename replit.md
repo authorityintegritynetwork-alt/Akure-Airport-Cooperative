@@ -89,7 +89,8 @@ Employers (e.g. FAAN, NAMA) are configured at runtime by admins via `/organizati
 - `artifacts/api-server/dev-start.mjs` — Combined dev startup script
 - `artifacts/api-server/src/routes/index.ts` — All API routes
 - `artifacts/cooperative/src/App.tsx` — Frontend routing + Clerk config
-- `artifacts/cooperative/src/components/layout.tsx` — Sidebar + layout
+- `artifacts/cooperative/src/components/layout.tsx` — Sidebar + layout (mobile bottom nav for member & admin; sidebar/hamburger kept on mobile for auditor & treasurer)
+- `artifacts/cooperative/src/components/admin-mobile-bottom-nav.tsx` — Admin mobile bottom nav
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
 - `lib/db/src/schema.ts` — Database schema (Drizzle ORM)
 

@@ -215,42 +215,89 @@ export function UploadPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Upload Monthly Deductions</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Upload the monthly deduction Excel file ({organization.toUpperCase()}). Members are matched by full name.
-          </p>
+    <div className="space-y-5 max-w-7xl">
+      {/* Hero gradient card */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="upload-hero-card"
+      >
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm text-white/80 font-medium uppercase tracking-wider">
+              Monthly Deductions
+            </p>
+            <h1 className="text-xl sm:text-2xl font-bold mt-0.5 leading-tight">
+              Upload {organization.toUpperCase()} sheet
+            </h1>
+            <p className="text-xs text-white/80 mt-1">
+              Members are matched by full name and tagged automatically.
+            </p>
+          </div>
+          {stage !== "select" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full bg-white/15 border-white/30 text-white hover:bg-white/25 backdrop-blur-sm shrink-0"
+              onClick={reset}
+              data-testid="button-cancel-upload"
+            >
+              Start Over
+            </Button>
+          )}
         </div>
-        {stage !== "select" && (
-          <Button variant="outline" size="sm" onClick={reset} data-testid="button-cancel-upload">
-            Start Over
-          </Button>
-        )}
+
+        {/* Stepper */}
+        <div className="relative mt-5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider">
+          {(["select", "pickSheet", "preview"] as Stage[]).map((s, i) => {
+            const labels = ["File", "Sheet", "Review"];
+            const isActive = stage === s;
+            const idx = ["select", "pickSheet", "preview"].indexOf(stage);
+            const isPast = i < idx;
+            return (
+              <div
+                key={s}
+                className={`flex-1 rounded-full px-2 py-1.5 text-center backdrop-blur-sm border ${
+                  isActive
+                    ? "bg-white text-primary border-white"
+                    : isPast
+                    ? "bg-white/30 text-white border-white/40"
+                    : "bg-white/10 text-white/70 border-white/20"
+                }`}
+              >
+                {i + 1}. {labels[i]}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {stage === "select" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="rounded-2xl shadow-sm border-border/70">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
               <FileSpreadsheet className="w-5 h-5" />
               Step 1 — Choose period & file
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Organization</label>
-              <div className="flex gap-2 mt-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organization</label>
+              <div className="flex gap-2 mt-1.5">
                 {(["faan", "nama"] as Org[]).map((o) => (
                   <button
                     key={o}
                     type="button"
                     onClick={() => setOrganization(o)}
-                    className={`flex-1 border rounded-md px-3 py-2 text-sm font-medium ${
+                    className={`flex-1 border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                       organization === o
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background hover:bg-muted"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-background hover:bg-muted border-border/60"
                     }`}
                     data-testid={`org-${o}`}
                   >
@@ -258,16 +305,15 @@ export function UploadPage() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Pick the employer this spreadsheet is from. Matched members will be tagged
-                to this organization automatically.
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                Pick the employer this spreadsheet is from.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium">Month</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Month</label>
                 <select
-                  className="w-full mt-1 border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  className="w-full mt-1.5 border border-input rounded-xl px-3 py-2 text-sm bg-background h-10"
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
                   data-testid="select-upload-month"
@@ -276,23 +322,24 @@ export function UploadPage() {
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium">Year</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Year</label>
                 <Input
                   type="number"
                   value={year}
                   onChange={(e) => setYear(parseInt(e.target.value))}
+                  className="mt-1.5 rounded-xl"
                   data-testid="input-upload-year"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium">Excel File (.xlsx)</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Excel File (.xlsx)</label>
               <Input
                 type="file"
                 accept=".xlsx,.xls"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="mt-1"
+                className="mt-1.5 rounded-xl file:bg-primary/10 file:text-primary file:border-0 file:rounded-lg file:px-3 file:py-1.5 file:mr-3 file:font-semibold cursor-pointer"
                 data-testid="input-upload-file"
               />
             </div>
@@ -300,6 +347,7 @@ export function UploadPage() {
             <Button
               onClick={handleUpload}
               disabled={!file || uploading || listSheets.isPending}
+              className="w-full rounded-xl h-11"
               data-testid="button-upload-preview"
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -310,36 +358,36 @@ export function UploadPage() {
       )}
 
       {stage === "pickSheet" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Step 2 — Pick a sheet</CardTitle>
-            <p className="text-sm text-muted-foreground">
+        <Card className="rounded-2xl shadow-sm border-border/70">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Step 2 — Pick a sheet</CardTitle>
+            <p className="text-xs text-muted-foreground">
               Workbook contains {sheets.length} sheet{sheets.length === 1 ? "" : "s"}.
               Choose the one with this month's deductions.
             </p>
           </CardHeader>
           <CardContent>
-            <div className="divide-y border rounded-md">
+            <div className="space-y-2">
               {sheets.map((s) => (
                 <button
                   key={s.name}
                   type="button"
                   onClick={() => handlePickSheet(s.name)}
                   disabled={preview.isPending}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 text-left disabled:opacity-50"
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-border/70 hover:bg-muted/40 hover:border-primary/40 text-left disabled:opacity-50 transition-colors"
                   data-testid={`sheet-${s.name}`}
                 >
-                  <div>
-                    <p className="font-medium text-sm">{s.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate">{s.name}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       {s.rowCount} data row{s.rowCount === 1 ? "" : "s"} detected
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0">
                     {s.looksValid ? (
-                      <Badge variant="secondary">Valid format</Badge>
+                      <Badge variant="secondary" className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[10px]">Valid</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-muted-foreground">No deduction columns</Badge>
+                      <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">No data</Badge>
                     )}
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
@@ -351,42 +399,48 @@ export function UploadPage() {
       )}
 
       {stage === "preview" && previewData && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle>Step 3 — Review & confirm</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Sheet: <span className="font-medium">{previewData.sheetName}</span> &middot; {previewData.totalRows} rows
+        <Card className="rounded-2xl shadow-sm border-border/70">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <CardTitle className="text-base">Step 3 — Review & confirm</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1 truncate">
+                  Sheet: <span className="font-medium">{previewData.sheetName}</span> · {previewData.totalRows} rows
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 justify-end">
-                <Badge variant="secondary" className="text-primary">
+              <div className="flex flex-wrap gap-1.5 justify-end">
+                <Badge className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" variant="outline">
                   {previewData.matchedRows} matched
                 </Badge>
                 {previewData.unmatchedRows > 0 && (
-                  <Badge variant="destructive">{previewData.unmatchedRows} unmatched</Badge>
+                  <Badge className="rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20" variant="outline">
+                    {previewData.unmatchedRows} unmatched
+                  </Badge>
                 )}
                 {previewData.errorRows > 0 && (
-                  <Badge variant="destructive">{previewData.errorRows} errors</Badge>
+                  <Badge className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20" variant="outline">
+                    {previewData.errorRows} errors
+                  </Badge>
                 )}
               </div>
             </div>
             {previewData.duplicateMonth && (
-              <div className="mt-3 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                A processed upload already exists for {previewData.month} {previewData.year}.
-                Continuing will record duplicate transactions.
+              <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  A processed upload already exists for {previewData.month} {previewData.year}.
+                  Continuing will record duplicate transactions.
+                </span>
               </div>
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="overflow-auto max-h-[28rem] border rounded">
+            <div className="overflow-auto max-h-[28rem] rounded-xl border border-border/60">
               <table className="w-full text-xs">
                 <thead className="bg-muted sticky top-0 z-10">
                   <tr>
                     <th className="text-left p-2">Row</th>
-                    <th className="text-left p-2 min-w-[140px]">Name in File</th>
+                    <th className="text-left p-2 min-w-[140px] sticky left-0 bg-muted z-10">Name in File</th>
                     <th className="text-left p-2 min-w-[200px]">Matched Member</th>
                     <th className="text-left p-2">Org</th>
                     {CATEGORY_COLUMNS_BY_ORG[organization].map((c) => (
@@ -486,10 +540,11 @@ export function UploadPage() {
               </table>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => handleProcess(false)}
                 disabled={process.isPending || previewData.unmatchedRows > 0}
+                className="rounded-xl flex-1 min-w-[200px] h-11"
                 data-testid="button-process-upload"
               >
                 {process.isPending ? "Processing..." : `Process ${previewData.matchedRows} Members`}
@@ -499,6 +554,7 @@ export function UploadPage() {
                   variant="outline"
                   onClick={() => handleProcess(true)}
                   disabled={process.isPending}
+                  className="rounded-xl flex-1 min-w-[200px] h-11"
                   data-testid="button-process-skip-errors"
                 >
                   Skip {previewData.unmatchedRows} unmatched & process the rest
@@ -516,38 +572,83 @@ export function UploadHistoryPage() {
   const { data: history, isLoading } = useListUploadHistory();
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold">Upload History</h1>
+    <div className="space-y-5 max-w-4xl">
+      {/* Hero */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="upload-history-hero"
+      >
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative">
+          <p className="text-xs sm:text-sm text-white/80 font-medium uppercase tracking-wider">
+            Upload History
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold mt-0.5 tabular-nums">
+            {history?.length ?? 0}
+          </h1>
+          <p className="text-xs text-white/80 mt-1">Past deduction uploads</p>
+        </div>
+      </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4 space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-          ) : !history || history.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No uploads yet.</div>
-          ) : (
-            <div className="divide-y">
-              {[...history].reverse().map((record: any) => (
-                <div key={record.id} className="flex items-center justify-between px-4 py-3" data-testid={`upload-row-${record.id}`}>
-                  <div>
-                    <p className="font-medium text-sm">{record.month} {record.year}</p>
-                    <p className="text-xs text-muted-foreground">
-                      By {record.uploaderName} &bull; {formatDate(record.createdAt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-xs text-muted-foreground">
-                      <p>{record.rowsProcessed} processed</p>
-                      {record.rowsSkipped > 0 && <p className="text-destructive">{record.rowsSkipped} skipped</p>}
-                    </div>
-                    <Badge variant={record.status === "processed" ? "default" : "secondary"}>{record.status}</Badge>
-                  </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
+        </div>
+      ) : !history || history.length === 0 ? (
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="text-center py-16 text-muted-foreground">
+            <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p className="font-medium">No uploads yet.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2.5">
+          {[...history].reverse().map((record: any) => (
+            <div
+              key={record.id}
+              className="rounded-2xl border border-border/70 bg-card shadow-sm p-4 flex items-start gap-3"
+              data-testid={`upload-row-${record.id}`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-sm truncate">{record.month} {record.year}</p>
+                  <Badge
+                    variant="outline"
+                    className={`rounded-full text-[10px] shrink-0 ${
+                      record.status === "processed"
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {record.status}
+                  </Badge>
                 </div>
-              ))}
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                  By {record.uploaderName} · {formatDate(record.createdAt)}
+                </p>
+                <div className="flex gap-3 mt-2 text-[11px]">
+                  <span className="text-muted-foreground">
+                    <span className="font-bold text-foreground tabular-nums">{record.rowsProcessed}</span> processed
+                  </span>
+                  {record.rowsSkipped > 0 && (
+                    <span className="text-destructive">
+                      <span className="font-bold tabular-nums">{record.rowsSkipped}</span> skipped
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

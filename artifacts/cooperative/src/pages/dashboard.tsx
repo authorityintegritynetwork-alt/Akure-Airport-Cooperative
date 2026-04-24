@@ -55,12 +55,7 @@ export function Dashboard() {
     return <MemberDashboard profile={profile} />;
   }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
-      <AdminDashboard />
-    </div>
-  );
+  return <AdminDashboard />;
 }
 
 type BalanceCard = { key: string; label: string; direction: "credit" | "debit" };
@@ -114,22 +109,24 @@ function KpiCard({
     info: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
   };
   const card = (
-    <Card className="hover:shadow-md transition-shadow border-border/70">
-      <CardContent className="pt-5 pb-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1 min-w-0">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-            <p className="text-2xl font-bold tabular-nums truncate">{value}</p>
-            {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${toneClasses[tone]}`}>
-            {icon}
-          </div>
+    <Card className="rounded-2xl hover:shadow-md transition-shadow border-border/70 shadow-sm h-full">
+      <CardContent className="p-4">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${toneClasses[tone]} mb-2.5`}>
+          {icon}
         </div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+        <p className="text-base sm:text-xl font-bold tabular-nums truncate mt-0.5">{value}</p>
+        {sub && <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{sub}</p>}
       </CardContent>
     </Card>
   );
-  return href ? <Link href={href}>{card}</Link> : card;
+  return href ? (
+    <Link href={href} className="block">
+      {card}
+    </Link>
+  ) : (
+    card
+  );
 }
 
 function PendingMembersPanel() {
@@ -327,7 +324,20 @@ function AdminDashboard() {
   const { data: summary, isLoading } = useGetAdminDashboardSummary();
   const { data: profile } = useGetProfile();
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
+  }
   if (!summary) return null;
 
   const totalActionable =
@@ -337,33 +347,100 @@ function AdminDashboard() {
     summary.loansAwaitingDisbursement +
     summary.pendingMembers;
 
+  const firstName = (profile?.fullName || "").split(" ")[0] || "there";
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const roleLabel = (profile?.role || "admin").replace("_", " ").toUpperCase();
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">Welcome back,</p>
-          <h2 className="text-2xl font-bold tracking-tight">{profile?.fullName ?? "Administrator"}</h2>
+    <div className="space-y-5">
+      {/* Hero gradient card */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="admin-hero-card"
+      >
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs sm:text-sm text-white/80 font-medium">
+              {greeting},
+            </p>
+            <h1 className="text-xl sm:text-2xl font-bold mt-0.5 leading-tight">
+              {firstName}
+            </h1>
+          </div>
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide bg-white/15 backdrop-blur-sm border border-white/20"
+            data-testid="admin-role-badge"
+          >
+            <ShieldCheck className="w-3 h-3" />
+            {roleLabel}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="relative mt-6">
+          <p className="text-xs text-white/80 font-medium uppercase tracking-wider">
+            Total Members
+          </p>
+          <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums tracking-tight">
+            {summary.totalMembers}
+          </p>
+          <p className="text-xs text-white/80 mt-1">
+            {summary.activeMembers} active
+            {summary.pendingMembers
+              ? ` · ${summary.pendingMembers} pending approval`
+              : ""}
+          </p>
+        </div>
+
+        <div className="relative mt-5">
           {totalActionable > 0 ? (
-            <Badge variant="secondary" className="bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5" />
-              {totalActionable} item{totalActionable === 1 ? "" : "s"} need attention
-            </Badge>
+            <Link href="/loans">
+              <div className="rounded-2xl bg-amber-400/20 backdrop-blur-sm border border-amber-200/40 p-3 flex items-center gap-3 cursor-pointer hover:bg-amber-400/30 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-amber-300/30 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-white/80 font-semibold uppercase tracking-wide">
+                    Action needed
+                  </p>
+                  <p className="text-sm font-bold leading-tight mt-0.5">
+                    {totalActionable} item{totalActionable === 1 ? "" : "s"} awaiting your review
+                  </p>
+                </div>
+                <ArrowUpRight className="w-4 h-4 shrink-0" />
+              </div>
+            </Link>
           ) : (
-            <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              All caught up
-            </Badge>
+            <div className="rounded-2xl bg-emerald-400/20 backdrop-blur-sm border border-emerald-200/40 p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-300/30 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-white/80 font-semibold uppercase tracking-wide">
+                  All clear
+                </p>
+                <p className="text-sm font-bold leading-tight mt-0.5">
+                  No pending approvals — everything is up to date.
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Members"
           value={summary.totalMembers}
-          sub={`${summary.activeMembers} active${summary.pendingMembers ? ` · ${summary.pendingMembers} pending` : ""}`}
+          sub={`${summary.activeMembers} active`}
           icon={<Users className="w-5 h-5" />}
           tone="primary"
           href="/members"
@@ -375,7 +452,7 @@ function AdminDashboard() {
           tone="success"
         />
         <KpiCard
-          label="Loans outstanding"
+          label="Loans out"
           value={formatCurrency(summary.totalLoansOutstanding)}
           icon={<CreditCard className="w-5 h-5" />}
           tone="warning"

@@ -15,7 +15,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Wallet, CreditCard, ShoppingBag, ArrowLeft } from "lucide-react";
+import {
+  Wallet,
+  CreditCard,
+  ShoppingBag,
+  ArrowLeft,
+  Mail,
+  Phone,
+  IdCard,
+} from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -26,7 +34,7 @@ export function MemberDetailPage() {
   const { data: member, isLoading, error } = useGetMember(memberId, {
     query: { enabled: !!memberId, queryKey: getGetMemberQueryKey(memberId), retry: false },
   });
-  const { data: summary } = useGetMemberSummary(memberId, {
+  useGetMemberSummary(memberId, {
     query: { enabled: !!memberId, queryKey: getGetMemberSummaryQueryKey(memberId) },
   });
   const { data: transactions } = useListTransactions({ memberId }, {
@@ -43,11 +51,27 @@ export function MemberDetailPage() {
     return (
       <div className="space-y-4 max-w-md">
         <div className="text-muted-foreground">Invalid member ID in the URL.</div>
-        <Link href="/members"><Button variant="outline" size="sm"><ArrowLeft className="w-4 h-4 mr-2"/>Back to members</Button></Link>
+        <Link href="/members">
+          <Button variant="outline" size="sm" className="rounded-full">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to members
+          </Button>
+        </Link>
       </div>
     );
   }
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <div className="grid grid-cols-3 gap-3">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
   if (!member) {
     const status = (error as any)?.response?.status ?? (error as any)?.status;
     const msg =
@@ -64,7 +88,7 @@ export function MemberDetailPage() {
           </p>
         </div>
         <Link href="/members">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="rounded-full">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to members
           </Button>
         </Link>
@@ -72,74 +96,133 @@ export function MemberDetailPage() {
     );
   }
 
+  const statusTone =
+    member.status === "active"
+      ? "bg-emerald-400/20 border-emerald-200/40"
+      : member.status === "pending"
+      ? "bg-amber-400/20 border-amber-200/40"
+      : "bg-white/15 border-white/20";
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <Link href="/members">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{member.fullName}</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
-            <Badge variant="outline">{member.role.replace("_", " ")}</Badge>
-            {member.staffId && <span className="text-sm text-muted-foreground">ID: {member.staffId}</span>}
+    <div className="space-y-5 max-w-4xl">
+      <Link href="/members">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full -ml-2 text-muted-foreground hover:text-foreground"
+          data-testid="button-back-members"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1.5" /> Members
+        </Button>
+      </Link>
+
+      {/* Hero gradient card */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="member-detail-hero"
+      >
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+
+        <div className="relative flex items-start gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-2xl font-bold shrink-0">
+            {member.fullName.charAt(0).toUpperCase()}
           </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold leading-tight truncate">
+              {member.fullName}
+            </h1>
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide backdrop-blur-sm border ${statusTone}`}
+              >
+                {member.status}
+              </span>
+              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-white/15 backdrop-blur-sm border border-white/20">
+                {member.role.replace("_", " ")}
+              </span>
+              {member.organization && (
+                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-white/15 backdrop-blur-sm border border-white/20">
+                  {member.organization}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="relative mt-5 grid gap-2 text-xs text-white/90">
+          <div className="flex items-center gap-2 truncate">
+            <Mail className="w-3.5 h-3.5 shrink-0 opacity-70" />
+            <span className="truncate">{member.email}</span>
+          </div>
+          {member.phone && (
+            <div className="flex items-center gap-2">
+              <Phone className="w-3.5 h-3.5 shrink-0 opacity-70" />
+              <span>{member.phone}</span>
+            </div>
+          )}
+          {member.staffId && (
+            <div className="flex items-center gap-2">
+              <IdCard className="w-3.5 h-3.5 shrink-0 opacity-70" />
+              <span>Staff ID {member.staffId}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Wallet className="w-8 h-8 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Savings Balance</p>
-                <p className="text-xl font-bold">{formatCurrency(member.savingsBalance)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <CreditCard className="w-8 h-8 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Loan Balance</p>
-                <p className="text-xl font-bold">{formatCurrency(member.totalLoanBalance)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <ShoppingBag className="w-8 h-8 text-orange-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Store Debt</p>
-                <p className="text-xl font-bold">{formatCurrency(member.totalStoreDebt)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Balance grid */}
+      <div className="grid gap-3 grid-cols-3">
+        <BalanceTile
+          icon={<Wallet className="w-5 h-5" />}
+          label="Savings"
+          value={formatCurrency(member.savingsBalance)}
+          tone="success"
+        />
+        <BalanceTile
+          icon={<CreditCard className="w-5 h-5" />}
+          label="Loan Bal."
+          value={formatCurrency(member.totalLoanBalance)}
+          tone="warning"
+        />
+        <BalanceTile
+          icon={<ShoppingBag className="w-5 h-5" />}
+          label="Store Debt"
+          value={formatCurrency(member.totalStoreDebt)}
+          tone="info"
+        />
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Recent Transactions</CardTitle></CardHeader>
+      <Card className="rounded-2xl shadow-sm border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Recent Transactions</CardTitle>
+        </CardHeader>
         <CardContent>
           {!transactions || transactions.length === 0 ? (
-            <div className="text-muted-foreground text-sm">No transactions recorded.</div>
+            <div className="text-muted-foreground text-sm py-6 text-center">
+              No transactions recorded.
+            </div>
           ) : (
-            <div className="divide-y">
+            <div className="space-y-2">
               {transactions.slice(0, 10).map((tx: any) => (
-                <div key={tx.id} className="flex justify-between py-2 text-sm">
-                  <div>
-                    <p className="font-medium capitalize">{tx.type.replace("_", " ")}</p>
-                    <p className="text-xs text-muted-foreground">{tx.month} {tx.year}</p>
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm capitalize truncate">
+                      {tx.type.replace("_", " ")}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {tx.month} {tx.year}
+                    </p>
                   </div>
-                  <span className="font-semibold">{formatCurrency(tx.amount)}</span>
+                  <span className="font-bold text-sm tabular-nums shrink-0">
+                    {formatCurrency(tx.amount)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -147,20 +230,40 @@ export function MemberDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Loans</CardTitle></CardHeader>
+      <Card className="rounded-2xl shadow-sm border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Loans</CardTitle>
+        </CardHeader>
         <CardContent>
           {!loans || loans.length === 0 ? (
-            <div className="text-muted-foreground text-sm">No loan applications.</div>
+            <div className="text-muted-foreground text-sm py-6 text-center">
+              No loan applications.
+            </div>
           ) : (
-            <div className="divide-y">
+            <div className="space-y-2">
               {loans.map((loan: any) => (
-                <div key={loan.id} className="flex justify-between py-2 text-sm">
-                  <div>
-                    <p className="font-medium">{formatCurrency(loan.amount)}</p>
-                    <p className="text-xs text-muted-foreground">{loan.tenureMonths} months &bull; {formatDate(loan.createdAt)}</p>
+                <div
+                  key={loan.id}
+                  className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm tabular-nums">
+                      {formatCurrency(loan.amount)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {loan.tenureMonths} months · {formatDate(loan.createdAt)}
+                    </p>
                   </div>
-                  <Badge variant={loan.status === "disbursed" ? "default" : loan.status === "rejected" ? "destructive" : "secondary"} className="text-xs">
+                  <Badge
+                    variant={
+                      loan.status === "disbursed"
+                        ? "default"
+                        : loan.status === "rejected"
+                        ? "destructive"
+                        : "secondary"
+                    }
+                    className="text-[10px] rounded-full"
+                  >
                     {loan.status.replace(/_/g, " ")}
                   </Badge>
                 </div>
@@ -170,22 +273,37 @@ export function MemberDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Store Purchases</CardTitle></CardHeader>
+      <Card className="rounded-2xl shadow-sm border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Store Purchases</CardTitle>
+        </CardHeader>
         <CardContent>
           {!purchases || purchases.length === 0 ? (
-            <div className="text-muted-foreground text-sm">No store purchases.</div>
+            <div className="text-muted-foreground text-sm py-6 text-center">
+              No store purchases.
+            </div>
           ) : (
-            <div className="divide-y">
+            <div className="space-y-2">
               {purchases.map((p: any) => (
-                <div key={p.id} className="flex justify-between py-2 text-sm">
-                  <div>
-                    <p className="font-medium">{p.itemName}</p>
-                    <p className="text-xs text-muted-foreground">{p.quantity} &times; {formatCurrency(p.unitPrice)}</p>
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{p.itemName}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {p.quantity} × {formatCurrency(p.unitPrice)}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(p.totalPrice)}</p>
-                    {p.status !== "settled" && <p className="text-xs text-destructive">Owed: {formatCurrency(p.outstandingBalance)}</p>}
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-sm tabular-nums">
+                      {formatCurrency(p.totalPrice)}
+                    </p>
+                    {p.status !== "settled" && (
+                      <p className="text-[10px] text-destructive">
+                        Owed {formatCurrency(p.outstandingBalance)}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -194,5 +312,40 @@ export function MemberDetailPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function BalanceTile({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  tone: "success" | "warning" | "info";
+}) {
+  const toneClass = {
+    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    info: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  }[tone];
+  return (
+    <Card className="rounded-2xl shadow-sm border-border/70 h-full">
+      <CardContent className="p-3 sm:p-4">
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${toneClass}`}
+        >
+          {icon}
+        </div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+          {label}
+        </p>
+        <p className="text-sm sm:text-lg font-bold tabular-nums truncate mt-0.5">
+          {value}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
