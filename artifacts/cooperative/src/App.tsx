@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
+import { useEffect, useRef, useState } from "react";
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { InstallBanner } from "@/components/install-banner";
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -191,6 +192,19 @@ function ProtectedRoute({ component: Component, bare }: { component: React.Compo
   );
 }
 
+function ScopedInstallBanner() {
+  // Use a separate dismiss key for anonymous visitors vs each signed-in user.
+  // This means a logged-in user gets a fresh "post sign-in" prompt even if
+  // they previously dismissed the public landing-page banner.
+  // Important: do NOT remount the banner with a `key` when scope changes —
+  // doing so would lose the cached `beforeinstallprompt` event and prevent
+  // the native install bubble from being shown after sign-in.
+  const { user, isLoaded } = useUser();
+  if (!isLoaded) return null;
+  const scopeKey = user?.id ? `user:${user.id}` : "anon";
+  return <InstallBanner scopeKey={scopeKey} />;
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -204,6 +218,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
+        <ScopedInstallBanner />
         <StepUpProvider>
         <Switch>
           <Route path="/" component={HomeRedirect} />

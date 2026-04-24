@@ -91,6 +91,9 @@ Employers (e.g. FAAN, NAMA) are configured at runtime by admins via `/organizati
 - `artifacts/cooperative/src/App.tsx` — Frontend routing + Clerk config
 - `artifacts/cooperative/src/components/layout.tsx` — Sidebar + layout (mobile bottom nav for member & admin; sidebar/hamburger kept on mobile for auditor & treasurer)
 - `artifacts/cooperative/src/components/admin-mobile-bottom-nav.tsx` — Admin mobile bottom nav
+- `artifacts/cooperative/public/manifest.webmanifest` + `public/sw.js` — PWA manifest & service worker
+- `artifacts/cooperative/src/lib/use-install-prompt.tsx` — Hook capturing `beforeinstallprompt`, iOS detection, 7-day dismiss TTL keyed per user
+- `artifacts/cooperative/src/components/install-banner.tsx` — Slim sticky-top install banner; opens an "Add to Home Screen" sheet on iOS
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
 - `lib/db/src/schema.ts` — Database schema (Drizzle ORM)
 
