@@ -65,7 +65,28 @@ The `dev-start.mjs` script in `api-server/` starts both:
 4. Super Admin approves → status: `super_admin_approved` (or rejects)
 5. Treasurer disburses → status: `disbursed`
 
-Interest: 10% flat (configurable in Settings)
+Interest: per-product flat rate (see Loan Products below)
+
+## Loan Products
+
+Each loan application is tied to a `loan_products` row. Admins manage products from Settings → Loan Products. The seed creates 6 defaults (codes are stable):
+
+| Code | Name | Rate | Default / Max tenure |
+|---|---|---|---|
+| `regular` | Regular Loan | 10% | 18 / 24 mo |
+| `electronics` | Electronics Loan | 10% | 8 / 8 mo |
+| `commercial` | Commercial Loan | 5% | 3 / 3 mo |
+| `emergency` | Emergency Loan | 5% | 4 / 4 mo |
+| `fuel_venture` | Fuel Venture | 5% | 1 / 1 mo |
+| `provision` | Provision | 0% | 1 / 1 mo |
+
+- Schema: `lib/db/src/schema/loanProducts.ts`; `loans.loanProductId` is a nullable FK so historical loans (pre-feature) keep working.
+- Seeding: `artifacts/api-server/src/lib/seedLoanProducts.ts` runs on boot and only inserts missing rows (idempotent on `code`).
+- API:
+  - `GET /loan-products` — active only; admins may pass `?includeInactive=true`.
+  - `POST/PATCH/DELETE /loan-products[/:id]` — admin + step-up. DELETE refuses (409) if any loan references the product (pre-check + Postgres FK 23503 race fallback).
+  - `POST /loans` and `POST /loans/calculate` — `loanProductId` is **required**; tenure must be a positive integer ≤ `product.maxTenureMonths`; calc uses `product.interestRate` (flat % of principal).
+- Frontend: member apply dialog (`my-loans.tsx`) renders a 6-card picker that auto-sets default tenure and constrains the max. Admin loans dashboard and "My Loans" rows show a product badge. Settings has full CRUD with active toggle.
 
 ## Excel Upload
 

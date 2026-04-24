@@ -164,8 +164,18 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
             <p className="text-base font-bold tabular-nums mt-1">
               {formatCurrency(loan.amount)}
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {loan.tenureMonths}m · Applied {formatDate(loan.createdAt)}
+            <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+              {loan.loanProductName && (
+                <Badge
+                  variant="secondary"
+                  className="rounded-full text-[10px] px-2 py-0 h-4 font-semibold"
+                >
+                  {loan.loanProductName}
+                </Badge>
+              )}
+              <span>
+                {loan.tenureMonths}m · Applied {formatDate(loan.createdAt)}
+              </span>
             </p>
           </div>
           <button

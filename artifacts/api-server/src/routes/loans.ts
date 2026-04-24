@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, loansTable, membersTable, transactionsTable, systemSettingsTable, notificationsTable } from "@workspace/db";
+import { db, loansTable, membersTable, transactionsTable, systemSettingsTable, notificationsTable, loanProductsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireAuditor, requireMember, requireReverification, requireSuperAdmin, requireTreasurer, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
@@ -20,10 +20,11 @@ import {
 
 const router: IRouter = Router();
 
-function formatLoan(loan: any, memberName: string) {
+function formatLoan(loan: any, memberName: string, loanProductName: string | null = null) {
   return {
     ...loan,
     memberName,
+    loanProductName,
     amount: parseFloat(loan.amount),
     interestRate: parseFloat(loan.interestRate),
     interestAmount: parseFloat(loan.interestAmount),
@@ -33,11 +34,26 @@ function formatLoan(loan: any, memberName: string) {
   };
 }
 
+async function getLoanProductMap(): Promise<Record<number, string>> {
+  const rows = await db
+    .select({ id: loanProductsTable.id, name: loanProductsTable.name })
+    .from(loanProductsTable);
+  return Object.fromEntries(rows.map((r) => [r.id, r.name]));
+}
+
 async function getLoanWithMember(loanId: number) {
   const [loan] = await db.select().from(loansTable).where(eq(loansTable.id, loanId));
   if (!loan) return null;
   const [member] = await db.select().from(membersTable).where(eq(membersTable.id, loan.memberId));
-  return { loan, memberName: member?.fullName || "Unknown" };
+  let productName: string | null = null;
+  if (loan.loanProductId) {
+    const [p] = await db
+      .select({ name: loanProductsTable.name })
+      .from(loanProductsTable)
+      .where(eq(loanProductsTable.id, loan.loanProductId));
+    productName = p?.name ?? null;
+  }
+  return { loan, memberName: member?.fullName || "Unknown", productName };
 }
 
 async function getSettings() {
@@ -62,9 +78,48 @@ router.get("/loans", requireAuth, requireAdmin, async (req: AuthRequest, res): P
 
   const members = await db.select({ id: membersTable.id, fullName: membersTable.fullName }).from(membersTable);
   const memberMap = Object.fromEntries(members.map((m) => [m.id, m.fullName]));
+  const productMap = await getLoanProductMap();
 
-  res.json(loans.map((l) => formatLoan(l, memberMap[l.memberId] || "Unknown")));
+  res.json(
+    loans.map((l) =>
+      formatLoan(
+        l,
+        memberMap[l.memberId] || "Unknown",
+        l.loanProductId ? productMap[l.loanProductId] ?? null : null,
+      ),
+    ),
+  );
 });
+
+async function resolveProductForApply(
+  loanProductId: number,
+  tenureMonths: number,
+): Promise<
+  | { ok: true; product: typeof loanProductsTable.$inferSelect; rate: number }
+  | { ok: false; status: number; error: string }
+> {
+  if (!Number.isInteger(tenureMonths) || tenureMonths < 1) {
+    return { ok: false, status: 400, error: "Tenure must be at least 1 month" };
+  }
+  const [product] = await db
+    .select()
+    .from(loanProductsTable)
+    .where(eq(loanProductsTable.id, loanProductId));
+  if (!product) {
+    return { ok: false, status: 404, error: "Loan product not found" };
+  }
+  if (!product.isActive) {
+    return { ok: false, status: 400, error: "This loan product is not currently available" };
+  }
+  if (tenureMonths > product.maxTenureMonths) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Tenure cannot exceed ${product.maxTenureMonths} month(s) for ${product.name}`,
+    };
+  }
+  return { ok: true, product, rate: parseFloat(product.interestRate) };
+}
 
 router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CreateLoanBody.safeParse(req.body);
@@ -73,8 +128,15 @@ router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res):
     return;
   }
 
-  const settings = await getSettings();
-  const rate = settings ? parseFloat(settings.loanInterestRate) : 10;
+  const resolved = await resolveProductForApply(
+    parsed.data.loanProductId,
+    parsed.data.tenureMonths,
+  );
+  if (!resolved.ok) {
+    res.status(resolved.status).json({ error: resolved.error });
+    return;
+  }
+  const { product, rate } = resolved;
   const principal = parsed.data.amount;
   const interestAmount = (principal * rate) / 100;
   const totalRepayable = principal + interestAmount;
@@ -84,6 +146,7 @@ router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res):
     .insert(loansTable)
     .values({
       memberId: req.memberId!,
+      loanProductId: product.id,
       amount: principal.toString(),
       interestRate: rate.toString(),
       interestAmount: interestAmount.toString(),
@@ -100,17 +163,26 @@ router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res):
     action: "APPLY_LOAN",
     entity: "loan",
     entityId: loan.id,
-    details: `Loan application of ₦${principal.toLocaleString()} for ${parsed.data.tenureMonths} months`,
+    details: `${product ? product.name + " — " : ""}Loan application of ₦${principal.toLocaleString()} for ${parsed.data.tenureMonths} months`,
   });
 
   const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
-  res.status(201).json(formatLoan(loan, member?.fullName || "Unknown"));
+  res.status(201).json(formatLoan(loan, member?.fullName || "Unknown", product?.name ?? null));
 });
 
 router.get("/loans/my", requireAuth, async (req: AuthRequest, res): Promise<void> => {
   const loans = await db.select().from(loansTable).where(eq(loansTable.memberId, req.memberId!));
   const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
-  res.json(loans.map((l) => formatLoan(l, member?.fullName || "Unknown")));
+  const productMap = await getLoanProductMap();
+  res.json(
+    loans.map((l) =>
+      formatLoan(
+        l,
+        member?.fullName || "Unknown",
+        l.loanProductId ? productMap[l.loanProductId] ?? null : null,
+      ),
+    ),
+  );
 });
 
 router.post("/loans/calculate", requireAuth, requireMember, async (req: AuthRequest, res): Promise<void> => {
@@ -120,8 +192,15 @@ router.post("/loans/calculate", requireAuth, requireMember, async (req: AuthRequ
     return;
   }
 
-  const settings = await getSettings();
-  const rate = settings ? parseFloat(settings.loanInterestRate) : 10;
+  const resolved = await resolveProductForApply(
+    parsed.data.loanProductId,
+    parsed.data.tenureMonths,
+  );
+  if (!resolved.ok) {
+    res.status(resolved.status).json({ error: resolved.error });
+    return;
+  }
+  const { rate } = resolved;
   const principal = parsed.data.amount;
   const interestAmount = (principal * rate) / 100;
   const totalRepayable = principal + interestAmount;

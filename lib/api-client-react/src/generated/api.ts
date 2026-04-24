@@ -23,6 +23,7 @@ import type {
   BulkAssignOrganization200,
   BulkOrganizationBody,
   CreateLoanBody,
+  CreateLoanProductBody,
   CreateMemberBody,
   CreateOrganizationBody,
   CreateStoreItemBody,
@@ -38,6 +39,7 @@ import type {
   GetStepUpStatus200,
   HealthStatus,
   ListAuditLogsParams,
+  ListLoanProductsParams,
   ListLoansParams,
   ListMembersParams,
   ListMyTransactionsParams,
@@ -51,6 +53,7 @@ import type {
   LoanCalculateBody,
   LoanCalculation,
   LoanPipelineItem,
+  LoanProduct,
   Member,
   MemberDashboardSummary,
   MemberProfile,
@@ -67,6 +70,7 @@ import type {
   StorePurchase,
   SystemSettings,
   Transaction,
+  UpdateLoanProductBody,
   UpdateMemberBody,
   UpdateOrganizationBody,
   UpdateSettingsBody,
@@ -3234,6 +3238,360 @@ export function useGetLoanRepayments<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List configurable loan products
+ */
+export const getListLoanProductsUrl = (params?: ListLoanProductsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/loan-products?${stringifiedParams}`
+    : `/api/loan-products`;
+};
+
+export const listLoanProducts = async (
+  params?: ListLoanProductsParams,
+  options?: RequestInit,
+): Promise<LoanProduct[]> => {
+  return customFetch<LoanProduct[]>(getListLoanProductsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLoanProductsQueryKey = (
+  params?: ListLoanProductsParams,
+) => {
+  return [`/api/loan-products`, ...(params ? [params] : [])] as const;
+};
+
+export const getListLoanProductsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLoanProducts>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLoanProductsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLoanProducts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListLoanProductsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLoanProducts>>
+  > = ({ signal }) => listLoanProducts(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLoanProducts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLoanProductsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLoanProducts>>
+>;
+export type ListLoanProductsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List configurable loan products
+ */
+
+export function useListLoanProducts<
+  TData = Awaited<ReturnType<typeof listLoanProducts>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListLoanProductsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLoanProducts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLoanProductsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a loan product (Admin)
+ */
+export const getCreateLoanProductUrl = () => {
+  return `/api/loan-products`;
+};
+
+export const createLoanProduct = async (
+  createLoanProductBody: CreateLoanProductBody,
+  options?: RequestInit,
+): Promise<LoanProduct> => {
+  return customFetch<LoanProduct>(getCreateLoanProductUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLoanProductBody),
+  });
+};
+
+export const getCreateLoanProductMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLoanProduct>>,
+    TError,
+    { data: BodyType<CreateLoanProductBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLoanProduct>>,
+  TError,
+  { data: BodyType<CreateLoanProductBody> },
+  TContext
+> => {
+  const mutationKey = ["createLoanProduct"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLoanProduct>>,
+    { data: BodyType<CreateLoanProductBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createLoanProduct(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLoanProductMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLoanProduct>>
+>;
+export type CreateLoanProductMutationBody = BodyType<CreateLoanProductBody>;
+export type CreateLoanProductMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a loan product (Admin)
+ */
+export const useCreateLoanProduct = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLoanProduct>>,
+    TError,
+    { data: BodyType<CreateLoanProductBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLoanProduct>>,
+  TError,
+  { data: BodyType<CreateLoanProductBody> },
+  TContext
+> => {
+  return useMutation(getCreateLoanProductMutationOptions(options));
+};
+
+/**
+ * @summary Update a loan product (Admin)
+ */
+export const getUpdateLoanProductUrl = (id: number) => {
+  return `/api/loan-products/${id}`;
+};
+
+export const updateLoanProduct = async (
+  id: number,
+  updateLoanProductBody: UpdateLoanProductBody,
+  options?: RequestInit,
+): Promise<LoanProduct> => {
+  return customFetch<LoanProduct>(getUpdateLoanProductUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateLoanProductBody),
+  });
+};
+
+export const getUpdateLoanProductMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLoanProduct>>,
+    TError,
+    { id: number; data: BodyType<UpdateLoanProductBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateLoanProduct>>,
+  TError,
+  { id: number; data: BodyType<UpdateLoanProductBody> },
+  TContext
+> => {
+  const mutationKey = ["updateLoanProduct"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateLoanProduct>>,
+    { id: number; data: BodyType<UpdateLoanProductBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateLoanProduct(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateLoanProductMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateLoanProduct>>
+>;
+export type UpdateLoanProductMutationBody = BodyType<UpdateLoanProductBody>;
+export type UpdateLoanProductMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a loan product (Admin)
+ */
+export const useUpdateLoanProduct = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLoanProduct>>,
+    TError,
+    { id: number; data: BodyType<UpdateLoanProductBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateLoanProduct>>,
+  TError,
+  { id: number; data: BodyType<UpdateLoanProductBody> },
+  TContext
+> => {
+  return useMutation(getUpdateLoanProductMutationOptions(options));
+};
+
+/**
+ * @summary Delete a loan product (Admin)
+ */
+export const getDeleteLoanProductUrl = (id: number) => {
+  return `/api/loan-products/${id}`;
+};
+
+export const deleteLoanProduct = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteLoanProductUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLoanProductMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLoanProduct>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLoanProduct>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteLoanProduct"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLoanProduct>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteLoanProduct(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLoanProductMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLoanProduct>>
+>;
+
+export type DeleteLoanProductMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a loan product (Admin)
+ */
+export const useDeleteLoanProduct = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLoanProduct>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLoanProduct>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteLoanProductMutationOptions(options));
+};
 
 /**
  * @summary List available store items

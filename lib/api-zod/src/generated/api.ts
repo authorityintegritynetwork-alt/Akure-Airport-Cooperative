@@ -689,6 +689,8 @@ export const ListLoansResponseItem = zod.object({
   id: zod.number(),
   memberId: zod.number(),
   memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
   amount: zod.number(),
   interestRate: zod.number(),
   interestAmount: zod.number(),
@@ -724,10 +726,12 @@ export const ListLoansResponse = zod.array(ListLoansResponseItem);
 /**
  * @summary Apply for a loan (Member)
  */
+
 export const CreateLoanBody = zod.object({
   amount: zod.number(),
-  tenureMonths: zod.number(),
+  tenureMonths: zod.number().min(1),
   purpose: zod.string().optional(),
+  loanProductId: zod.number(),
 });
 
 /**
@@ -737,6 +741,8 @@ export const ListMyLoansResponseItem = zod.object({
   id: zod.number(),
   memberId: zod.number(),
   memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
   amount: zod.number(),
   interestRate: zod.number(),
   interestAmount: zod.number(),
@@ -772,9 +778,11 @@ export const ListMyLoansResponse = zod.array(ListMyLoansResponseItem);
 /**
  * @summary Calculate loan repayment preview (any authenticated user)
  */
+
 export const CalculateLoanBody = zod.object({
   amount: zod.number(),
-  tenureMonths: zod.number(),
+  tenureMonths: zod.number().min(1),
+  loanProductId: zod.number(),
 });
 
 export const CalculateLoanResponse = zod.object({
@@ -797,6 +805,8 @@ export const GetLoanResponse = zod.object({
   id: zod.number(),
   memberId: zod.number(),
   memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
   amount: zod.number(),
   interestRate: zod.number(),
   interestAmount: zod.number(),
@@ -847,6 +857,8 @@ export const ApproveLoanResponse = zod.object({
   id: zod.number(),
   memberId: zod.number(),
   memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
   amount: zod.number(),
   interestRate: zod.number(),
   interestAmount: zod.number(),
@@ -897,6 +909,8 @@ export const RejectLoanResponse = zod.object({
   id: zod.number(),
   memberId: zod.number(),
   memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
   amount: zod.number(),
   interestRate: zod.number(),
   interestAmount: zod.number(),
@@ -947,6 +961,8 @@ export const DisburseLoanResponse = zod.object({
   id: zod.number(),
   memberId: zod.number(),
   memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
   amount: zod.number(),
   interestRate: zod.number(),
   interestAmount: zod.number(),
@@ -1000,6 +1016,80 @@ export const GetLoanRepaymentsResponseItem = zod.object({
 export const GetLoanRepaymentsResponse = zod.array(
   GetLoanRepaymentsResponseItem,
 );
+
+/**
+ * @summary List configurable loan products
+ */
+export const ListLoanProductsQueryParams = zod.object({
+  includeInactive: zod.coerce.boolean().optional(),
+});
+
+export const ListLoanProductsResponseItem = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  interestRate: zod.number(),
+  defaultTenureMonths: zod.number(),
+  maxTenureMonths: zod.number(),
+  isActive: zod.boolean(),
+  sortOrder: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListLoanProductsResponse = zod.array(ListLoanProductsResponseItem);
+
+/**
+ * @summary Create a loan product (Admin)
+ */
+
+export const CreateLoanProductBody = zod.object({
+  code: zod.string().describe("Lowercase identifier, e.g. 'regular'."),
+  name: zod.string(),
+  description: zod.string().optional(),
+  interestRate: zod.number().describe("Flat percent of principal."),
+  defaultTenureMonths: zod.number().min(1),
+  maxTenureMonths: zod.number().min(1),
+  sortOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Update a loan product (Admin)
+ */
+export const UpdateLoanProductParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateLoanProductBody = zod.object({
+  name: zod.string().optional(),
+  description: zod.string().nullish(),
+  interestRate: zod.number().optional(),
+  defaultTenureMonths: zod.number().min(1).optional(),
+  maxTenureMonths: zod.number().min(1).optional(),
+  isActive: zod.boolean().optional(),
+  sortOrder: zod.number().optional(),
+});
+
+export const UpdateLoanProductResponse = zod.object({
+  id: zod.number(),
+  code: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  interestRate: zod.number(),
+  defaultTenureMonths: zod.number(),
+  maxTenureMonths: zod.number(),
+  isActive: zod.boolean(),
+  sortOrder: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a loan product (Admin)
+ */
+export const DeleteLoanProductParams = zod.object({
+  id: zod.coerce.number(),
+});
 
 /**
  * @summary List available store items

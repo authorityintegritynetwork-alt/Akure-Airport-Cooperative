@@ -11,6 +11,10 @@ export interface Loan {
   id: number;
   memberId: number;
   memberName: string;
+  /** @nullable */
+  loanProductId?: number | null;
+  /** @nullable */
+  loanProductName?: string | null;
   amount: number;
   interestRate: number;
   interestAmount: number;

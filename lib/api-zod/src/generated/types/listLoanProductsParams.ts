@@ -6,10 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CreateLoanBody {
-  amount: number;
-  /** @minimum 1 */
-  tenureMonths: number;
-  purpose?: string;
-  loanProductId: number;
-}
+export type ListLoanProductsParams = {
+  includeInactive?: boolean;
+};

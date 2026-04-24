@@ -8,5 +8,7 @@
 
 export interface LoanCalculateBody {
   amount: number;
+  /** @minimum 1 */
   tenureMonths: number;
+  loanProductId: number;
 }

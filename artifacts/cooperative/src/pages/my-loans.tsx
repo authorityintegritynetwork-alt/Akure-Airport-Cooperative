@@ -4,6 +4,7 @@ import {
   useCreateLoan,
   useCalculateLoan,
   useGetLoanRepayments,
+  useListLoanProducts,
   getListMyLoansQueryKey,
   getGetLoanRepaymentsQueryKey,
 } from "@workspace/api-client-react";
@@ -45,6 +46,10 @@ import {
 } from "lucide-react";
 
 const loanSchema = z.object({
+  loanProductId: z
+    .number({ error: "Please choose a loan type" })
+    .int()
+    .positive(),
   amount: z.number({ error: "Amount is required" }).positive(),
   tenureMonths: z.number({ error: "Tenure is required" }).int().min(1).max(60),
   purpose: z.string().optional(),
@@ -142,8 +147,18 @@ function LoanCard({ loan }: { loan: any }) {
               </span>
               <LoanStatusPill status={loan.status} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {loan.tenureMonths} months · Applied {formatDate(loan.createdAt)}
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+              {loan.loanProductName && (
+                <Badge
+                  variant="secondary"
+                  className="rounded-full text-[10px] px-2 py-0 h-4 font-semibold"
+                >
+                  {loan.loanProductName}
+                </Badge>
+              )}
+              <span>
+                {loan.tenureMonths} months · Applied {formatDate(loan.createdAt)}
+              </span>
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -274,6 +289,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export function MyLoansPage() {
   const { data: loans, isLoading } = useListMyLoans();
+  const { data: loanProducts } = useListLoanProducts();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [calcResult, setCalcResult] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -284,16 +300,34 @@ export function MyLoansPage() {
 
   const form = useForm<LoanForm>({
     resolver: zodResolver(loanSchema),
-    defaultValues: { amount: 0, tenureMonths: 12, purpose: "" },
+    defaultValues: {
+      loanProductId: undefined as unknown as number,
+      amount: 0,
+      tenureMonths: 12,
+      purpose: "",
+    },
   });
 
   const amount = form.watch("amount");
   const tenureMonths = form.watch("tenureMonths");
+  const selectedProductId = form.watch("loanProductId");
+  const selectedProduct = (loanProducts ?? []).find(
+    (p) => p.id === selectedProductId,
+  );
+
+  function handleSelectProduct(p: { id: number; defaultTenureMonths: number; maxTenureMonths: number }) {
+    form.setValue("loanProductId", p.id, { shouldValidate: true });
+    const current = form.getValues("tenureMonths");
+    if (!current || current > p.maxTenureMonths) {
+      form.setValue("tenureMonths", p.defaultTenureMonths);
+    }
+    setCalcResult(null);
+  }
 
   function handleCalculate() {
-    if (amount > 0 && tenureMonths > 0) {
+    if (amount > 0 && tenureMonths > 0 && selectedProductId) {
       calcLoan.mutate(
-        { data: { amount, tenureMonths } },
+        { data: { amount, tenureMonths, loanProductId: selectedProductId } },
         { onSuccess: (result) => setCalcResult(result) },
       );
     }
@@ -306,6 +340,7 @@ export function MyLoansPage() {
           amount: data.amount,
           tenureMonths: data.tenureMonths,
           purpose: data.purpose || undefined,
+          loanProductId: data.loanProductId,
         },
       },
       {
@@ -361,8 +396,51 @@ export function MyLoansPage() {
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4"
+                className="space-y-4 max-h-[70vh] overflow-y-auto pr-1"
               >
+                <FormField
+                  control={form.control}
+                  name="loanProductId"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Loan type</FormLabel>
+                      <div
+                        className="grid grid-cols-2 gap-2"
+                        data-testid="loan-product-picker"
+                      >
+                        {(loanProducts ?? []).map((p) => {
+                          const active = selectedProductId === p.id;
+                          return (
+                            <button
+                              type="button"
+                              key={p.id}
+                              onClick={() => handleSelectProduct(p)}
+                              data-testid={`loan-product-${p.code}`}
+                              className={`text-left rounded-xl border p-3 transition-all active:scale-[0.98] ${
+                                active
+                                  ? "border-primary bg-primary/10 ring-1 ring-primary"
+                                  : "border-border/60 bg-card hover:border-primary/40"
+                              }`}
+                            >
+                              <p className="text-sm font-semibold leading-tight">
+                                {p.name}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                {p.interestRate}% · up to {p.maxTenureMonths} mo
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {selectedProduct?.description && (
+                        <p className="text-[11px] text-muted-foreground pt-1">
+                          {selectedProduct.description}
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="amount"
@@ -438,7 +516,7 @@ export function MyLoansPage() {
                   <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-3 text-sm space-y-1.5">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        Interest (10% flat)
+                        Interest ({calcResult.interestRate}% flat)
                       </span>
                       <span className="font-semibold tabular-nums">
                         {formatCurrency(calcResult.interestAmount)}

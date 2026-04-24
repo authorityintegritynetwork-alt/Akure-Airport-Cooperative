@@ -2,6 +2,7 @@ export * from "./members";
 export * from "./organizations";
 export * from "./transactions";
 export * from "./loans";
+export * from "./loanProducts";
 export * from "./store";
 export * from "./notifications";
 export * from "./audit";

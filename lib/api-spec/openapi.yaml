@@ -790,6 +790,82 @@ paths:
                 items:
                   $ref: "#/components/schemas/Transaction"
 
+  # ── LOAN PRODUCTS ─────────────────────────────────────────────────────────────
+  /loan-products:
+    get:
+      operationId: listLoanProducts
+      tags: [loanProducts]
+      summary: List configurable loan products
+      parameters:
+        - in: query
+          name: includeInactive
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LoanProduct"
+    post:
+      operationId: createLoanProduct
+      tags: [loanProducts]
+      summary: Create a loan product (Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoanProductBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoanProduct"
+
+  /loan-products/{id}:
+    patch:
+      operationId: updateLoanProduct
+      tags: [loanProducts]
+      summary: Update a loan product (Admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLoanProductBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoanProduct"
+    delete:
+      operationId: deleteLoanProduct
+      tags: [loanProducts]
+      summary: Delete a loan product (Admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # ── STORE ────────────────────────────────────────────────────────────────────
   /store/items:
     get:
@@ -1453,6 +1529,55 @@ components:
           type: string
           enum: [faan, nama]
 
+    LoanProduct:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        interestRate: { type: number }
+        defaultTenureMonths: { type: integer }
+        maxTenureMonths: { type: integer }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        - id
+        - code
+        - name
+        - interestRate
+        - defaultTenureMonths
+        - maxTenureMonths
+        - isActive
+        - sortOrder
+        - createdAt
+        - updatedAt
+
+    CreateLoanProductBody:
+      type: object
+      properties:
+        code: { type: string, description: "Lowercase identifier, e.g. 'regular'." }
+        name: { type: string }
+        description: { type: string }
+        interestRate: { type: number, description: "Flat percent of principal." }
+        defaultTenureMonths: { type: integer, minimum: 1 }
+        maxTenureMonths: { type: integer, minimum: 1 }
+        sortOrder: { type: integer }
+      required: [code, name, interestRate, defaultTenureMonths, maxTenureMonths]
+
+    UpdateLoanProductBody:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        interestRate: { type: number }
+        defaultTenureMonths: { type: integer, minimum: 1 }
+        maxTenureMonths: { type: integer, minimum: 1 }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+
     MemberSummary:
       type: object
       properties:
@@ -1791,6 +1916,10 @@ components:
           type: integer
         memberName:
           type: string
+        loanProductId:
+          type: ["integer", "null"]
+        loanProductName:
+          type: ["string", "null"]
         amount:
           type: number
         interestRate:
@@ -1865,9 +1994,12 @@ components:
           type: number
         tenureMonths:
           type: integer
+          minimum: 1
         purpose:
           type: string
-      required: [amount, tenureMonths]
+        loanProductId:
+          type: integer
+      required: [amount, tenureMonths, loanProductId]
 
     LoanActionBody:
       type: object
@@ -1885,7 +2017,10 @@ components:
           type: number
         tenureMonths:
           type: integer
-      required: [amount, tenureMonths]
+          minimum: 1
+        loanProductId:
+          type: integer
+      required: [amount, tenureMonths, loanProductId]
 
     LoanCalculation:
       type: object

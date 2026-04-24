@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedOrganizations } from "./lib/seedOrganizations";
+import { seedLoanProducts } from "./lib/seedLoanProducts";
 
 const rawPort = process.env["PORT"];
 
@@ -19,6 +20,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function bootstrap() {
   try {
     await seedOrganizations();
+    await seedLoanProducts();
   } catch (err) {
     logger.error({ err }, "Failed to seed organizations on startup");
   }

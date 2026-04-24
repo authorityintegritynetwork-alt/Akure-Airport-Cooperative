@@ -2,12 +2,14 @@ import { pgTable, text, serial, timestamp, numeric, integer } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membersTable } from "./members";
+import { loanProductsTable } from "./loanProducts";
 
 export const loansTable = pgTable("loans", {
   id: serial("id").primaryKey(),
   memberId: integer("member_id")
     .notNull()
     .references(() => membersTable.id),
+  loanProductId: integer("loan_product_id").references(() => loanProductsTable.id),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   interestRate: numeric("interest_rate", { precision: 5, scale: 2 }).notNull(),
   interestAmount: numeric("interest_amount", { precision: 15, scale: 2 }).notNull(),

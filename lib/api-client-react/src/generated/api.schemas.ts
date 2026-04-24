@@ -238,6 +238,48 @@ export interface UpdateOrganizationBody {
   excelFormat?: UpdateOrganizationBodyExcelFormat;
 }
 
+export interface LoanProduct {
+  id: number;
+  code: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  interestRate: number;
+  defaultTenureMonths: number;
+  maxTenureMonths: number;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLoanProductBody {
+  /** Lowercase identifier, e.g. 'regular'. */
+  code: string;
+  name: string;
+  description?: string;
+  /** Flat percent of principal. */
+  interestRate: number;
+  /** @minimum 1 */
+  defaultTenureMonths: number;
+  /** @minimum 1 */
+  maxTenureMonths: number;
+  sortOrder?: number;
+}
+
+export interface UpdateLoanProductBody {
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+  interestRate?: number;
+  /** @minimum 1 */
+  defaultTenureMonths?: number;
+  /** @minimum 1 */
+  maxTenureMonths?: number;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
 export interface MemberSummary {
   memberId: number;
   fullName: string;
@@ -423,6 +465,10 @@ export interface Loan {
   id: number;
   memberId: number;
   memberName: string;
+  /** @nullable */
+  loanProductId?: number | null;
+  /** @nullable */
+  loanProductName?: string | null;
   amount: number;
   interestRate: number;
   interestAmount: number;
@@ -461,8 +507,10 @@ export interface Loan {
 
 export interface CreateLoanBody {
   amount: number;
+  /** @minimum 1 */
   tenureMonths: number;
   purpose?: string;
+  loanProductId: number;
 }
 
 export interface LoanActionBody {
@@ -473,7 +521,9 @@ export interface LoanActionBody {
 
 export interface LoanCalculateBody {
   amount: number;
+  /** @minimum 1 */
   tenureMonths: number;
+  loanProductId: number;
 }
 
 export interface LoanCalculation {
@@ -742,6 +792,10 @@ export const ListLoansStatus = {
   disbursed: "disbursed",
   rejected: "rejected",
 } as const;
+
+export type ListLoanProductsParams = {
+  includeInactive?: boolean;
+};
 
 export type ListStoreItemsParams = {
   search?: string;
