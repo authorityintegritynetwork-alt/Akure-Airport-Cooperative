@@ -50,7 +50,7 @@ const CATEGORY_COLUMNS_BY_ORG: Record<Org, { key: string; label: string }[]> = {
   ],
   nama: [
     { key: "savings", label: "Savings" },
-    { key: "provident", label: "Provident" },
+    { key: "provident", label: "Provision" },
     { key: "realLoan", label: "Real Loan" },
     { key: "emergencyLoan", label: "Emer. Loan" },
     { key: "electronics", label: "Electronics (S/Elect)" },

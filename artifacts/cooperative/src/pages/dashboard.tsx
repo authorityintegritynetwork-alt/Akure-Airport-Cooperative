@@ -81,7 +81,7 @@ const BALANCE_CARDS_BY_ORG: Record<"faan" | "nama", BalanceCard[]> = {
   ],
   nama: [
     { key: "savingsBalance", label: "Savings", direction: "credit" },
-    { key: "providentBalance", label: "Provident", direction: "credit" },
+    { key: "providentBalance", label: "Provision", direction: "credit" },
     { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
     { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
     { key: "electronicsDebt", label: "Electronics (S/Elect)", direction: "debit" },
@@ -469,7 +469,7 @@ function MemberDashboard({ profile }: { profile: any }) {
           <p className="text-xs text-white/70 mt-1">
             {org === "faan"
               ? "Savings + Provision + Christmas"
-              : "Savings + Provident"}
+              : "Savings + Provision"}
           </p>
         </div>
 

@@ -61,7 +61,7 @@ const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
     txType: "provident",
     balanceField: "providentBalance",
     direction: "credit",
-    label: "Provident",
+    label: "Provision",
   },
   christmas: {
     txType: "christmas",
