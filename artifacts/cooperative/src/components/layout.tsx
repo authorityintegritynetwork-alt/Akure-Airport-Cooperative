@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, Building2 } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: profile } = useGetProfile();
@@ -150,14 +151,34 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 sticky top-0 z-10">
-            <SidebarTrigger />
-            <div className="flex items-center gap-4">
-              <Link href="/my-notifications" className="relative p-2 rounded-full hover:bg-accent cursor-pointer">
+          <header className="h-14 border-b border-border bg-card/80 backdrop-blur flex items-center justify-between px-4 sticky top-0 z-30">
+            {/* Members on mobile use the bottom nav, so hide the hamburger for them on small screens */}
+            <div className={isMember ? "hidden md:block" : ""}>
+              <SidebarTrigger />
+            </div>
+
+            {/* On mobile show a compact brand for members so the header isn't empty */}
+            {isMember && (
+              <Link
+                href="/dashboard"
+                className="md:hidden flex items-center gap-2 min-w-0"
+                data-testid="mobile-header-brand"
+              >
+                <img src={logoUrl} alt="AASCMS" className="w-7 h-7 object-contain shrink-0" />
+                <span className="font-semibold text-sm truncate">AASCMS</span>
+              </Link>
+            )}
+
+            <div className="flex items-center gap-1">
+              <Link
+                href="/my-notifications"
+                className="relative p-2 rounded-full hover:bg-accent cursor-pointer"
+                data-testid="header-notifications"
+              >
                 {unreadCount > 0 ? (
                   <>
                     <BellRing className="w-5 h-5 text-primary" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-card" />
                   </>
                 ) : (
                   <Bell className="w-5 h-5 text-muted-foreground" />
@@ -165,10 +186,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
           </header>
-          <main className="flex-1 p-4 md:p-6 overflow-auto">
+          <main
+            className={`flex-1 overflow-auto p-4 md:p-6 ${
+              isMember ? "pb-24 md:pb-6" : ""
+            }`}
+          >
             {children}
           </main>
         </div>
+
+        {isMember && <MobileBottomNav />}
       </div>
     </SidebarProvider>
   );

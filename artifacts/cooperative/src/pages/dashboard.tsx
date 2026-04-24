@@ -27,6 +27,11 @@ import {
   ArrowUpRight,
   Activity,
   AlertCircle,
+  ShoppingCart,
+  Bell,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import { useStepUpAction } from "@/lib/step-up";
@@ -45,10 +50,15 @@ export function Dashboard() {
 
   const isAdmin = profile.role === "admin" || profile.role === "super_admin";
 
+  // Members get the new fintech-style dashboard (no page heading — the hero card greets them).
+  if (!isAdmin) {
+    return <MemberDashboard profile={profile} />;
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
-      {isAdmin ? <AdminDashboard /> : <MemberDashboard profile={profile} />}
+      <AdminDashboard />
     </div>
   );
 }
@@ -392,85 +402,190 @@ function AdminDashboard() {
 function MemberDashboard({ profile }: { profile: any }) {
   const { data: summary, isLoading } = useGetMemberDashboardSummary();
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
+  }
   if (!summary) return null;
 
-  const org: "faan" | "nama" = profile.organization === "nama" ? "nama" : "faan";
+  const orgCode = (profile.organization || "faan").toString().toLowerCase();
+  const org: "faan" | "nama" = orgCode === "nama" ? "nama" : "faan";
   const balanceCards = BALANCE_CARDS_BY_ORG[org];
+  const orgLabel = (profile.organization || "FAAN").toString().toUpperCase();
+
+  const firstName = (profile.fullName || "").split(" ")[0] || "there";
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Organization:</span>
-        <span
-          className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold uppercase bg-primary/10 text-primary border-primary/30"
-          data-testid="dashboard-org-badge"
-        >
-          {org}
-        </span>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Savings</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(summary.savingsBalance)}</div>
-            <p className="text-xs text-muted-foreground">
-              {org === "faan" ? "Savings + Provision + Christmas" : "Savings + Provident"}
+    <div className="space-y-5">
+      {/* Hero balance card with gradient */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
+        }}
+        data-testid="member-hero-card"
+      >
+        {/* Decorative blobs */}
+        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
+
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs sm:text-sm text-white/70 font-medium">
+              {greeting},
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Outstanding Loans</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summary.outstandingLoanBalance)}</div>
-            <p className="text-xs text-muted-foreground">{summary.activeLoanCount} active loans</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Store Debt</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summary.storeDebt)}</div>
-          </CardContent>
-        </Card>
+            <h1 className="text-xl sm:text-2xl font-bold mt-0.5 leading-tight">
+              {firstName}
+            </h1>
+          </div>
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide bg-white/15 backdrop-blur-sm border border-white/20"
+            data-testid="dashboard-org-badge"
+          >
+            <Sparkles className="w-3 h-3" />
+            {orgLabel}
+          </span>
+        </div>
+
+        <div className="relative mt-6">
+          <p className="text-xs text-white/70 font-medium uppercase tracking-wider">
+            Total Savings
+          </p>
+          <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums tracking-tight">
+            {formatCurrency(summary.savingsBalance)}
+          </p>
+          <p className="text-xs text-white/70 mt-1">
+            {org === "faan"
+              ? "Savings + Provision + Christmas"
+              : "Savings + Provident"}
+          </p>
+        </div>
+
+        <div className="relative mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/70 font-semibold">
+              <CreditCard className="w-3 h-3" /> Loan due
+            </div>
+            <p className="text-lg font-bold mt-1 tabular-nums">
+              {formatCurrency(summary.outstandingLoanBalance)}
+            </p>
+            <p className="text-[10px] text-white/60 mt-0.5">
+              {summary.activeLoanCount} active
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/70 font-semibold">
+              <ShoppingBag className="w-3 h-3" /> Store debt
+            </div>
+            <p className="text-lg font-bold mt-1 tabular-nums">
+              {formatCurrency(summary.storeDebt)}
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Balance Breakdown</CardTitle>
-          <p className="text-sm text-muted-foreground">All individual savings and outstanding deductions.</p>
+      {/* Quick actions */}
+      <div className="grid grid-cols-4 gap-2 sm:gap-3">
+        <QuickAction
+          href="/my-savings"
+          icon={<Wallet className="w-5 h-5" />}
+          label="Savings"
+          tone="emerald"
+        />
+        <QuickAction
+          href="/my-loans"
+          icon={<CreditCard className="w-5 h-5" />}
+          label="Loans"
+          tone="violet"
+        />
+        <QuickAction
+          href="/store"
+          icon={<ShoppingCart className="w-5 h-5" />}
+          label="Store"
+          tone="amber"
+        />
+        <QuickAction
+          href="/my-notifications"
+          icon={<Bell className="w-5 h-5" />}
+          label="Alerts"
+          tone="sky"
+        />
+      </div>
+
+      {/* Balance breakdown */}
+      <Card className="rounded-2xl border-border/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Balance breakdown</CardTitle>
+            <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
+              {orgLabel}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Your individual savings buckets and outstanding deductions.
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2.5 grid-cols-2 lg:grid-cols-3">
             {balanceCards.map((b) => {
               const value = Number(profile[b.key] ?? 0);
+              const isCredit = b.direction === "credit";
+              const isZero = value === 0;
               return (
                 <div
                   key={b.key}
-                  className="border rounded-md p-3 flex flex-col gap-1"
+                  className={`relative rounded-2xl p-3 border overflow-hidden ${
+                    isZero
+                      ? "bg-muted/30 border-border/50"
+                      : isCredit
+                      ? "bg-gradient-to-br from-emerald-50 to-emerald-50/40 border-emerald-200/70 dark:from-emerald-500/10 dark:to-emerald-500/5 dark:border-emerald-500/20"
+                      : "bg-gradient-to-br from-rose-50 to-rose-50/40 border-rose-200/70 dark:from-rose-500/10 dark:to-rose-500/5 dark:border-rose-500/20"
+                  }`}
                   data-testid={`balance-${b.key}`}
                 >
-                  <span className="text-xs text-muted-foreground font-medium">{b.label}</span>
-                  <span
-                    className={
-                      "text-lg font-semibold tabular-nums " +
-                      (value === 0
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[11px] font-medium text-muted-foreground leading-tight">
+                      {b.label}
+                    </span>
+                    <div
+                      className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center ${
+                        isZero
+                          ? "bg-muted text-muted-foreground"
+                          : isCredit
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                      }`}
+                    >
+                      {isCredit ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3" />
+                      )}
+                    </div>
+                  </div>
+                  <p
+                    className={`mt-2 font-bold tabular-nums text-base sm:text-lg ${
+                      isZero
                         ? "text-muted-foreground"
-                        : b.direction === "credit"
-                        ? "text-primary"
-                        : "text-destructive")
-                    }
+                        : isCredit
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : "text-rose-700 dark:text-rose-300"
+                    }`}
                   >
                     {formatCurrency(value)}
-                  </span>
+                  </p>
                 </div>
               );
             })}
@@ -478,28 +593,94 @@ function MemberDashboard({ profile }: { profile: any }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+      {/* Recent activity */}
+      <Card className="rounded-2xl border-border/60 shadow-sm">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Recent activity</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Latest deductions & transactions on your account.
+            </p>
+          </div>
+          <Link href="/my-savings">
+            <Button variant="ghost" size="sm" className="gap-1 -mr-2">
+              View all <ArrowUpRight className="w-3.5 h-3.5" />
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
           {summary.recentTransactions.length > 0 ? (
-            <div className="space-y-4">
+            <div className="divide-y divide-border/50">
               {summary.recentTransactions.map((tx) => (
-                <div key={tx.id} className="flex justify-between items-center border-b pb-2">
-                  <div>
-                    <p className="font-medium capitalize">{tx.type.replace('_', ' ')}</p>
-                    <p className="text-sm text-muted-foreground">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                <div
+                  key={tx.id}
+                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                  data-testid={`recent-tx-${tx.id}`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-4 h-4" />
                   </div>
-                  <div className="font-semibold">{formatCurrency(tx.amount)}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium capitalize text-sm truncate">
+                      {tx.type.replace("_", " ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(tx.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <span className="font-semibold tabular-nums text-sm text-emerald-700 dark:text-emerald-300">
+                    +{formatCurrency(tx.amount)}
+                  </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-6 text-muted-foreground">No recent activity</div>
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No transactions yet — your monthly deduction will appear here.
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function QuickAction({
+  href,
+  icon,
+  label,
+  tone,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  tone: "emerald" | "violet" | "amber" | "sky";
+}) {
+  const tones: Record<string, string> = {
+    emerald:
+      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/15",
+    violet:
+      "bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-500/15",
+    amber:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/15",
+    sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400 group-hover:bg-sky-500/15",
+  };
+  return (
+    <Link href={href} data-testid={`quick-action-${label.toLowerCase()}`}>
+      <div className="group rounded-2xl bg-card border border-border/60 p-3 flex flex-col items-center gap-2 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer active:scale-95">
+        <div
+          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${tones[tone]}`}
+        >
+          {icon}
+        </div>
+        <span className="text-[11px] sm:text-xs font-semibold text-foreground">
+          {label}
+        </span>
+      </div>
+    </Link>
   );
 }

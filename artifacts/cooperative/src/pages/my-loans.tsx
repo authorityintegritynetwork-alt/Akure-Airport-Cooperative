@@ -33,7 +33,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  PlusCircle,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Banknote,
+} from "lucide-react";
 
 const loanSchema = z.object({
   amount: z.number({ error: "Amount is required" }).positive(),
@@ -43,94 +52,202 @@ const loanSchema = z.object({
 
 type LoanForm = z.infer<typeof loanSchema>;
 
-function loanStatusBadge(status: string) {
-  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    pending: { label: "Pending", variant: "secondary" },
-    admin_approved: { label: "Admin Approved", variant: "outline" },
-    auditor_approved: { label: "Auditor Approved", variant: "outline" },
-    super_admin_approved: { label: "Super Admin Approved", variant: "outline" },
-    disbursed: { label: "Disbursed", variant: "default" },
-    rejected: { label: "Rejected", variant: "destructive" },
+const STATUS_META: Record<
+  string,
+  {
+    label: string;
+    cls: string;
+    icon: React.ReactNode;
+  }
+> = {
+  pending: {
+    label: "Pending review",
+    cls: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+    icon: <Clock className="w-3 h-3" />,
+  },
+  admin_approved: {
+    label: "Admin approved",
+    cls: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+    icon: <CheckCircle2 className="w-3 h-3" />,
+  },
+  auditor_approved: {
+    label: "Auditor approved",
+    cls: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+    icon: <CheckCircle2 className="w-3 h-3" />,
+  },
+  super_admin_approved: {
+    label: "Awaiting disbursement",
+    cls: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
+    icon: <CheckCircle2 className="w-3 h-3" />,
+  },
+  disbursed: {
+    label: "Disbursed",
+    cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+    icon: <Banknote className="w-3 h-3" />,
+  },
+  rejected: {
+    label: "Rejected",
+    cls: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+    icon: <XCircle className="w-3 h-3" />,
+  },
+};
+
+function LoanStatusPill({ status }: { status: string }) {
+  const m = STATUS_META[status] || {
+    label: status,
+    cls: "bg-muted text-muted-foreground",
+    icon: <Clock className="w-3 h-3" />,
   };
-  const m = map[status] || { label: status, variant: "secondary" as const };
-  return <Badge variant={m.variant}>{m.label}</Badge>;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${m.cls}`}
+    >
+      {m.icon}
+      {m.label}
+    </span>
+  );
 }
 
-function LoanDetailRow({ loan }: { loan: any }) {
+function LoanCard({ loan }: { loan: any }) {
   const [open, setOpen] = useState(false);
   const { data: repayments } = useGetLoanRepayments(loan.id, {
     query: { enabled: open, queryKey: getGetLoanRepaymentsQueryKey(loan.id) },
   });
 
+  const principal = Number(loan.amount) || 0;
+  const outstanding = Number(loan.outstandingBalance) || 0;
+  const totalRepayable = Number(loan.totalRepayable) || principal;
+  const paid = Math.max(0, totalRepayable - outstanding);
+  const percentPaid =
+    totalRepayable > 0
+      ? Math.min(100, Math.round((paid / totalRepayable) * 100))
+      : 0;
+  const isDisbursed = loan.status === "disbursed";
+
   return (
-    <div className="border rounded-lg">
-      <div
-        className="flex items-center justify-between p-4 cursor-pointer"
+    <div
+      className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden"
+      data-testid={`loan-row-${loan.id}`}
+    >
+      <button
+        type="button"
+        className="w-full text-left p-4 active:bg-muted/40 transition-colors"
         onClick={() => setOpen(!open)}
-        data-testid={`loan-row-${loan.id}`}
       >
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">{formatCurrency(loan.amount)}</span>
-            {loanStatusBadge(loan.status)}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-lg font-bold tabular-nums">
+                {formatCurrency(loan.amount)}
+              </span>
+              <LoanStatusPill status={loan.status} />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {loan.tenureMonths} months · Applied {formatDate(loan.createdAt)}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {loan.tenureMonths} months &bull; Applied {formatDate(loan.createdAt)}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Outstanding</p>
-            <p className="font-semibold">{formatCurrency(loan.outstandingBalance)}</p>
+          <div className="text-right shrink-0">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+              Outstanding
+            </p>
+            <p
+              className={`font-bold tabular-nums text-base ${
+                outstanding > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+              }`}
+            >
+              {formatCurrency(outstanding)}
+            </p>
           </div>
-          {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </div>
-      </div>
+
+        {isDisbursed && (
+          <div className="mt-3 space-y-1.5">
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all"
+                style={{ width: `${percentPaid}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{percentPaid}% repaid</span>
+              <span className="inline-flex items-center gap-1">
+                {open ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+                Details
+              </span>
+            </div>
+          </div>
+        )}
+
+        {!isDisbursed && (
+          <div className="mt-2 flex justify-end">
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              {open ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+              Details
+            </span>
+          </div>
+        )}
+      </button>
 
       {open && (
-        <div className="border-t p-4 space-y-4 bg-muted/30">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Principal</p>
-              <p className="font-medium">{formatCurrency(loan.amount)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Interest ({loan.interestRate}%)</p>
-              <p className="font-medium">{formatCurrency(loan.interestAmount)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Total Repayable</p>
-              <p className="font-medium">{formatCurrency(loan.totalRepayable)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Monthly Payment</p>
-              <p className="font-medium">{formatCurrency(loan.monthlyRepayment)}</p>
-            </div>
+        <div className="border-t border-border/60 p-4 space-y-4 bg-muted/30">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <Stat label="Principal" value={formatCurrency(loan.amount)} />
+            <Stat
+              label={`Interest (${loan.interestRate}%)`}
+              value={formatCurrency(loan.interestAmount)}
+            />
+            <Stat
+              label="Total repayable"
+              value={formatCurrency(loan.totalRepayable)}
+            />
+            <Stat
+              label="Monthly"
+              value={formatCurrency(loan.monthlyRepayment)}
+            />
           </div>
 
           {loan.purpose && (
-            <div>
-              <p className="text-muted-foreground text-sm">Purpose</p>
-              <p className="text-sm">{loan.purpose}</p>
+            <div className="rounded-xl bg-card border border-border/50 p-3">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                Purpose
+              </p>
+              <p className="text-sm mt-1">{loan.purpose}</p>
             </div>
           )}
 
           {loan.rejectionReason && (
-            <div className="bg-destructive/10 p-3 rounded text-sm text-destructive">
-              Rejection reason: {loan.rejectionReason}
+            <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-sm text-rose-700 dark:text-rose-300">
+              <p className="font-semibold text-xs uppercase mb-1">
+                Rejection reason
+              </p>
+              {loan.rejectionReason}
             </div>
           )}
 
           <div>
-            <h4 className="font-medium mb-2 text-sm">Repayment History</h4>
+            <h4 className="font-semibold mb-2 text-sm">Repayment history</h4>
             {!repayments || repayments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No repayments recorded yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No repayments recorded yet.
+              </p>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y divide-border/50 rounded-xl bg-card border border-border/50 px-3">
                 {repayments.map((r) => (
                   <div key={r.id} className="flex justify-between py-2 text-sm">
-                    <span className="text-muted-foreground">{r.month} {r.year} &bull; {formatDate(r.createdAt)}</span>
-                    <span className="font-medium">{formatCurrency(r.amount)}</span>
+                    <span className="text-muted-foreground">
+                      {r.month} {r.year} · {formatDate(r.createdAt)}
+                    </span>
+                    <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(r.amount)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -138,6 +255,19 @@ function LoanDetailRow({ loan }: { loan: any }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-card border border-border/50 p-3">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+        {label}
+      </p>
+      <p className="font-semibold tabular-nums text-sm mt-0.5 truncate">
+        {value}
+      </p>
     </div>
   );
 }
@@ -171,51 +301,83 @@ export function MyLoansPage() {
 
   function onSubmit(data: LoanForm) {
     createLoan.mutate(
-      { data: { amount: data.amount, tenureMonths: data.tenureMonths, purpose: data.purpose || undefined } },
+      {
+        data: {
+          amount: data.amount,
+          tenureMonths: data.tenureMonths,
+          purpose: data.purpose || undefined,
+        },
+      },
       {
         onSuccess: () => {
-          toast({ title: "Loan application submitted", description: "Your application is under review." });
-          queryClient.invalidateQueries({ queryKey: getListMyLoansQueryKey() });
+          toast({
+            title: "Loan application submitted",
+            description: "Your application is under review.",
+          });
+          queryClient.invalidateQueries({
+            queryKey: getListMyLoansQueryKey(),
+          });
           setDialogOpen(false);
           form.reset();
           setCalcResult(null);
         },
         onError: (err: any) => {
-          toast({ title: "Error", description: err.message || "Failed to submit loan", variant: "destructive" });
+          toast({
+            title: "Error",
+            description: err.message || "Failed to submit loan",
+            variant: "destructive",
+          });
         },
       },
     );
   }
 
+  const totalOutstanding =
+    loans?.reduce(
+      (s, l) => s + (Number((l as any).outstandingBalance) || 0),
+      0,
+    ) ?? 0;
+  const activeCount =
+    loans?.filter((l: any) => l.status === "disbursed").length ?? 0;
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">My Loans</h1>
+        <h1 className="text-xl md:text-2xl font-bold">My Loans</h1>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-apply-loan">
+            <Button
+              data-testid="button-apply-loan"
+              className="rounded-full shadow-md shadow-primary/25 hidden md:inline-flex"
+            >
               <PlusCircle className="w-4 h-4 mr-2" />
               Apply for Loan
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md rounded-3xl">
             <DialogHeader>
               <DialogTitle>Apply for a Loan</DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+              >
                 <FormField
                   control={form.control}
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Loan Amount (₦)</FormLabel>
+                      <FormLabel>Loan amount (₦)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
+                          className="h-11 rounded-xl"
                           data-testid="input-loan-amount"
                           {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value))
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -227,13 +389,16 @@ export function MyLoansPage() {
                   name="tenureMonths"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Repayment Period (months)</FormLabel>
+                      <FormLabel>Repayment period (months)</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
+                          className="h-11 rounded-xl"
                           data-testid="input-tenure-months"
                           {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          onChange={(e) =>
+                            field.onChange(parseInt(e.target.value))
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -247,36 +412,64 @@ export function MyLoansPage() {
                     <FormItem>
                       <FormLabel>Purpose (optional)</FormLabel>
                       <FormControl>
-                        <Input data-testid="input-loan-purpose" {...field} placeholder="e.g. School fees, Medical" />
+                        <Input
+                          className="h-11 rounded-xl"
+                          data-testid="input-loan-purpose"
+                          {...field}
+                          placeholder="e.g. School fees, Medical"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <Button type="button" variant="outline" className="w-full" onClick={handleCalculate} data-testid="button-calculate-loan">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-xl h-11"
+                  onClick={handleCalculate}
+                  data-testid="button-calculate-loan"
+                >
                   Calculate
                 </Button>
 
                 {calcResult && (
-                  <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
+                  <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-3 text-sm space-y-1.5">
                     <div className="flex justify-between">
-                      <span>Interest (10% flat)</span>
-                      <span>{formatCurrency(calcResult.interestAmount)}</span>
+                      <span className="text-muted-foreground">
+                        Interest (10% flat)
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {formatCurrency(calcResult.interestAmount)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Total Repayable</span>
-                      <span className="font-semibold">{formatCurrency(calcResult.totalRepayable)}</span>
+                      <span className="text-muted-foreground">
+                        Total repayable
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {formatCurrency(calcResult.totalRepayable)}
+                      </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Monthly Payment</span>
-                      <span className="font-semibold">{formatCurrency(calcResult.monthlyRepayment)}</span>
+                    <div className="flex justify-between text-base pt-1.5 border-t border-primary/15">
+                      <span className="font-semibold">Monthly payment</span>
+                      <span className="font-bold tabular-nums text-primary">
+                        {formatCurrency(calcResult.monthlyRepayment)}
+                      </span>
                     </div>
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" disabled={createLoan.isPending} data-testid="button-submit-loan">
-                  {createLoan.isPending ? "Submitting..." : "Submit Application"}
+                <Button
+                  type="submit"
+                  className="w-full rounded-xl h-11"
+                  disabled={createLoan.isPending}
+                  data-testid="button-submit-loan"
+                >
+                  {createLoan.isPending
+                    ? "Submitting..."
+                    : "Submit application"}
                 </Button>
               </form>
             </Form>
@@ -284,19 +477,73 @@ export function MyLoansPage() {
         </Dialog>
       </div>
 
+      {/* Hero summary */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-violet-500/20"
+        style={{
+          background:
+            "linear-gradient(135deg, hsl(258 70% 35%) 0%, hsl(248 70% 45%) 50%, hsl(220 80% 50%) 100%)",
+        }}
+        data-testid="loans-hero"
+      >
+        <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-12 -left-8 w-52 h-52 rounded-full bg-white/5 blur-3xl" />
+
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-white/75 font-semibold uppercase tracking-wider">
+              Total Outstanding
+            </p>
+            <p className="text-3xl sm:text-4xl font-bold mt-2 tabular-nums tracking-tight">
+              {formatCurrency(totalOutstanding)}
+            </p>
+            <p className="text-xs text-white/70 mt-1">
+              {activeCount} active loan{activeCount === 1 ? "" : "s"} ·{" "}
+              {loans?.length ?? 0} total
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20">
+            <CreditCard className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
       {isLoading ? (
-        <div className="space-y-3">{[1, 2].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
+        <div className="space-y-3">
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
       ) : !loans || loans.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12 text-muted-foreground">
-            No loan applications yet. Click "Apply for Loan" to get started.
+        <Card className="rounded-2xl border-border/60 shadow-sm">
+          <CardContent className="text-center py-12">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+              <CreditCard className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium">No loan applications yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tap the + button below to apply for your first loan.
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {loans.map((loan) => <LoanDetailRow key={loan.id} loan={loan} />)}
+          {loans.map((loan) => (
+            <LoanCard key={loan.id} loan={loan} />
+          ))}
         </div>
       )}
+
+      {/* Floating apply button on mobile */}
+      <button
+        type="button"
+        onClick={() => setDialogOpen(true)}
+        className="md:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-blue-500 text-primary-foreground shadow-xl shadow-primary/40 flex items-center justify-center active:scale-95 transition-transform"
+        data-testid="button-apply-loan-fab"
+        aria-label="Apply for loan"
+      >
+        <PlusCircle className="w-6 h-6" />
+      </button>
     </div>
   );
 }
