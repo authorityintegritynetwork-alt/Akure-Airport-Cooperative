@@ -38,12 +38,67 @@ import {
   PlusCircle,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
+  ArrowLeft,
   CreditCard,
   CheckCircle2,
   Clock,
   XCircle,
   Banknote,
+  Wallet,
+  Tv,
+  Stethoscope,
+  Fuel,
+  ShoppingBasket,
+  Briefcase,
+  Sparkles,
 } from "lucide-react";
+
+const PRODUCT_VISUAL: Record<
+  string,
+  { icon: React.ReactNode; gradient: string; ring: string }
+> = {
+  regular: {
+    icon: <Wallet className="w-5 h-5" />,
+    gradient: "from-blue-500/15 to-indigo-500/10",
+    ring: "ring-blue-500/30",
+  },
+  electronics: {
+    icon: <Tv className="w-5 h-5" />,
+    gradient: "from-violet-500/15 to-purple-500/10",
+    ring: "ring-violet-500/30",
+  },
+  emergency: {
+    icon: <Stethoscope className="w-5 h-5" />,
+    gradient: "from-rose-500/15 to-red-500/10",
+    ring: "ring-rose-500/30",
+  },
+  fuel_venture: {
+    icon: <Fuel className="w-5 h-5" />,
+    gradient: "from-amber-500/15 to-orange-500/10",
+    ring: "ring-amber-500/30",
+  },
+  provision: {
+    icon: <ShoppingBasket className="w-5 h-5" />,
+    gradient: "from-emerald-500/15 to-teal-500/10",
+    ring: "ring-emerald-500/30",
+  },
+  commercial: {
+    icon: <Briefcase className="w-5 h-5" />,
+    gradient: "from-sky-500/15 to-cyan-500/10",
+    ring: "ring-sky-500/30",
+  },
+};
+
+function getProductVisual(code: string) {
+  return (
+    PRODUCT_VISUAL[code] ?? {
+      icon: <Sparkles className="w-5 h-5" />,
+      gradient: "from-slate-500/15 to-slate-500/5",
+      ring: "ring-slate-500/30",
+    }
+  );
+}
 
 const loanSchema = z.object({
   loanProductId: z
@@ -291,6 +346,7 @@ export function MyLoansPage() {
   const { data: loans, isLoading } = useListMyLoans();
   const { data: loanProducts } = useListLoanProducts();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const [calcResult, setCalcResult] = useState<any>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -307,6 +363,31 @@ export function MyLoansPage() {
       purpose: "",
     },
   });
+
+  function resetForm() {
+    form.reset({
+      loanProductId: undefined as unknown as number,
+      amount: 0,
+      tenureMonths: 12,
+      purpose: "",
+    });
+  }
+
+  function openDialog() {
+    resetForm();
+    setCalcResult(null);
+    setStep(1);
+    setDialogOpen(true);
+  }
+
+  function handleDialogChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setStep(1);
+      setCalcResult(null);
+      resetForm();
+    }
+  }
 
   const amount = form.watch("amount");
   const tenureMonths = form.watch("tenureMonths");
@@ -334,6 +415,22 @@ export function MyLoansPage() {
   }
 
   function onSubmit(data: LoanForm) {
+    const product = (loanProducts ?? []).find(
+      (p) => p.id === data.loanProductId,
+    );
+    if (!product) {
+      form.setError("loanProductId", { message: "Please choose a loan type" });
+      setStep(1);
+      return;
+    }
+    if (data.tenureMonths > product.maxTenureMonths) {
+      form.setError("tenureMonths", {
+        message: `${product.name} allows up to ${product.maxTenureMonths} month${
+          product.maxTenureMonths === 1 ? "" : "s"
+        }.`,
+      });
+      return;
+    }
     createLoan.mutate(
       {
         data: {
@@ -379,178 +476,291 @@ export function MyLoansPage() {
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold">My Loans</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              data-testid="button-apply-loan"
-              className="rounded-full shadow-md shadow-primary/25 hidden md:inline-flex"
-            >
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Apply for Loan
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md rounded-3xl">
-            <DialogHeader>
-              <DialogTitle>Apply for a Loan</DialogTitle>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+          <Button
+            type="button"
+            data-testid="button-apply-loan"
+            onClick={openDialog}
+            className="rounded-full shadow-md shadow-primary/25 hidden md:inline-flex"
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Apply for Loan
+          </Button>
+          <DialogContent className="sm:max-w-lg rounded-3xl p-0 gap-0 overflow-hidden">
+            <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                {step === 2 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(1);
+                      setCalcResult(null);
+                    }}
+                    className="-ml-1.5 p-1.5 rounded-full hover:bg-muted active:scale-95 transition"
+                    data-testid="button-back-to-products"
+                    aria-label="Back to loan types"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                )}
+                <DialogTitle className="text-base font-semibold">
+                  {step === 1 ? "Choose a loan" : "Loan details"}
+                </DialogTitle>
+              </div>
+              <div className="flex items-center gap-1.5 pt-2">
+                <span
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    step >= 1 ? "bg-primary" : "bg-muted"
+                  }`}
+                />
+                <span
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    step >= 2 ? "bg-primary" : "bg-muted"
+                  }`}
+                />
+              </div>
             </DialogHeader>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4 max-h-[70vh] overflow-y-auto pr-1"
+
+            {step === 1 && (
+              <div
+                className="px-5 py-4 space-y-2.5 max-h-[70vh] overflow-y-auto"
+                data-testid="loan-product-picker"
               >
-                <FormField
-                  control={form.control}
-                  name="loanProductId"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Loan type</FormLabel>
-                      <div
-                        className="grid grid-cols-2 gap-2"
-                        data-testid="loan-product-picker"
-                      >
-                        {(loanProducts ?? []).map((p) => {
-                          const active = selectedProductId === p.id;
-                          return (
-                            <button
-                              type="button"
-                              key={p.id}
-                              onClick={() => handleSelectProduct(p)}
-                              data-testid={`loan-product-${p.code}`}
-                              className={`text-left rounded-xl border p-3 transition-all active:scale-[0.98] ${
-                                active
-                                  ? "border-primary bg-primary/10 ring-1 ring-primary"
-                                  : "border-border/60 bg-card hover:border-primary/40"
-                              }`}
+                <p className="text-xs text-muted-foreground pb-1">
+                  Pick the option that best matches what you need the funds for.
+                  You can compare rates and terms below.
+                </p>
+                {(loanProducts ?? []).map((p) => {
+                  const v = getProductVisual(p.code);
+                  return (
+                    <button
+                      type="button"
+                      key={p.id}
+                      onClick={() => {
+                        handleSelectProduct(p);
+                        setStep(2);
+                      }}
+                      data-testid={`loan-product-${p.code}`}
+                      className={`group w-full text-left rounded-2xl border border-border/60 p-3.5 bg-gradient-to-br ${v.gradient} hover:border-primary/50 hover:ring-2 ${v.ring} transition-all active:scale-[0.99]`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-background/80 backdrop-blur-sm border border-border/60 flex items-center justify-center text-foreground/80 shrink-0">
+                          {v.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold leading-tight truncate">
+                              {p.name}
+                            </p>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition shrink-0" />
+                          </div>
+                          {p.description && (
+                            <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                              {p.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5 py-0 h-4 font-semibold"
                             >
-                              <p className="text-sm font-semibold leading-tight">
-                                {p.name}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground mt-1">
-                                {p.interestRate}% · up to {p.maxTenureMonths} mo
-                              </p>
-                            </button>
-                          );
-                        })}
+                              {p.interestRate}% flat
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 h-4 font-medium"
+                            >
+                              Up to {p.maxTenureMonths} mo
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                      {selectedProduct?.description && (
-                        <p className="text-[11px] text-muted-foreground pt-1">
-                          {selectedProduct.description}
-                        </p>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Loan amount (₦)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          className="h-11 rounded-xl"
-                          data-testid="input-loan-amount"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="tenureMonths"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Repayment period (months)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          className="h-11 rounded-xl"
-                          data-testid="input-tenure-months"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="purpose"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Purpose (optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          className="h-11 rounded-xl"
-                          data-testid="input-loan-purpose"
-                          {...field}
-                          placeholder="e.g. School fees, Medical"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </button>
+                  );
+                })}
+                {(loanProducts ?? []).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No loan products are available right now.
+                  </p>
+                )}
+              </div>
+            )}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full rounded-xl h-11"
-                  onClick={handleCalculate}
-                  data-testid="button-calculate-loan"
+            {step === 2 && selectedProduct && (
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto"
                 >
-                  Calculate
-                </Button>
-
-                {calcResult && (
-                  <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-3 text-sm space-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Interest ({calcResult.interestRate}% flat)
-                      </span>
-                      <span className="font-semibold tabular-nums">
-                        {formatCurrency(calcResult.interestAmount)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Total repayable
-                      </span>
-                      <span className="font-semibold tabular-nums">
-                        {formatCurrency(calcResult.totalRepayable)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-base pt-1.5 border-t border-primary/15">
-                      <span className="font-semibold">Monthly payment</span>
-                      <span className="font-bold tabular-nums text-primary">
-                        {formatCurrency(calcResult.monthlyRepayment)}
-                      </span>
+                  {/* Selected product summary */}
+                  <div
+                    className={`rounded-2xl border border-border/60 p-3 bg-gradient-to-br ${getProductVisual(selectedProduct.code).gradient}`}
+                    data-testid="selected-product-summary"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-background/80 backdrop-blur-sm border border-border/60 flex items-center justify-center text-foreground/80 shrink-0">
+                        {getProductVisual(selectedProduct.code).icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold leading-tight">
+                          {selectedProduct.name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {selectedProduct.interestRate}% flat · up to{" "}
+                          {selectedProduct.maxTenureMonths} mo
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep(1);
+                          setCalcResult(null);
+                        }}
+                        className="text-[11px] font-semibold text-primary hover:underline"
+                        data-testid="button-change-product"
+                      >
+                        Change
+                      </button>
                     </div>
                   </div>
-                )}
 
-                <Button
-                  type="submit"
-                  className="w-full rounded-xl h-11"
-                  disabled={createLoan.isPending}
-                  data-testid="button-submit-loan"
-                >
-                  {createLoan.isPending
-                    ? "Submitting..."
-                    : "Submit application"}
-                </Button>
-              </form>
-            </Form>
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Loan amount (₦)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            className="h-11 rounded-xl"
+                            data-testid="input-loan-amount"
+                            placeholder="e.g. 50000"
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value === ""
+                                  ? 0
+                                  : parseFloat(e.target.value),
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="tenureMonths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center justify-between">
+                          <span>Repayment period (months)</span>
+                          <span className="text-[10px] font-normal text-muted-foreground">
+                            Max {selectedProduct.maxTenureMonths} mo
+                          </span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={selectedProduct.maxTenureMonths}
+                            className="h-11 rounded-xl"
+                            data-testid="input-tenure-months"
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value === ""
+                                  ? 0
+                                  : parseInt(e.target.value),
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="purpose"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purpose (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            className="h-11 rounded-xl"
+                            data-testid="input-loan-purpose"
+                            {...field}
+                            placeholder="e.g. School fees, Medical"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-xl h-11"
+                    onClick={handleCalculate}
+                    disabled={
+                      !amount ||
+                      !tenureMonths ||
+                      tenureMonths > selectedProduct.maxTenureMonths ||
+                      calcLoan.isPending
+                    }
+                    data-testid="button-calculate-loan"
+                  >
+                    {calcLoan.isPending ? "Calculating..." : "Preview repayment"}
+                  </Button>
+
+                  {calcResult && (
+                    <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-3 text-sm space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Interest ({calcResult.interestRate}% flat)
+                        </span>
+                        <span className="font-semibold tabular-nums">
+                          {formatCurrency(calcResult.interestAmount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          Total repayable
+                        </span>
+                        <span className="font-semibold tabular-nums">
+                          {formatCurrency(calcResult.totalRepayable)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-base pt-1.5 border-t border-primary/15">
+                        <span className="font-semibold">Monthly payment</span>
+                        <span className="font-bold tabular-nums text-primary">
+                          {formatCurrency(calcResult.monthlyRepayment)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl h-11"
+                    disabled={createLoan.isPending}
+                    data-testid="button-submit-loan"
+                  >
+                    {createLoan.isPending
+                      ? "Submitting..."
+                      : "Submit application"}
+                  </Button>
+                </form>
+              </Form>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -615,7 +825,7 @@ export function MyLoansPage() {
       {/* Floating apply button on mobile */}
       <button
         type="button"
-        onClick={() => setDialogOpen(true)}
+        onClick={openDialog}
         className="md:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-blue-500 text-primary-foreground shadow-xl shadow-primary/40 flex items-center justify-center active:scale-95 transition-transform"
         data-testid="button-apply-loan-fab"
         aria-label="Apply for loan"
