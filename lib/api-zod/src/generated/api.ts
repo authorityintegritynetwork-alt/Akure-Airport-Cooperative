@@ -891,6 +891,58 @@ export const ApproveLoanResponse = zod.object({
 });
 
 /**
+ * @summary Super-admin override that approves a loan in one step, bypassing admin and auditor stages.
+ */
+export const FastTrackApproveLoanParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const FastTrackApproveLoanBody = zod.object({
+  notes: zod.string().optional(),
+  confirmationPhrase: zod
+    .string()
+    .optional()
+    .describe('For disburse — must equal \"DISBURSE-{loanId}\"'),
+});
+
+export const FastTrackApproveLoanResponse = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  loanProductId: zod.number().nullish(),
+  loanProductName: zod.string().nullish(),
+  amount: zod.number(),
+  interestRate: zod.number(),
+  interestAmount: zod.number(),
+  totalRepayable: zod.number(),
+  monthlyRepayment: zod.number(),
+  tenureMonths: zod.number(),
+  purpose: zod.string().nullish(),
+  status: zod.enum([
+    "pending",
+    "admin_approved",
+    "auditor_approved",
+    "super_admin_approved",
+    "disbursed",
+    "rejected",
+  ]),
+  outstandingBalance: zod.number(),
+  adminApprovedAt: zod.coerce.date().nullish(),
+  adminApprovedBy: zod.number().nullish(),
+  auditorApprovedAt: zod.coerce.date().nullish(),
+  auditorApprovedBy: zod.number().nullish(),
+  superAdminApprovedAt: zod.coerce.date().nullish(),
+  superAdminApprovedBy: zod.number().nullish(),
+  disbursedAt: zod.coerce.date().nullish(),
+  disbursedBy: zod.number().nullish(),
+  rejectedAt: zod.coerce.date().nullish(),
+  rejectedBy: zod.number().nullish(),
+  rejectionReason: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Reject a loan
  */
 export const RejectLoanParams = zod.object({

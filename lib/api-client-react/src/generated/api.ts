@@ -2979,6 +2979,93 @@ export const useApproveLoan = <
 };
 
 /**
+ * @summary Super-admin override that approves a loan in one step, bypassing admin and auditor stages.
+ */
+export const getFastTrackApproveLoanUrl = (id: number) => {
+  return `/api/loans/${id}/fast-track-approve`;
+};
+
+export const fastTrackApproveLoan = async (
+  id: number,
+  loanActionBody: LoanActionBody,
+  options?: RequestInit,
+): Promise<Loan> => {
+  return customFetch<Loan>(getFastTrackApproveLoanUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(loanActionBody),
+  });
+};
+
+export const getFastTrackApproveLoanMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fastTrackApproveLoan>>,
+    TError,
+    { id: number; data: BodyType<LoanActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof fastTrackApproveLoan>>,
+  TError,
+  { id: number; data: BodyType<LoanActionBody> },
+  TContext
+> => {
+  const mutationKey = ["fastTrackApproveLoan"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof fastTrackApproveLoan>>,
+    { id: number; data: BodyType<LoanActionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return fastTrackApproveLoan(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type FastTrackApproveLoanMutationResult = NonNullable<
+  Awaited<ReturnType<typeof fastTrackApproveLoan>>
+>;
+export type FastTrackApproveLoanMutationBody = BodyType<LoanActionBody>;
+export type FastTrackApproveLoanMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Super-admin override that approves a loan in one step, bypassing admin and auditor stages.
+ */
+export const useFastTrackApproveLoan = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fastTrackApproveLoan>>,
+    TError,
+    { id: number; data: BodyType<LoanActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof fastTrackApproveLoan>>,
+  TError,
+  { id: number; data: BodyType<LoanActionBody> },
+  TContext
+> => {
+  return useMutation(getFastTrackApproveLoanMutationOptions(options));
+};
+
+/**
  * @summary Reject a loan
  */
 export const getRejectLoanUrl = (id: number) => {

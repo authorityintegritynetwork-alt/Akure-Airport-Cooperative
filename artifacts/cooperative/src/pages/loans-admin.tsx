@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useListLoans,
   useApproveLoan,
+  useFastTrackApproveLoan,
   useRejectLoan,
   useDisburseLoan,
   useGetProfile,
@@ -35,6 +36,7 @@ import {
   ChevronUp,
   CreditCard,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { useStepUpAction } from "@/lib/step-up";
 
@@ -65,6 +67,13 @@ function canApprove(role: string, status: string): boolean {
   return false;
 }
 
+function canFastTrack(role: string, status: string): boolean {
+  return (
+    role === "super_admin" &&
+    ["pending", "admin_approved", "auditor_approved"].includes(status)
+  );
+}
+
 function canDisburse(role: string, status: string): boolean {
   return (role === "treasurer" || role === "super_admin") && status === "super_admin_approved";
 }
@@ -80,15 +89,20 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
   const [open, setOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [fastTrackOpen, setFastTrackOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const approveLoan = useApproveLoan();
+  const fastTrackLoan = useFastTrackApproveLoan();
   const rejectLoan = useRejectLoan();
   const disburseLoan = useDisburseLoan();
 
   const approveWithStepUp = useStepUpAction((id: number) =>
     approveLoan.mutateAsync({ id, data: {} }),
+  );
+  const fastTrackWithStepUp = useStepUpAction((id: number) =>
+    fastTrackLoan.mutateAsync({ id, data: {} }),
   );
   const rejectWithStepUp = useStepUpAction((id: number, notes: string) =>
     rejectLoan.mutateAsync({ id, data: { notes } }),
@@ -102,6 +116,20 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
       await approveWithStepUp(loan.id);
       toast({ title: "Loan approved" });
       queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  }
+
+  async function handleFastTrack() {
+    try {
+      await fastTrackWithStepUp(loan.id);
+      toast({
+        title: "Loan fast-tracked",
+        description: "The loan is now ready for disbursement.",
+      });
+      queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
+      setFastTrackOpen(false);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -139,9 +167,15 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
   }
 
   const canA = canApprove(role, loan.status);
+  const canFT = canFastTrack(role, loan.status);
   const canD = canDisburse(role, loan.status);
   const canR = canReject(role, loan.status);
-  const hasAction = canA || canD || canR;
+  const hasAction = canA || canFT || canD || canR;
+  const skippedStages: string[] = [];
+  if (canFT) {
+    if (!loan.adminApprovedAt) skippedStages.push("Admin approval");
+    if (!loan.auditorApprovedAt) skippedStages.push("Auditor approval");
+  }
 
   return (
     <div
@@ -239,6 +273,18 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
               <CheckCircle className="w-4 h-4" /> Approve
             </Button>
           )}
+          {canFT && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 min-w-[140px] rounded-lg gap-1.5 h-9 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 hover:text-amber-700"
+              onClick={() => setFastTrackOpen(true)}
+              disabled={fastTrackLoan.isPending}
+              data-testid={`button-fast-track-${loan.id}`}
+            >
+              <Zap className="w-4 h-4" /> Fast-track
+            </Button>
+          )}
           {canD && (
             <Button
               size="sm"
@@ -279,6 +325,68 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
             <Button variant="destructive" className="w-full rounded-xl" onClick={handleReject} disabled={rejectLoan.isPending} data-testid="button-confirm-reject">
               Confirm Rejection
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fastTrackOpen} onOpenChange={setFastTrackOpen}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                <Zap className="w-4 h-4" />
+              </span>
+              Fast-track approval
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl bg-muted/50 border border-border/60 p-3 text-sm space-y-1">
+              <p className="font-semibold">{loan.memberName}</p>
+              <p className="text-muted-foreground">
+                {formatCurrency(loan.amount)} · {loan.tenureMonths} months
+                {loan.loanProductName ? ` · ${loan.loanProductName}` : ""}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This will set the loan to <span className="font-semibold text-foreground">awaiting disbursement</span> in one step,
+              bypassing the standard approval chain. Use this only for urgent or
+              pre-vetted cases.
+            </p>
+            {skippedStages.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs space-y-1.5">
+                <p className="font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Stages that will be skipped:
+                </p>
+                <ul className="list-disc list-inside text-amber-700/90 dark:text-amber-200/90 space-y-0.5">
+                  {skippedStages.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-amber-700/70 dark:text-amber-200/70 pt-1">
+                  This action is logged in the audit trail with your name.
+                </p>
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => setFastTrackOpen(false)}
+                disabled={fastTrackLoan.isPending}
+                data-testid={`button-cancel-fast-track-${loan.id}`}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={handleFastTrack}
+                disabled={fastTrackLoan.isPending}
+                data-testid={`button-confirm-fast-track-${loan.id}`}
+              >
+                {fastTrackLoan.isPending ? "Approving..." : "Yes, fast-track"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -719,6 +719,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/Loan"
 
+  /loans/{id}/fast-track-approve:
+    post:
+      operationId: fastTrackApproveLoan
+      tags: [loans]
+      summary: Super-admin override that approves a loan in one step, bypassing admin and auditor stages.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoanActionBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
   /loans/{id}/reject:
     post:
       operationId: rejectLoan

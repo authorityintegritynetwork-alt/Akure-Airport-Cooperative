@@ -65,6 +65,8 @@ The `dev-start.mjs` script in `api-server/` starts both:
 4. Super Admin approves → status: `super_admin_approved` (or rejects)
 5. Treasurer disburses → status: `disbursed`
 
+**Super-admin fast-track override**: From any non-terminal pre-disbursement status (`pending`, `admin_approved`, `auditor_approved`), a super admin can use `POST /loans/:id/fast-track-approve` to set the loan straight to `super_admin_approved`. This bypasses the standard chain, fills `superAdminApprovedAt/By` only (intermediate fields stay null so the trail accurately reflects who approved what), and writes a dedicated `FAST_TRACK_APPROVE_LOAN` audit entry naming the skipped stages. The UI surfaces this as an amber "Fast-track" button (separate from the normal Approve button) gated behind a confirmation dialog and email-OTP step-up.
+
 Interest: per-product flat rate (see Loan Products below)
 
 ## Loan Products

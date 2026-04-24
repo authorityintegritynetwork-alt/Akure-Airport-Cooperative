@@ -318,6 +318,74 @@ router.post("/loans/:id/approve", requireAuth, requireReverification, async (req
   res.json(formatLoan(updated, result.memberName));
 });
 
+router.post("/loans/:id/fast-track-approve", requireAuth, requireReverification, async (req: AuthRequest, res): Promise<void> => {
+  const role = req.memberRole!;
+  if (role !== "super_admin") {
+    res.status(403).json({ error: "Only a Super Admin can fast-track approve a loan" });
+    return;
+  }
+
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const result = await getLoanWithMember(id);
+  if (!result) {
+    res.status(404).json({ error: "Loan not found" });
+    return;
+  }
+
+  const { loan } = result;
+  const actorId = req.memberId!;
+
+  const eligible = ["pending", "admin_approved", "auditor_approved"];
+  if (!eligible.includes(loan.status)) {
+    res.status(400).json({
+      error: `Fast-track approval is only available from pending, admin_approved, or auditor_approved (current status: ${loan.status}).`,
+    });
+    return;
+  }
+
+  const skipped: string[] = [];
+  if (!loan.adminApprovedAt) skipped.push("admin");
+  if (!loan.auditorApprovedAt) skipped.push("auditor");
+
+  // Compare-and-set on the prior status to prevent racing with a regular approval.
+  const [updated] = await db
+    .update(loansTable)
+    .set({
+      status: "super_admin_approved",
+      superAdminApprovedAt: new Date(),
+      superAdminApprovedBy: actorId,
+    })
+    .where(and(eq(loansTable.id, id), eq(loansTable.status, loan.status)))
+    .returning();
+
+  if (!updated) {
+    res.status(409).json({ error: "Loan status changed since you loaded it. Please refresh and try again." });
+    return;
+  }
+
+  await logAudit({
+    actorId: req.memberId,
+    action: "FAST_TRACK_APPROVE_LOAN",
+    entity: "loan",
+    entityId: id,
+    details:
+      skipped.length > 0
+        ? `Super-admin override: bypassed ${skipped.join(" and ")} stage${skipped.length === 1 ? "" : "s"}; status set to super_admin_approved.`
+        : "Super-admin override: status set to super_admin_approved.",
+  });
+
+  await sendNotification({
+    memberId: loan.memberId,
+    type: "loan_update",
+    title: "Loan Application Update",
+    message: "Your loan application has been approved by the Super Admin and is awaiting disbursement.",
+  });
+
+  res.json(formatLoan(updated, result.memberName, result.productName ?? null));
+});
+
 router.post("/loans/:id/reject", requireAuth, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
