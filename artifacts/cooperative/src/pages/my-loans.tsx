@@ -11,7 +11,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,11 +102,11 @@ function getProductVisual(code: string) {
 
 const loanSchema = z.object({
   loanProductId: z
-    .number({ error: "Please choose a loan type" })
+    .number({ message: "Please choose a loan type" })
     .int()
     .positive(),
-  amount: z.number({ error: "Amount is required" }).positive(),
-  tenureMonths: z.number({ error: "Tenure is required" }).int().min(1).max(60),
+  amount: z.number({ message: "Amount is required" }).positive(),
+  tenureMonths: z.number({ message: "Tenure is required" }).int().min(1).max(60),
   purpose: z.string().optional(),
 });
 

@@ -9,7 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,7 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const storeItemSchema = z.object({
   name: z.string().min(1, "Name required"),
   description: z.string().optional(),
-  price: z.number({ error: "Price required" }).positive(),
+  price: z.number({ message: "Price required" }).positive(),
   quantityAvailable: z.number().int().min(0).default(0),
 });
 type StoreItemForm = z.infer<typeof storeItemSchema>;
