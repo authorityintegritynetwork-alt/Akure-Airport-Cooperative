@@ -186,7 +186,8 @@ router.get(
   requireAuth,
   requireAdminOnly,
   async (req: AuthRequest, res): Promise<void> => {
-    const id = parseInt(req.params.id, 10);
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
     if (Number.isNaN(id)) {
       res.status(400).json({ error: "Invalid id" });
       return;

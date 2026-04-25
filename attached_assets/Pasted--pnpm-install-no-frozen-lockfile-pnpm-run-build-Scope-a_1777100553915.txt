@@ -1,0 +1,100 @@
+      > pnpm install --no-frozen-lockfile && pnpm run build
+
+      Scope: all 10 workspace projects
+      Lockfile is up to date, resolution step is skipped
+      Already up to date
+
+      . preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+      . preinstall: Done
+      ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+      │                                                                              │
+      │   Ignored build scripts: @clerk/shared@3.47.4, @clerk/shared@4.8.2.          │
+      │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+      │   to run scripts.                                                            │
+      │                                                                              │
+      ╰──────────────────────────────────────────────────────────────────────────────╯
+      Done in 1.2s using pnpm v10.26.1
+
+      > workspace@1.0.0 build /workspace
+      > pnpm run typecheck && pnpm -r --if-present run build
+
+
+      > workspace@1.0.0 typecheck /workspace
+      > pnpm run typecheck:libs && pnpm -r --filter "./artifacts/**" --filter "./scripts" --if-present run typecheck
+
+
+      > workspace@1.0.0 typecheck:libs /workspace
+      > tsc --build
+
+      Scope: 4 of 10 workspace projects
+      artifacts/api-server typecheck$ tsc -p tsconfig.json --noEmit
+      artifacts/cooperative typecheck$ tsc -p tsconfig.json --noEmit
+      artifacts/mockup-sandbox typecheck$ tsc -p tsconfig.json --noEmit
+      scripts typecheck$ tsc -p tsconfig.json --noEmit
+      scripts typecheck: Done
+      artifacts/api-server typecheck: src/routes/broadcasts.ts(189,25): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+      artifacts/api-server typecheck:   Type 'string[]' is not assignable to type 'string'.
+      artifacts/api-server typecheck: src/routes/support.ts(216,11): error TS2769: No overload matches this call.
+      artifacts/api-server typecheck:   Overload 1 of 3, '(column: Aliased<string>, values: SQLWrapper | (string | Placeholder<string, any>)[]): SQL<unknown>', gave the following error.
+      artifacts/api-server typecheck:     Argument of type 'PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<string>'.
+      artifacts/api-server typecheck:       Type 'PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<string>': sql, fieldAlias
+      artifacts/api-server typecheck:   Overload 2 of 3, '(column: PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; ... 8 more ...; generated: undefined; }, {}, {}>, values: SQLWrapper | readonly ("member" | ... 4 more ... | Placeholder<...>)[]): SQL<...>', gave the following error.
+      artifacts/api-server typecheck:     Argument of type 'string[]' is not assignable to parameter of type 'SQLWrapper | readonly ("member" | "admin" | "financial_auditor" | "treasurer" | "super_admin" | Placeholder<string, any>)[]'.
+      artifacts/api-server typecheck:       Type 'string[]' is not assignable to type 'readonly ("member" | "admin" | "financial_auditor" | "treasurer" | "super_admin" | Placeholder<string, any>)[]'.
+      artifacts/api-server typecheck:         Type 'string' is not assignable to type '"member" | "admin" | "financial_auditor" | "treasurer" | "super_admin" | Placeholder<string, any>'.
+      artifacts/api-server typecheck:   Overload 3 of 3, '(column: never, values: SQLWrapper | readonly unknown[]): SQL<unknown>', gave the following error.
+      artifacts/api-server typecheck:     Argument of type 'PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+      artifacts/api-server typecheck: src/routes/support.ts(241,25): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+      artifacts/api-server typecheck:   Type 'string[]' is not assignable to type 'string'.
+      artifacts/api-server typecheck: src/routes/support.ts(270,25): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+      artifacts/api-server typecheck:   Type 'string[]' is not assignable to type 'string'.
+      artifacts/api-server typecheck: src/routes/support.ts(359,17): error TS2769: No overload matches this call.
+      artifacts/api-server typecheck:   Overload 1 of 3, '(column: Aliased<string>, values: SQLWrapper | (string | Placeholder<string, any>)[]): SQL<unknown>', gave the following error.
+      artifacts/api-server typecheck:     Argument of type 'PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'Aliased<string>'.
+      artifacts/api-server typecheck:       Type 'PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>' is missing the following properties from type 'Aliased<string>': sql, fieldAlias
+      artifacts/api-server typecheck:   Overload 2 of 3, '(column: PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; ... 8 more ...; generated: undefined; }, {}, {}>, values: SQLWrapper | readonly ("member" | ... 4 more ... | Placeholder<...>)[]): SQL<...>', gave the following error.
+      artifacts/api-server typecheck:     Argument of type 'string[]' is not assignable to parameter of type 'SQLWrapper | readonly ("member" | "admin" | "financial_auditor" | "treasurer" | "super_admin" | Placeholder<string, any>)[]'.
+      artifacts/api-server typecheck:       Type 'string[]' is not assignable to type 'readonly ("member" | "admin" | "financial_auditor" | "treasurer" | "super_admin" | Placeholder<string, any>)[]'.
+      artifacts/api-server typecheck:         Type 'string' is not assignable to type '"member" | "admin" | "financial_auditor" | "treasurer" | "super_admin" | Placeholder<string, any>'.
+      artifacts/api-server typecheck:   Overload 3 of 3, '(column: never, values: SQLWrapper | readonly unknown[]): SQL<unknown>', gave the following error.
+      artifacts/api-server typecheck:     Argument of type 'PgColumn<{ name: "role"; tableName: "members"; dataType: "string"; columnType: "PgText"; data: "member" | "admin" | "financial_auditor" | "treasurer" | "super_admin"; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>' is not assignable to parameter of type 'never'.
+      artifacts/api-server typecheck: src/routes/support.ts(386,25): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+      artifacts/api-server typecheck:   Type 'string[]' is not assignable to type 'string'.
+      artifacts/api-server typecheck: Failed
+      /workspace/artifacts/api-server:
+       ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 typecheck: `tsc -p tsconfig.json --noEmit`
+      Exit status 2
+      artifacts/mockup-sandbox typecheck: Done
+       ELIFECYCLE  Command failed with exit code 2.
+       ELIFECYCLE  Command failed with exit code 2.
+       ELIFECYCLE  Command failed with exit code 2.
+
+  - Done (10.0s)
+
+- [1;36mDebug Info:[0m
+  - Command failed `pnpm run heroku-build`
+    exit status: 2
+    stdout: <see above>
+    stderr: <see above>
+
+[0;31m! Failed to execute build script[0m
+[0;31m![0m
+[0;31m! The Heroku Node.js pnpm Install buildpack allows customization of the build process by executing the following scripts if they are defined in `[0;33mpackage.json[0m[0;31m`:[0m
+[0;31m! - `[0;33mheroku-prebuild[0m[0;31m` [0m
+[0;31m! - `[0;33mheroku-build[0m[0;31m` or `[0;33mbuild[0m[0;31m` [0m
+[0;31m! - `[0;33mheroku-postbuild[0m[0;31m`[0m
+[0;31m![0m
+[0;31m! An unexpected error occurred while executing `[0;33mpnpm run heroku-build[0m[0;31m`. See the log output above for more information.[0m
+[0;31m![0m
+[0;31m! Suggestions:[0m
+[0;31m! - Ensure that this command runs locally without error.[0m
+[0;31m![0m
+[0;31m! Use the debug information above to troubleshoot and retry your build.[0m
+[0;31m![0m
+[0;31m! If the issue persists and you think you found a bug in the buildpack, reproduce the issue locally with a minimal example. Open an issue in the buildpack's GitHub repository and include the details here:[0m
+[0;31m! [1;4;36mhttps://github.com/heroku/buildpacks-nodejs/issues[0m
+
+
+Timer: Builder ran for 17.149231537s and ended at 2026-04-25T07:02:12Z
+[31;1mERROR: [0mfailed to build: exit status 1
+Build failed ❌

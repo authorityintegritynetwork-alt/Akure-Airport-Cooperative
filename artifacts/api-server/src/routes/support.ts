@@ -213,7 +213,7 @@ router.post(
       .where(
         and(
           eq(membersTable.status, "active"),
-          inArray(membersTable.role, ADMIN_ROLES as unknown as string[]),
+          inArray(membersTable.role, [...ADMIN_ROLES]),
         ),
       );
     const link = `/support-admin/${ticket.id}`;
@@ -238,7 +238,8 @@ router.get(
   "/support/tickets/:id",
   requireAuth,
   async (req: AuthRequest, res): Promise<void> => {
-    const id = parseInt(req.params.id, 10);
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
     if (Number.isNaN(id)) {
       res.status(400).json({ error: "Invalid id" });
       return;
@@ -267,7 +268,8 @@ router.post(
   "/support/tickets/:id/messages",
   requireAuth,
   async (req: AuthRequest, res): Promise<void> => {
-    const id = parseInt(req.params.id, 10);
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
     if (Number.isNaN(id)) {
       res.status(400).json({ error: "Invalid id" });
       return;
@@ -356,7 +358,7 @@ router.post(
             .where(
               and(
                 eq(membersTable.status, "active"),
-                inArray(membersTable.role, ADMIN_ROLES as unknown as string[]),
+                inArray(membersTable.role, [...ADMIN_ROLES]),
               ),
             );
           for (const a of admins) {
@@ -383,7 +385,8 @@ router.patch(
   "/support/tickets/:id",
   requireAuth,
   async (req: AuthRequest, res): Promise<void> => {
-    const id = parseInt(req.params.id, 10);
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
     if (Number.isNaN(id)) {
       res.status(400).json({ error: "Invalid id" });
       return;
