@@ -138,3 +138,24 @@ Sensitive actions require a fresh email-OTP step-up within a 10-minute window. B
 - Settings updates
 - Member role/status changes, deletions, bulk org assignment, activate/deactivate
 - Excel deduction file processing
+
+## Admin Broadcasts
+
+Admins can post organization-wide announcements that fan out as in-app notifications (and optional emails) to a chosen audience.
+
+- Tables: `broadcasts` (sender, title, message, category, audience JSON, recipientCount, sendEmail) and reuses `notifications` (type=`announcement`).
+- Audience targeting: `{kind:"all"}` (every active member), `{kind:"role", role}` (single role), `{kind:"members", memberIds:[…]}` (explicit list).
+- Endpoints: `POST /api/broadcasts`, `GET /api/broadcasts`, `GET /api/broadcasts/:id` (admin only). Each sender's audit log records the broadcast.
+- Frontend: `/announcements` (admin) — composer + recent broadcasts list with per-broadcast read stats and recipient detail dialog. Members see broadcasts in their existing notifications page.
+- Implementation note: the audience zod schema is defined inline in the route in zod v3 (the db package's `broadcastAudienceSchema` is built with `zod/v4`, which is incompatible with v3 parsers).
+
+## Member ↔ Admin Support Tickets
+
+Asynchronous ticket-based chat between members and admins, with internal notes and audit trail.
+
+- Tables: `support_tickets` (memberId, subject, category, status, priority, assignedToMemberId, timestamps) and `support_messages` (ticketId, senderMemberId, body, isInternalNote).
+- Statuses: `open`, `in_progress`, `waiting_member`, `resolved`, `closed`. Categories: `loan`, `deduction`, `account`, `store`, `general`. Priorities: `normal`, `high`, `urgent`.
+- Endpoints: `POST/GET /api/support/tickets`, `GET/PATCH /api/support/tickets/:id`, `POST /api/support/tickets/:id/messages`, `GET /api/support/stats` (admin).
+- Authorization: members see only their own tickets and never receive `isInternalNote` messages in API responses; admin roles (`admin`, `financial_auditor`, `treasurer`, `super_admin`) see all tickets and can post internal notes.
+- Notifications fan out on every non-internal message and on admin status changes. Status/priority/assignee changes are recorded in the audit log (action `UPDATE_SUPPORT_TICKET`).
+- Frontend: `/support` (member) — own tickets + new-ticket modal + `TicketThreadDialog`. `/support-admin` (admin) — queue with stats tiles, filters (status/assignee/category), and the same `TicketThreadDialog` with status/assign controls and internal-note toggle.

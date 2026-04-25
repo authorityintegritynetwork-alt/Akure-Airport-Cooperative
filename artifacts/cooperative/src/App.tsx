@@ -28,6 +28,9 @@ import { SettingsPage } from "./pages/settings";
 import { RolesPage } from "./pages/roles";
 import { CompleteProfilePage } from "./pages/complete-profile";
 import { OrganizationsPage } from "./pages/organizations";
+import { AnnouncementsPage } from "./pages/announcements";
+import { SupportPage } from "./pages/support";
+import { SupportAdminPage } from "./pages/support-admin";
 import { useGetProfile } from "@workspace/api-client-react";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -255,6 +258,15 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/loans">
             <ProtectedRoute component={LoansAdminPage} />
+          </Route>
+          <Route path="/announcements">
+            <ProtectedRoute component={AnnouncementsPage} />
+          </Route>
+          <Route path="/support">
+            <ProtectedRoute component={SupportPage} />
+          </Route>
+          <Route path="/support-admin">
+            <ProtectedRoute component={SupportAdminPage} />
           </Route>
           <Route path="/upload">
             <ProtectedRoute component={UploadPage} />

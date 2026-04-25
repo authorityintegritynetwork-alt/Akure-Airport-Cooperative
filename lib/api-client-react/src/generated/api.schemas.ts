@@ -609,6 +609,8 @@ export const NotificationType = {
   transaction: "transaction",
   store_purchase: "store_purchase",
   system: "system",
+  announcement: "announcement",
+  support: "support",
 } as const;
 
 export interface Notification {
@@ -617,8 +619,232 @@ export interface Notification {
   type: NotificationType;
   title: string;
   message: string;
+  /** @nullable */
+  link?: string | null;
   isRead: boolean;
   createdAt: string;
+}
+
+export type BroadcastAudienceKind =
+  (typeof BroadcastAudienceKind)[keyof typeof BroadcastAudienceKind];
+
+export const BroadcastAudienceKind = {
+  all: "all",
+  role: "role",
+  members: "members",
+} as const;
+
+export type BroadcastAudienceRole =
+  (typeof BroadcastAudienceRole)[keyof typeof BroadcastAudienceRole];
+
+export const BroadcastAudienceRole = {
+  member: "member",
+  admin: "admin",
+  financial_auditor: "financial_auditor",
+  super_admin: "super_admin",
+  treasurer: "treasurer",
+} as const;
+
+export interface BroadcastAudience {
+  kind: BroadcastAudienceKind;
+  role?: BroadcastAudienceRole;
+  memberIds?: number[];
+}
+
+export type BroadcastSummaryCategory =
+  (typeof BroadcastSummaryCategory)[keyof typeof BroadcastSummaryCategory];
+
+export const BroadcastSummaryCategory = {
+  announcement: "announcement",
+  policy: "policy",
+  maintenance: "maintenance",
+  urgent: "urgent",
+} as const;
+
+export interface BroadcastSummary {
+  id: number;
+  title: string;
+  message: string;
+  category: BroadcastSummaryCategory;
+  audience: BroadcastAudience;
+  recipientCount: number;
+  readCount: number;
+  sendEmail: boolean;
+  /** @nullable */
+  senderName?: string | null;
+  createdAt: string;
+}
+
+export type BroadcastDetailRecipientsItem = {
+  memberId: number;
+  memberName: string;
+  isRead: boolean;
+};
+
+export type BroadcastDetail = BroadcastSummary & {
+  recipients: BroadcastDetailRecipientsItem[];
+};
+
+export type CreateBroadcastBodyCategory =
+  (typeof CreateBroadcastBodyCategory)[keyof typeof CreateBroadcastBodyCategory];
+
+export const CreateBroadcastBodyCategory = {
+  announcement: "announcement",
+  policy: "policy",
+  maintenance: "maintenance",
+  urgent: "urgent",
+} as const;
+
+export interface CreateBroadcastBody {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  title: string;
+  /** @minLength 1 */
+  message: string;
+  category: CreateBroadcastBodyCategory;
+  audience: BroadcastAudience;
+  sendEmail?: boolean;
+}
+
+export type SupportTicketSummaryCategory =
+  (typeof SupportTicketSummaryCategory)[keyof typeof SupportTicketSummaryCategory];
+
+export const SupportTicketSummaryCategory = {
+  loan: "loan",
+  deduction: "deduction",
+  account: "account",
+  store: "store",
+  general: "general",
+} as const;
+
+export type SupportTicketSummaryStatus =
+  (typeof SupportTicketSummaryStatus)[keyof typeof SupportTicketSummaryStatus];
+
+export const SupportTicketSummaryStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  waiting_member: "waiting_member",
+  resolved: "resolved",
+  closed: "closed",
+} as const;
+
+export type SupportTicketSummaryPriority =
+  (typeof SupportTicketSummaryPriority)[keyof typeof SupportTicketSummaryPriority];
+
+export const SupportTicketSummaryPriority = {
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export interface SupportTicketSummary {
+  id: number;
+  memberId: number;
+  memberName: string;
+  subject: string;
+  category: SupportTicketSummaryCategory;
+  status: SupportTicketSummaryStatus;
+  priority: SupportTicketSummaryPriority;
+  /** @nullable */
+  assignedToMemberId?: number | null;
+  /** @nullable */
+  assignedToName?: string | null;
+  unreadForViewer: boolean;
+  messageCount: number;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportMessage {
+  id: number;
+  ticketId: number;
+  senderMemberId: number;
+  senderName: string;
+  senderRole: string;
+  body: string;
+  isInternalNote: boolean;
+  createdAt: string;
+}
+
+export type SupportTicketDetail = SupportTicketSummary & {
+  messages: SupportMessage[];
+};
+
+export type CreateSupportTicketBodyCategory =
+  (typeof CreateSupportTicketBodyCategory)[keyof typeof CreateSupportTicketBodyCategory];
+
+export const CreateSupportTicketBodyCategory = {
+  loan: "loan",
+  deduction: "deduction",
+  account: "account",
+  store: "store",
+  general: "general",
+} as const;
+
+export type CreateSupportTicketBodyPriority =
+  (typeof CreateSupportTicketBodyPriority)[keyof typeof CreateSupportTicketBodyPriority];
+
+export const CreateSupportTicketBodyPriority = {
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export interface CreateSupportTicketBody {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  subject: string;
+  category: CreateSupportTicketBodyCategory;
+  priority?: CreateSupportTicketBodyPriority;
+  /** @minLength 1 */
+  body: string;
+}
+
+export type UpdateSupportTicketBodyStatus =
+  (typeof UpdateSupportTicketBodyStatus)[keyof typeof UpdateSupportTicketBodyStatus];
+
+export const UpdateSupportTicketBodyStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  waiting_member: "waiting_member",
+  resolved: "resolved",
+  closed: "closed",
+} as const;
+
+export type UpdateSupportTicketBodyPriority =
+  (typeof UpdateSupportTicketBodyPriority)[keyof typeof UpdateSupportTicketBodyPriority];
+
+export const UpdateSupportTicketBodyPriority = {
+  normal: "normal",
+  high: "high",
+  urgent: "urgent",
+} as const;
+
+export interface UpdateSupportTicketBody {
+  status?: UpdateSupportTicketBodyStatus;
+  priority?: UpdateSupportTicketBodyPriority;
+  /** @nullable */
+  assignedToMemberId?: number | null;
+}
+
+export interface AddSupportMessageBody {
+  /** @minLength 1 */
+  body: string;
+  isInternalNote?: boolean;
+}
+
+export interface SupportStats {
+  open: number;
+  inProgress: number;
+  waitingMember: number;
+  resolved: number;
+  unassigned: number;
+  urgent: number;
 }
 
 export interface AuditLog {
@@ -809,6 +1035,32 @@ export type ListStorePurchasesParams = {
 export type ListNotificationsParams = {
   unread?: boolean;
 };
+
+export type ListSupportTicketsParams = {
+  status?: ListSupportTicketsStatus;
+  assignee?: ListSupportTicketsAssignee;
+  category?: string;
+};
+
+export type ListSupportTicketsStatus =
+  (typeof ListSupportTicketsStatus)[keyof typeof ListSupportTicketsStatus];
+
+export const ListSupportTicketsStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  waiting_member: "waiting_member",
+  resolved: "resolved",
+  closed: "closed",
+} as const;
+
+export type ListSupportTicketsAssignee =
+  (typeof ListSupportTicketsAssignee)[keyof typeof ListSupportTicketsAssignee];
+
+export const ListSupportTicketsAssignee = {
+  me: "me",
+  unassigned: "unassigned",
+  any: "any",
+} as const;
 
 export type ListAuditLogsParams = {
   action?: string;

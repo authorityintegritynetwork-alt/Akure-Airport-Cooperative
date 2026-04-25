@@ -9,8 +9,9 @@ export const notificationsTable = pgTable("notifications", {
     .notNull()
     .references(() => membersTable.id),
   type: text("type", {
-    enum: ["loan_update", "transaction", "store_purchase", "system"],
+    enum: ["loan_update", "transaction", "store_purchase", "system", "announcement", "support"],
   }).notNull(),
+  link: text("link"),
   title: text("title").notNull(),
   message: text("message").notNull(),
   isRead: boolean("is_read").notNull().default(false),

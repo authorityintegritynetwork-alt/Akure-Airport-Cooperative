@@ -28,6 +28,8 @@ import {
   Moon,
   LogOut,
   History,
+  Megaphone,
+  Headphones,
 } from "lucide-react";
 
 type Tab = {
@@ -160,6 +162,18 @@ export function AdminMobileBottomNav() {
                           href="/organizations"
                           icon={<Building2 className="w-5 h-5" />}
                           label="Organizations"
+                          onClick={() => setMoreOpen(false)}
+                        />
+                        <MoreLink
+                          href="/announcements"
+                          icon={<Megaphone className="w-5 h-5" />}
+                          label="Announcements"
+                          onClick={() => setMoreOpen(false)}
+                        />
+                        <MoreLink
+                          href="/support-admin"
+                          icon={<Headphones className="w-5 h-5" />}
+                          label="Support Queue"
                           onClick={() => setMoreOpen(false)}
                         />
                         <MoreLink

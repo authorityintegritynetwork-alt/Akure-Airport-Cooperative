@@ -9,3 +9,5 @@ export * from "./audit";
 export * from "./settings";
 export * from "./uploads";
 export * from "./stepUp";
+export * from "./broadcasts";
+export * from "./support";

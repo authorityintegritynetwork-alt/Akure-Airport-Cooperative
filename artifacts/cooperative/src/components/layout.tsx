@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, Building2 } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -91,6 +91,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {isMember && navItem("/store", <ShoppingCart className="w-4 h-4" />, "Store")}
                   {isMember && navItem("/my-purchases", <ShoppingBag className="w-4 h-4" />, "My Purchases")}
                   {navItem("/my-notifications", <Bell className="w-4 h-4" />, "Notifications")}
+                  {isMember && navItem("/support", <Headphones className="w-4 h-4" />, "Support")}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -105,6 +106,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {navItem("/upload", <FileSpreadsheet className="w-4 h-4" />, "Upload Deductions")}
                     {navItem("/store-admin", <ShoppingCart className="w-4 h-4" />, "Store Admin")}
                     {navItem("/organizations", <Building2 className="w-4 h-4" />, "Organizations")}
+                    {navItem("/announcements", <Megaphone className="w-4 h-4" />, "Announcements")}
+                    {navItem("/support-admin", <Headphones className="w-4 h-4" />, "Support Queue")}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>

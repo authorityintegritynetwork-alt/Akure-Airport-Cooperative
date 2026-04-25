@@ -14,4 +14,6 @@ export const NotificationType = {
   transaction: "transaction",
   store_purchase: "store_purchase",
   system: "system",
+  announcement: "announcement",
+  support: "support",
 } as const;

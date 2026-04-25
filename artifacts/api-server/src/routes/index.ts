@@ -15,6 +15,8 @@ import settingsRouter from "./settings";
 import dashboardRouter from "./dashboard";
 import uploadsRouter from "./uploads";
 import storageRouter from "./storage";
+import broadcastsRouter from "./broadcasts";
+import supportRouter from "./support";
 
 const router: IRouter = Router();
 
@@ -34,5 +36,7 @@ router.use(settingsRouter);
 router.use(dashboardRouter);
 router.use(uploadsRouter);
 router.use(storageRouter);
+router.use(broadcastsRouter);
+router.use(supportRouter);
 
 export default router;

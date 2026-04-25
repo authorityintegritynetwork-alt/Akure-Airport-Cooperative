@@ -1315,9 +1315,17 @@ export const ListNotificationsQueryParams = zod.object({
 export const ListNotificationsResponseItem = zod.object({
   id: zod.number(),
   memberId: zod.number(),
-  type: zod.enum(["loan_update", "transaction", "store_purchase", "system"]),
+  type: zod.enum([
+    "loan_update",
+    "transaction",
+    "store_purchase",
+    "system",
+    "announcement",
+    "support",
+  ]),
   title: zod.string(),
   message: zod.string(),
+  link: zod.string().nullish(),
   isRead: zod.boolean(),
   createdAt: zod.coerce.date(),
 });
@@ -1335,11 +1343,292 @@ export const MarkNotificationReadParams = zod.object({
 export const MarkNotificationReadResponse = zod.object({
   id: zod.number(),
   memberId: zod.number(),
-  type: zod.enum(["loan_update", "transaction", "store_purchase", "system"]),
+  type: zod.enum([
+    "loan_update",
+    "transaction",
+    "store_purchase",
+    "system",
+    "announcement",
+    "support",
+  ]),
   title: zod.string(),
   message: zod.string(),
+  link: zod.string().nullish(),
   isRead: zod.boolean(),
   createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List broadcasts sent (admin)
+ */
+export const ListBroadcastsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  message: zod.string(),
+  category: zod.enum(["announcement", "policy", "maintenance", "urgent"]),
+  audience: zod.object({
+    kind: zod.enum(["all", "role", "members"]),
+    role: zod
+      .enum([
+        "member",
+        "admin",
+        "financial_auditor",
+        "super_admin",
+        "treasurer",
+      ])
+      .optional(),
+    memberIds: zod.array(zod.number()).optional(),
+  }),
+  recipientCount: zod.number(),
+  readCount: zod.number(),
+  sendEmail: zod.boolean(),
+  senderName: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListBroadcastsResponse = zod.array(ListBroadcastsResponseItem);
+
+/**
+ * @summary Send a broadcast announcement to selected members (admin)
+ */
+export const createBroadcastBodyTitleMax = 200;
+
+export const CreateBroadcastBody = zod.object({
+  title: zod.string().min(1).max(createBroadcastBodyTitleMax),
+  message: zod.string().min(1),
+  category: zod.enum(["announcement", "policy", "maintenance", "urgent"]),
+  audience: zod.object({
+    kind: zod.enum(["all", "role", "members"]),
+    role: zod
+      .enum([
+        "member",
+        "admin",
+        "financial_auditor",
+        "super_admin",
+        "treasurer",
+      ])
+      .optional(),
+    memberIds: zod.array(zod.number()).optional(),
+  }),
+  sendEmail: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get a broadcast with read statistics (admin)
+ */
+export const GetBroadcastParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBroadcastResponse = zod
+  .object({
+    id: zod.number(),
+    title: zod.string(),
+    message: zod.string(),
+    category: zod.enum(["announcement", "policy", "maintenance", "urgent"]),
+    audience: zod.object({
+      kind: zod.enum(["all", "role", "members"]),
+      role: zod
+        .enum([
+          "member",
+          "admin",
+          "financial_auditor",
+          "super_admin",
+          "treasurer",
+        ])
+        .optional(),
+      memberIds: zod.array(zod.number()).optional(),
+    }),
+    recipientCount: zod.number(),
+    readCount: zod.number(),
+    sendEmail: zod.boolean(),
+    senderName: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      recipients: zod.array(
+        zod.object({
+          memberId: zod.number(),
+          memberName: zod.string(),
+          isRead: zod.boolean(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary List support tickets (members see own; admins see all with filters)
+ */
+export const ListSupportTicketsQueryParams = zod.object({
+  status: zod
+    .enum(["open", "in_progress", "waiting_member", "resolved", "closed"])
+    .optional(),
+  assignee: zod.enum(["me", "unassigned", "any"]).optional(),
+  category: zod.coerce.string().optional(),
+});
+
+export const ListSupportTicketsResponseItem = zod.object({
+  id: zod.number(),
+  memberId: zod.number(),
+  memberName: zod.string(),
+  subject: zod.string(),
+  category: zod.enum(["loan", "deduction", "account", "store", "general"]),
+  status: zod.enum([
+    "open",
+    "in_progress",
+    "waiting_member",
+    "resolved",
+    "closed",
+  ]),
+  priority: zod.enum(["normal", "high", "urgent"]),
+  assignedToMemberId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  unreadForViewer: zod.boolean(),
+  messageCount: zod.number(),
+  lastMessageAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListSupportTicketsResponse = zod.array(
+  ListSupportTicketsResponseItem,
+);
+
+/**
+ * @summary Open a new support ticket
+ */
+export const createSupportTicketBodySubjectMax = 200;
+
+export const CreateSupportTicketBody = zod.object({
+  subject: zod.string().min(1).max(createSupportTicketBodySubjectMax),
+  category: zod.enum(["loan", "deduction", "account", "store", "general"]),
+  priority: zod.enum(["normal", "high", "urgent"]).optional(),
+  body: zod.string().min(1),
+});
+
+/**
+ * @summary Get a single ticket with its messages
+ */
+export const GetSupportTicketParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetSupportTicketResponse = zod
+  .object({
+    id: zod.number(),
+    memberId: zod.number(),
+    memberName: zod.string(),
+    subject: zod.string(),
+    category: zod.enum(["loan", "deduction", "account", "store", "general"]),
+    status: zod.enum([
+      "open",
+      "in_progress",
+      "waiting_member",
+      "resolved",
+      "closed",
+    ]),
+    priority: zod.enum(["normal", "high", "urgent"]),
+    assignedToMemberId: zod.number().nullish(),
+    assignedToName: zod.string().nullish(),
+    unreadForViewer: zod.boolean(),
+    messageCount: zod.number(),
+    lastMessageAt: zod.coerce.date(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      messages: zod.array(
+        zod.object({
+          id: zod.number(),
+          ticketId: zod.number(),
+          senderMemberId: zod.number(),
+          senderName: zod.string(),
+          senderRole: zod.string(),
+          body: zod.string(),
+          isInternalNote: zod.boolean(),
+          createdAt: zod.coerce.date(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Update ticket status / priority / assignee (admin)
+ */
+export const UpdateSupportTicketParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateSupportTicketBody = zod.object({
+  status: zod
+    .enum(["open", "in_progress", "waiting_member", "resolved", "closed"])
+    .optional(),
+  priority: zod.enum(["normal", "high", "urgent"]).optional(),
+  assignedToMemberId: zod.number().nullish(),
+});
+
+export const UpdateSupportTicketResponse = zod
+  .object({
+    id: zod.number(),
+    memberId: zod.number(),
+    memberName: zod.string(),
+    subject: zod.string(),
+    category: zod.enum(["loan", "deduction", "account", "store", "general"]),
+    status: zod.enum([
+      "open",
+      "in_progress",
+      "waiting_member",
+      "resolved",
+      "closed",
+    ]),
+    priority: zod.enum(["normal", "high", "urgent"]),
+    assignedToMemberId: zod.number().nullish(),
+    assignedToName: zod.string().nullish(),
+    unreadForViewer: zod.boolean(),
+    messageCount: zod.number(),
+    lastMessageAt: zod.coerce.date(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      messages: zod.array(
+        zod.object({
+          id: zod.number(),
+          ticketId: zod.number(),
+          senderMemberId: zod.number(),
+          senderName: zod.string(),
+          senderRole: zod.string(),
+          body: zod.string(),
+          isInternalNote: zod.boolean(),
+          createdAt: zod.coerce.date(),
+        }),
+      ),
+    }),
+  );
+
+/**
+ * @summary Add a message to a ticket (member or admin)
+ */
+export const AddSupportTicketMessageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddSupportTicketMessageBody = zod.object({
+  body: zod.string().min(1),
+  isInternalNote: zod.boolean().optional(),
+});
+
+/**
+ * @summary Aggregate support queue counts (admin)
+ */
+export const GetSupportStatsResponse = zod.object({
+  open: zod.number(),
+  inProgress: zod.number(),
+  waitingMember: zod.number(),
+  resolved: zod.number(),
+  unassigned: zod.number(),
+  urgent: zod.number(),
 });
 
 /**

@@ -21,6 +21,8 @@ tags:
   - name: settings
   - name: storage
   - name: dashboard
+  - name: broadcasts
+  - name: support
 
 paths:
   /healthz:
@@ -1103,6 +1105,186 @@ paths:
       responses:
         "200":
           description: OK
+
+  # ── BROADCASTS (Admin announcements) ──────────────────────────────────────────
+  /broadcasts:
+    get:
+      operationId: listBroadcasts
+      tags: [broadcasts]
+      summary: List broadcasts sent (admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BroadcastSummary"
+    post:
+      operationId: createBroadcast
+      tags: [broadcasts]
+      summary: Send a broadcast announcement to selected members (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBroadcastBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastSummary"
+
+  /broadcasts/{id}:
+    get:
+      operationId: getBroadcast
+      tags: [broadcasts]
+      summary: Get a broadcast with read statistics (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastDetail"
+
+  # ── SUPPORT TICKETS ───────────────────────────────────────────────────────────
+  /support/tickets:
+    get:
+      operationId: listSupportTickets
+      tags: [support]
+      summary: List support tickets (members see own; admins see all with filters)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, in_progress, waiting_member, resolved, closed]
+        - in: query
+          name: assignee
+          schema:
+            type: string
+            enum: [me, unassigned, any]
+        - in: query
+          name: category
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportTicketSummary"
+    post:
+      operationId: createSupportTicket
+      tags: [support]
+      summary: Open a new support ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSupportTicketBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicketDetail"
+
+  /support/tickets/{id}:
+    get:
+      operationId: getSupportTicket
+      tags: [support]
+      summary: Get a single ticket with its messages
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicketDetail"
+    patch:
+      operationId: updateSupportTicket
+      tags: [support]
+      summary: Update ticket status / priority / assignee (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSupportTicketBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicketDetail"
+
+  /support/tickets/{id}/messages:
+    post:
+      operationId: addSupportTicketMessage
+      tags: [support]
+      summary: Add a message to a ticket (member or admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddSupportMessageBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportTicketDetail"
+
+  /support/stats:
+    get:
+      operationId: getSupportStats
+      tags: [support]
+      summary: Aggregate support queue counts (admin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportStats"
 
   # ── AUDIT LOGS ────────────────────────────────────────────────────────────────
   /audit-logs:
@@ -2208,17 +2390,242 @@ components:
           type: integer
         type:
           type: string
-          enum: [loan_update, transaction, store_purchase, system]
+          enum: [loan_update, transaction, store_purchase, system, announcement, support]
         title:
           type: string
         message:
           type: string
+        link:
+          type: ["string", "null"]
         isRead:
           type: boolean
         createdAt:
           type: string
           format: date-time
       required: [id, memberId, type, title, message, isRead, createdAt]
+
+    # ── BROADCASTS ────────────────────────────────────────────────────────────
+    BroadcastAudience:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [all, role, members]
+        role:
+          type: string
+          enum: [member, admin, financial_auditor, super_admin, treasurer]
+        memberIds:
+          type: array
+          items:
+            type: integer
+      required: [kind]
+
+    BroadcastSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        category:
+          type: string
+          enum: [announcement, policy, maintenance, urgent]
+        audience:
+          $ref: "#/components/schemas/BroadcastAudience"
+        recipientCount:
+          type: integer
+        readCount:
+          type: integer
+        sendEmail:
+          type: boolean
+        senderName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, message, category, audience, recipientCount, readCount, sendEmail, createdAt]
+
+    BroadcastDetail:
+      allOf:
+        - $ref: "#/components/schemas/BroadcastSummary"
+        - type: object
+          properties:
+            recipients:
+              type: array
+              items:
+                type: object
+                properties:
+                  memberId:
+                    type: integer
+                  memberName:
+                    type: string
+                  isRead:
+                    type: boolean
+                required: [memberId, memberName, isRead]
+          required: [recipients]
+
+    CreateBroadcastBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        message:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          enum: [announcement, policy, maintenance, urgent]
+        audience:
+          $ref: "#/components/schemas/BroadcastAudience"
+        sendEmail:
+          type: boolean
+      required: [title, message, category, audience]
+
+    # ── SUPPORT TICKETS ───────────────────────────────────────────────────────
+    SupportTicketSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        subject:
+          type: string
+        category:
+          type: string
+          enum: [loan, deduction, account, store, general]
+        status:
+          type: string
+          enum: [open, in_progress, waiting_member, resolved, closed]
+        priority:
+          type: string
+          enum: [normal, high, urgent]
+        assignedToMemberId:
+          type: ["integer", "null"]
+        assignedToName:
+          type: ["string", "null"]
+        unreadForViewer:
+          type: boolean
+        messageCount:
+          type: integer
+        lastMessageAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - memberId
+        - memberName
+        - subject
+        - category
+        - status
+        - priority
+        - unreadForViewer
+        - messageCount
+        - lastMessageAt
+        - createdAt
+        - updatedAt
+
+    SupportMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        ticketId:
+          type: integer
+        senderMemberId:
+          type: integer
+        senderName:
+          type: string
+        senderRole:
+          type: string
+        body:
+          type: string
+        isInternalNote:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, ticketId, senderMemberId, senderName, senderRole, body, isInternalNote, createdAt]
+
+    SupportTicketDetail:
+      allOf:
+        - $ref: "#/components/schemas/SupportTicketSummary"
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/SupportMessage"
+          required: [messages]
+
+    CreateSupportTicketBody:
+      type: object
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 200
+        category:
+          type: string
+          enum: [loan, deduction, account, store, general]
+        priority:
+          type: string
+          enum: [normal, high, urgent]
+        body:
+          type: string
+          minLength: 1
+      required: [subject, category, body]
+
+    UpdateSupportTicketBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, in_progress, waiting_member, resolved, closed]
+        priority:
+          type: string
+          enum: [normal, high, urgent]
+        assignedToMemberId:
+          type: ["integer", "null"]
+
+    AddSupportMessageBody:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+        isInternalNote:
+          type: boolean
+      required: [body]
+
+    SupportStats:
+      type: object
+      properties:
+        open:
+          type: integer
+        inProgress:
+          type: integer
+        waitingMember:
+          type: integer
+        resolved:
+          type: integer
+        unassigned:
+          type: integer
+        urgent:
+          type: integer
+      required: [open, inProgress, waitingMember, resolved, unassigned, urgent]
 
     # ── AUDIT LOG ──────────────────────────────────────────────────────────────
     AuditLog:

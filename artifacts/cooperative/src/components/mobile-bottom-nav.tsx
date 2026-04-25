@@ -23,6 +23,7 @@ import {
   Sun,
   Moon,
   LogOut,
+  Headphones,
 } from "lucide-react";
 
 type Tab = {
@@ -152,6 +153,12 @@ export function MobileBottomNav() {
                           icon={<Bell className="w-5 h-5" />}
                           label="Notifications"
                           badge={unreadCount > 0 ? unreadCount : undefined}
+                          onClick={() => setMoreOpen(false)}
+                        />
+                        <MoreLink
+                          href="/support"
+                          icon={<Headphones className="w-5 h-5" />}
+                          label="Support"
                           onClick={() => setMoreOpen(false)}
                         />
                       </div>
