@@ -1,0 +1,130 @@
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+Instance is starting... Waiting for health checks to pass.
+Instance is stopping.
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:9ebf477f-cb4a-415e-9b80-fae8c0dac037
+Download progress: 100% |[32m++++++++[0m| (28.0 MiB/s)
+Download complete for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:9ebf477f-cb4a-415e-9b80-fae8c0dac037
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+Instance is starting... Waiting for health checks to pass.
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Command failed with signal "SIGTERM"
+ ELIFECYCLE  Command failed.
+Instance stopped.
+Application exited with code 255
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+TCP health check failed on port 8000.
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Command failed with signal "SIGTERM"
+ ELIFECYCLE  Command failed.
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:9ebf477f-cb4a-415e-9b80-fae8c0dac037
+Instance stopped.
+Download progress: 100% |[32m++++++++[0m| (28.0 MiB/s)
+Download complete for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:9ebf477f-cb4a-415e-9b80-fae8c0dac037
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Killed
+Exit status 137
+ ELIFECYCLE  Command failed with exit code 137.
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+Killed
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Exit status 137
+ ELIFECYCLE  Command failed with exit code 137.
+Instance is starting... Waiting for health checks to pass.
+Instance stopped.
+Instance created. Preparing to start...
+Instance is starting... Waiting for health checks to pass.
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Exit status 137
+ ELIFECYCLE  Command failed with exit code 137.
+Killed
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+Instance is stopping.
+Instance created. Preparing to start...
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+Instance is starting... Waiting for health checks to pass.
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Command failed with signal "SIGTERM"
+ ELIFECYCLE  Command failed.
+TCP health check failed on port 8000.
+
+> workspace@1.0.0 start /workspace
+> NODE_ENV=production pnpm --filter @workspace/api-server run start
+
+
+> @workspace/api-server@0.0.0 start /workspace/artifacts/api-server
+> node --enable-source-maps ./dist/index.mjs
+
+/workspace/artifacts/api-server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/api-server@0.0.0 start: `node --enable-source-maps ./dist/index.mjs`
+Exit status 137
+Killed
+ ELIFECYCLE  Command failed with exit code 137.
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+Instance stopped.
