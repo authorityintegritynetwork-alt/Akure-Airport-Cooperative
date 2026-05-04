@@ -25,7 +25,8 @@
     "nodemailer": "^8.0.5",
     "pino": "^9",
     "pino-http": "^10",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

@@ -2694,6 +2694,12 @@ components:
       properties:
         savingsBalance:
           type: number
+        christmasBalance:
+          type: number
+        providentBalance:
+          type: number
+        fuelVentureBalance:
+          type: number
         activeLoanCount:
           type: integer
         outstandingLoanBalance:
@@ -2706,6 +2712,9 @@ components:
             $ref: "#/components/schemas/Transaction"
       required:
         - savingsBalance
+        - christmasBalance
+        - providentBalance
+        - fuelVentureBalance
         - activeLoanCount
         - outstandingLoanBalance
         - storeDebt

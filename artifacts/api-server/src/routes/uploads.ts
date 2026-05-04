@@ -511,7 +511,7 @@ router.post(
             }
             // Recompute aggregates from the new column values in the same UPDATE.
             setClauses.totalLoanBalance = sql`${membersTable.realLoanBalance} + ${membersTable.emergencyLoanBalance}`;
-            setClauses.totalStoreDebt = sql`${membersTable.electronicsDebt} + ${membersTable.sElectronicsDebt} + ${membersTable.furnitureDebt} + ${membersTable.commodityDebt} + ${membersTable.ghlFormDebt}`;
+            setClauses.totalStoreDebt = sql`${membersTable.electronicsDebt} + ${membersTable.sElectronicsDebt} + ${membersTable.commodityDebt} + ${membersTable.ghlFormDebt}`;
 
             await tx
               .update(membersTable)

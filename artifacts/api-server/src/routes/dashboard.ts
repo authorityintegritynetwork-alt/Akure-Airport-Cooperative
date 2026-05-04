@@ -58,6 +58,9 @@ router.get("/dashboard/member-summary", requireAuth, async (req: AuthRequest, re
 
   res.json({
     savingsBalance: parseFloat(member.savingsBalance),
+    christmasBalance: parseFloat(member.christmasBalance),
+    providentBalance: parseFloat(member.providentBalance),
+    fuelVentureBalance: parseFloat(member.fuelVentureBalance),
     activeLoanCount: activeLoans.length,
     outstandingLoanBalance: parseFloat(member.totalLoanBalance),
     storeDebt: parseFloat(member.totalStoreDebt),

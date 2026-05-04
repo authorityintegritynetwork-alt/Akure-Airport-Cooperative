@@ -63,20 +63,20 @@ type BalanceCard = { key: string; label: string; direction: "credit" | "debit" }
 const BALANCE_CARDS_BY_ORG: Record<"faan" | "nama", BalanceCard[]> = {
   faan: [
     { key: "savingsBalance", label: "Savings", direction: "credit" },
-    { key: "providentBalance", label: "Provision", direction: "credit" },
     { key: "christmasBalance", label: "Christmas", direction: "credit" },
+    { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
+    { key: "providentBalance", label: "Provision Loan", direction: "debit" },
     { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
     { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
     { key: "electronicsDebt", label: "Electronics", direction: "debit" },
     { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit" },
-    { key: "furnitureDebt", label: "Furniture", direction: "debit" },
+    { key: "fuelVentureBalance", label: "Fuel Venture Loan", direction: "debit" },
     { key: "commodityDebt", label: "Commodity", direction: "debit" },
     { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
-    { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
   ],
   nama: [
     { key: "savingsBalance", label: "Savings", direction: "credit" },
-    { key: "providentBalance", label: "Provision", direction: "credit" },
+    { key: "providentBalance", label: "Provision Loan", direction: "debit" },
     { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
     { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
     { key: "electronicsDebt", label: "Electronics (S/Elect)", direction: "debit" },
@@ -498,6 +498,12 @@ function MemberDashboard({ profile }: { profile: any }) {
   const balanceCards = BALANCE_CARDS_BY_ORG[org];
   const orgLabel = (profile.organization || "FAAN").toString().toUpperCase();
 
+  // Total Savings = pure savings + christmas (FAAN only). Provision is a loan, not savings.
+  // Shares will be added here once the field is plumbed through.
+  const totalSavings =
+    (summary.savingsBalance ?? 0) +
+    (org === "faan" ? (summary.christmasBalance ?? 0) : 0);
+
   const firstName = (profile.fullName || "").split(" ")[0] || "there";
   const hour = new Date().getHours();
   const greeting =
@@ -541,12 +547,10 @@ function MemberDashboard({ profile }: { profile: any }) {
             Total Savings
           </p>
           <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums tracking-tight">
-            {formatCurrency(summary.savingsBalance)}
+            {formatCurrency(totalSavings)}
           </p>
           <p className="text-xs text-white/70 mt-1">
-            {org === "faan"
-              ? "Savings + Provision + Christmas"
-              : "Savings + Provision"}
+            {org === "faan" ? "Savings + Christmas" : "Savings"}
           </p>
         </div>
 

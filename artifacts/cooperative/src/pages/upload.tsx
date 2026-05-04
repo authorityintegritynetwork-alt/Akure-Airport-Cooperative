@@ -43,7 +43,7 @@ const CATEGORY_COLUMNS_BY_ORG: Record<Org, { key: string; label: string }[]> = {
     { key: "emergencyLoan", label: "Emer. Loan" },
     { key: "electronics", label: "Electronics" },
     { key: "sElectronics", label: "S/Elect" },
-    { key: "furniture", label: "Furniture" },
+    { key: "fuelVenture", label: "Fuel Venture" },
     { key: "commodity", label: "Commodity" },
     { key: "ghlForm", label: "Loan Form" },
     { key: "fire", label: "Fire" },

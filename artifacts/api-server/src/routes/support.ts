@@ -7,7 +7,7 @@ import {
   type SupportTicket,
 } from "@workspace/db";
 import { and, asc, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
-import { z } from "@workspace/api-zod";
+import { z } from "zod";
 import { requireAuth, AuthRequest } from "../middlewares/auth";
 import { sendNotification } from "../lib/notifications";
 import { logAudit } from "../lib/audit";

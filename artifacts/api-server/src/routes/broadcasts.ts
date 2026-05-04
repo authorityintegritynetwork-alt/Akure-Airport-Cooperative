@@ -7,7 +7,7 @@ import {
   type BroadcastAudience,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { z } from "@workspace/api-zod";
+import { z } from "zod";
 
 const broadcastAudienceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("all") }),

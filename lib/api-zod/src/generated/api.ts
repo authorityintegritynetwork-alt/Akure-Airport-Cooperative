@@ -1683,6 +1683,9 @@ export const GetAdminDashboardSummaryResponse = zod.object({
  */
 export const GetMemberDashboardSummaryResponse = zod.object({
   savingsBalance: zod.number(),
+  christmasBalance: zod.number(),
+  providentBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
   activeLoanCount: zod.number(),
   outstandingLoanBalance: zod.number(),
   storeDebt: zod.number(),

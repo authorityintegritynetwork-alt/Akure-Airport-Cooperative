@@ -9,6 +9,9 @@ import type { Transaction } from "./transaction";
 
 export interface MemberDashboardSummary {
   savingsBalance: number;
+  christmasBalance: number;
+  providentBalance: number;
+  fuelVentureBalance: number;
   activeLoanCount: number;
   outstandingLoanBalance: number;
   storeDebt: number;
