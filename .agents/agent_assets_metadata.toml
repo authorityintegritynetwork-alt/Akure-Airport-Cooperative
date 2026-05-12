@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "7xz87mYnLvQYK_gmzUWsp"
+uri = "file://deliverables/AACSMS_Unified_Deduction_Template.xlsx"
+type = "table"
+title = "AACSMS Unified Monthly Deduction Template"

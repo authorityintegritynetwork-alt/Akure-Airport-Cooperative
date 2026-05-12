@@ -34,33 +34,28 @@ export const ALL_CATEGORIES: DeductionCategory[] = [
 
 export type Organization = "faan" | "nama";
 
-// Per-organization allow-list of categories that may appear in that org's spreadsheet.
-// Used to gate parsing so a stray header in one file does not credit the wrong bucket.
+// Unified template: every organisation's spreadsheet may carry any of these
+// categories. Columns the org does not use are simply left blank. The
+// `furniture` legacy bucket is intentionally omitted — no current spreadsheet
+// uses it, the DB column is being phased out.
+const UNIFIED_CATEGORIES: DeductionCategory[] = [
+  "savings",
+  "provident",
+  "christmas",
+  "fire",
+  "realLoan",
+  "emergencyLoan",
+  "fuelVenture",
+  "landLoan",
+  "electronics",
+  "sElectronics",
+  "commodity",
+  "ghlForm",
+];
+
 export const ORG_CATEGORIES: Record<Organization, DeductionCategory[]> = {
-  faan: [
-    "savings",
-    "provident",
-    "christmas",
-    "realLoan",
-    "emergencyLoan",
-    "electronics",
-    "sElectronics",
-    "furniture",
-    "commodity",
-    "ghlForm",
-    "fire",
-  ],
-  nama: [
-    "savings",
-    "provident",
-    "realLoan",
-    "emergencyLoan",
-    "electronics",
-    "commodity",
-    "ghlForm",
-    "fuelVenture",
-    "landLoan",
-  ],
+  faan: UNIFIED_CATEGORIES,
+  nama: UNIFIED_CATEGORIES,
 };
 
 const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
@@ -93,7 +88,14 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
     "selectronics",
     "s electronics",
     "s.electronics",
+    "s/electronics",
     "small elect",
+    "small electronics",
+    // Legacy FAAN alias: prior to the unified template this single column held
+    // both Small-Electronics AND Land-Loan amounts. Going forward the template
+    // splits them into separate columns. Keeping this alias so that historical
+    // FAAN sheets (pre-template) still parse — values land in S/Electronics
+    // exactly as they did before.
     "s/e/land",
     "s e land",
     "se/land",

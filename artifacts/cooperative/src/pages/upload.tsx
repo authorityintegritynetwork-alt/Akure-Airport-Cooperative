@@ -34,32 +34,23 @@ const MONTHS = [
 
 type Org = "faan" | "nama";
 
-const CATEGORY_COLUMNS_BY_ORG: Record<Org, { key: string; label: string }[]> = {
-  faan: [
-    { key: "savings", label: "Savings" },
-    { key: "provident", label: "Provision" },
-    { key: "christmas", label: "Christmas" },
-    { key: "realLoan", label: "Real Loan" },
-    { key: "emergencyLoan", label: "Emer. Loan" },
-    { key: "electronics", label: "Electronics" },
-    { key: "sElectronics", label: "S/Elect" },
-    { key: "fuelVenture", label: "Fuel Venture" },
-    { key: "commodity", label: "Commodity" },
-    { key: "ghlForm", label: "Loan Form" },
-    { key: "fire", label: "Fire" },
-  ],
-  nama: [
-    { key: "savings", label: "Savings" },
-    { key: "provident", label: "Provision" },
-    { key: "realLoan", label: "Real Loan" },
-    { key: "emergencyLoan", label: "Emer. Loan" },
-    { key: "electronics", label: "Electronics (S/Elect)" },
-    { key: "fuelVenture", label: "Fuel Venture" },
-    { key: "landLoan", label: "Land Loan" },
-    { key: "commodity", label: "Commodity" },
-    { key: "ghlForm", label: "Loan Form" },
-  ],
-};
+// Unified column list — same template for every organisation. Columns the
+// uploaded sheet does not carry are simply skipped (parser tolerates absent
+// headers). The org dropdown is kept for audit/duplicate-guard purposes only.
+const CATEGORY_COLUMNS: { key: string; label: string }[] = [
+  { key: "savings", label: "Savings" },
+  { key: "provident", label: "Provision" },
+  { key: "christmas", label: "Christmas" },
+  { key: "fire", label: "Fire Fund" },
+  { key: "realLoan", label: "Real Loan" },
+  { key: "emergencyLoan", label: "Emer. Loan" },
+  { key: "fuelVenture", label: "Fuel Venture" },
+  { key: "landLoan", label: "Land Loan" },
+  { key: "electronics", label: "Electronics" },
+  { key: "sElectronics", label: "S/Elect" },
+  { key: "commodity", label: "Commodity" },
+  { key: "ghlForm", label: "Loan Form" },
+];
 
 type Stage = "select" | "pickSheet" | "preview";
 
@@ -443,7 +434,7 @@ export function UploadPage() {
                     <th className="text-left p-2 min-w-[140px] sticky left-0 bg-muted z-10">Name in File</th>
                     <th className="text-left p-2 min-w-[200px]">Matched Member</th>
                     <th className="text-left p-2">Org</th>
-                    {CATEGORY_COLUMNS_BY_ORG[organization].map((c) => (
+                    {CATEGORY_COLUMNS.map((c) => (
                       <th key={c.key} className="text-right p-2">{c.label}</th>
                     ))}
                     <th className="text-right p-2">Total</th>
@@ -510,7 +501,7 @@ export function UploadPage() {
                             <span className="text-muted-foreground text-[10px]">—</span>
                           )}
                         </td>
-                        {CATEGORY_COLUMNS_BY_ORG[organization].map((c) => {
+                        {CATEGORY_COLUMNS.map((c) => {
                           const v = row[c.key] || 0;
                           return (
                             <td key={c.key} className="p-2 text-right tabular-nums">

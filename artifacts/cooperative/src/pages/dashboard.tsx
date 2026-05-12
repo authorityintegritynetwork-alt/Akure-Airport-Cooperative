@@ -60,32 +60,28 @@ export function Dashboard() {
 
 type BalanceCard = { key: string; label: string; direction: "credit" | "debit" };
 
-const BALANCE_CARDS_BY_ORG: Record<"faan" | "nama", BalanceCard[]> = {
-  faan: [
-    { key: "savingsBalance", label: "Savings", direction: "credit" },
-    { key: "christmasBalance", label: "Christmas", direction: "credit" },
-    { key: "fireFundBalance", label: "Fire Fund", direction: "credit" },
-    { key: "providentBalance", label: "Provision Loan", direction: "debit" },
-    { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
-    { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
-    { key: "electronicsDebt", label: "Electronics", direction: "debit" },
-    { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit" },
-    { key: "fuelVentureBalance", label: "Fuel Venture Loan", direction: "debit" },
-    { key: "commodityDebt", label: "Commodity", direction: "debit" },
-    { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
-  ],
-  nama: [
-    { key: "savingsBalance", label: "Savings", direction: "credit" },
-    { key: "providentBalance", label: "Provision Loan", direction: "debit" },
-    { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
-    { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
-    { key: "electronicsDebt", label: "Electronics (S/Elect)", direction: "debit" },
-    { key: "fuelVentureBalance", label: "Fuel Venture Loan", direction: "debit" },
-    { key: "landLoanBalance", label: "Land Loan", direction: "debit" },
-    { key: "commodityDebt", label: "Commodity", direction: "debit" },
-    { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
-  ],
-};
+// Unified card list — every member sees the same set of products. Cards
+// where the balance is zero AND the org doesn't typically use that product are
+// hidden via `hideWhenZeroFor` so NAMA members don't see empty Christmas /
+// Fire / S-Electronics cards and FAAN members don't see an empty Land Loan
+// card. A non-zero balance always renders, regardless of org.
+type Org = "faan" | "nama";
+type BalanceCardCfg = BalanceCard & { hideWhenZeroFor?: Org[] };
+
+const BALANCE_CARDS: BalanceCardCfg[] = [
+  { key: "savingsBalance", label: "Savings", direction: "credit" },
+  { key: "christmasBalance", label: "Christmas", direction: "credit", hideWhenZeroFor: ["nama"] },
+  { key: "fireFundBalance", label: "Fire Fund", direction: "credit", hideWhenZeroFor: ["nama"] },
+  { key: "providentBalance", label: "Provision Loan", direction: "debit" },
+  { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
+  { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
+  { key: "fuelVentureBalance", label: "Fuel Venture Loan", direction: "debit" },
+  { key: "landLoanBalance", label: "Land Loan", direction: "debit", hideWhenZeroFor: ["faan"] },
+  { key: "electronicsDebt", label: "Electronics", direction: "debit" },
+  { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit", hideWhenZeroFor: ["nama"] },
+  { key: "commodityDebt", label: "Commodity", direction: "debit" },
+  { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
+];
 
 function KpiCard({
   label,
@@ -494,15 +490,23 @@ function MemberDashboard({ profile }: { profile: any }) {
   if (!summary) return null;
 
   const orgCode = (profile.organization || "faan").toString().toLowerCase();
-  const org: "faan" | "nama" = orgCode === "nama" ? "nama" : "faan";
-  const balanceCards = BALANCE_CARDS_BY_ORG[org];
+  const org: Org = orgCode === "nama" ? "nama" : "faan";
   const orgLabel = (profile.organization || "FAAN").toString().toUpperCase();
 
-  // Total Savings = pure savings + christmas (FAAN only). Provision is a loan, not savings.
+  // Pick which cards to render: always show a card if it has a non-zero
+  // balance; otherwise hide it for orgs that don't typically use that product.
+  const balanceCards = BALANCE_CARDS.filter((c) => {
+    const value = Number(profile[c.key] ?? 0);
+    if (value !== 0) return true;
+    return !c.hideWhenZeroFor?.includes(org);
+  });
+
+  // Total Savings = Savings + Christmas. Provision is a loan, not savings.
+  // Christmas is always included; for orgs that don't run a Christmas pool
+  // (e.g. NAMA today) the balance is just zero so the math is unchanged.
   // Shares will be added here once the field is plumbed through.
   const totalSavings =
-    (summary.savingsBalance ?? 0) +
-    (org === "faan" ? (summary.christmasBalance ?? 0) : 0);
+    (summary.savingsBalance ?? 0) + (summary.christmasBalance ?? 0);
 
   const firstName = (profile.fullName || "").split(" ")[0] || "there";
   const hour = new Date().getHours();
@@ -550,7 +554,7 @@ function MemberDashboard({ profile }: { profile: any }) {
             {formatCurrency(totalSavings)}
           </p>
           <p className="text-xs text-white/70 mt-1">
-            {org === "faan" ? "Savings + Christmas" : "Savings"}
+            {(summary.christmasBalance ?? 0) > 0 ? "Savings + Christmas" : "Savings"}
           </p>
         </div>
 
