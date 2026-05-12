@@ -5,11 +5,9 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { UpdateOrganizationBodyExcelFormat } from "./updateOrganizationBodyExcelFormat";
 
 export interface UpdateOrganizationBody {
   name?: string;
   /** @nullable */
   description?: string | null;
-  excelFormat?: UpdateOrganizationBodyExcelFormat;
 }

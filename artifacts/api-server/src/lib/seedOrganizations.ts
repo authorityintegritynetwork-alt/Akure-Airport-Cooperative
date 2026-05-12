@@ -6,13 +6,21 @@ const SEED = [
     code: "FAAN",
     name: "Federal Airports Authority of Nigeria",
     description: "Federal Airports Authority of Nigeria staff.",
-    excelFormat: "faan" as const,
   },
   {
     code: "NAMA",
     name: "Nigerian Airspace Management Agency",
     description: "Nigerian Airspace Management Agency staff.",
-    excelFormat: "nama" as const,
+  },
+  {
+    code: "NIMET",
+    name: "Nigerian Meteorological Agency",
+    description: "Nigerian Meteorological Agency staff.",
+  },
+  {
+    code: "NCAA",
+    name: "Nigerian Civil Aviation Authority",
+    description: "Nigerian Civil Aviation Authority staff.",
   },
 ];
 

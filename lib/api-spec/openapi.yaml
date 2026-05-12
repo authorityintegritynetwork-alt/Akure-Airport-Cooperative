@@ -1701,13 +1701,10 @@ components:
         code: { type: string }
         name: { type: string }
         description: { type: ["string", "null"] }
-        excelFormat:
-          type: string
-          enum: [faan, nama]
         isActive: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, code, name, excelFormat, isActive, createdAt, updatedAt]
+      required: [id, code, name, isActive, createdAt, updatedAt]
 
     CreateOrganizationBody:
       type: object
@@ -1721,20 +1718,13 @@ components:
         description:
           type: string
           description: "Optional one-line description shown on the sign-up screen."
-        excelFormat:
-          type: string
-          enum: [faan, nama]
-          description: "Which Excel column layout this organization's monthly deduction file uses."
-      required: [code, name, excelFormat]
+      required: [code, name]
 
     UpdateOrganizationBody:
       type: object
       properties:
         name: { type: string }
         description: { type: ["string", "null"] }
-        excelFormat:
-          type: string
-          enum: [faan, nama]
 
     LoanProduct:
       type: object

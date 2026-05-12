@@ -97,7 +97,6 @@ router.post(
         code,
         name: parsed.data.name.trim(),
         description: parsed.data.description?.trim() || null,
-        excelFormat: parsed.data.excelFormat,
         isActive: true,
       })
       .returning();
@@ -107,7 +106,7 @@ router.post(
       action: "CREATE_ORGANIZATION",
       entity: "organization",
       entityId: org.id,
-      details: `Created organization ${org.code} (${org.name}), Excel format: ${org.excelFormat}`,
+      details: `Created organization ${org.code} (${org.name})`,
     });
 
     res.status(201).json(org);
@@ -145,7 +144,6 @@ router.patch(
     if (parsed.data.name != null) update.name = parsed.data.name.trim();
     if (parsed.data.description !== undefined)
       update.description = parsed.data.description?.trim() || null;
-    if (parsed.data.excelFormat != null) update.excelFormat = parsed.data.excelFormat;
 
     if (Object.keys(update).length === 0) {
       res.json(current);

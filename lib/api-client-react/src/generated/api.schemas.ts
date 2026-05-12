@@ -181,36 +181,16 @@ export interface BulkOrganizationBody {
   organization: string;
 }
 
-export type OrganizationExcelFormat =
-  (typeof OrganizationExcelFormat)[keyof typeof OrganizationExcelFormat];
-
-export const OrganizationExcelFormat = {
-  faan: "faan",
-  nama: "nama",
-} as const;
-
 export interface Organization {
   id: number;
   code: string;
   name: string;
   /** @nullable */
   description?: string | null;
-  excelFormat: OrganizationExcelFormat;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
-
-/**
- * Which Excel column layout this organization's monthly deduction file uses.
- */
-export type CreateOrganizationBodyExcelFormat =
-  (typeof CreateOrganizationBodyExcelFormat)[keyof typeof CreateOrganizationBodyExcelFormat];
-
-export const CreateOrganizationBodyExcelFormat = {
-  faan: "faan",
-  nama: "nama",
-} as const;
 
 export interface CreateOrganizationBody {
   /** Short uppercase identifier, 2-16 chars, e.g. 'FAAN'. */
@@ -219,23 +199,12 @@ export interface CreateOrganizationBody {
   name: string;
   /** Optional one-line description shown on the sign-up screen. */
   description?: string;
-  /** Which Excel column layout this organization's monthly deduction file uses. */
-  excelFormat: CreateOrganizationBodyExcelFormat;
 }
-
-export type UpdateOrganizationBodyExcelFormat =
-  (typeof UpdateOrganizationBodyExcelFormat)[keyof typeof UpdateOrganizationBodyExcelFormat];
-
-export const UpdateOrganizationBodyExcelFormat = {
-  faan: "faan",
-  nama: "nama",
-} as const;
 
 export interface UpdateOrganizationBody {
   name?: string;
   /** @nullable */
   description?: string | null;
-  excelFormat?: UpdateOrganizationBodyExcelFormat;
 }
 
 export interface LoanProduct {

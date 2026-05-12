@@ -53,14 +53,12 @@ const createSchema = z.object({
     ),
   name: z.string().min(2, "Display name required"),
   description: z.string().optional(),
-  excelFormat: z.enum(["faan", "nama"]),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
 const editSchema = z.object({
   name: z.string().min(2, "Display name required"),
   description: z.string().optional(),
-  excelFormat: z.enum(["faan", "nama"]),
 });
 type EditForm = z.infer<typeof editSchema>;
 
@@ -94,19 +92,18 @@ export function OrganizationsPage() {
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { code: "", name: "", description: "", excelFormat: "faan" },
+    defaultValues: { code: "", name: "", description: "" },
   });
 
   const editForm = useForm<EditForm>({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: "", description: "", excelFormat: "faan" },
+    defaultValues: { name: "", description: "" },
   });
 
   function openEdit(org: any) {
     editForm.reset({
       name: org.name ?? "",
       description: org.description ?? "",
-      excelFormat: org.excelFormat,
     });
     setEditing(org);
   }
@@ -128,7 +125,6 @@ export function OrganizationsPage() {
         code: data.code.trim().toUpperCase().replace(/\s+/g, "_"),
         name: data.name.trim(),
         description: data.description?.trim() || undefined,
-        excelFormat: data.excelFormat,
       });
       toast({ title: "Organization created" });
       invalidate();
@@ -150,7 +146,6 @@ export function OrganizationsPage() {
       await updateWithStepUp(editing.id, {
         name: data.name.trim(),
         description: data.description?.trim() || null,
-        excelFormat: data.excelFormat,
       });
       toast({ title: "Organization updated" });
       invalidate();
@@ -280,26 +275,6 @@ export function OrganizationsPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={createForm.control} name="excelFormat" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Excel deduction format *</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="rounded-xl" data-testid="select-org-format">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="faan">FAAN format</SelectItem>
-                          <SelectItem value="nama">NAMA format</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription className="text-xs">
-                        Which column layout the monthly deduction file for this organization uses.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
                   <Button
                     type="submit"
                     className="w-full rounded-xl h-11"
@@ -343,9 +318,6 @@ export function OrganizationsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-bold text-sm">{org.code}</span>
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
-                    {org.excelFormat}
-                  </span>
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border ${
                       org.isActive
@@ -410,26 +382,6 @@ export function OrganizationsPage() {
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl><Input className="rounded-xl" data-testid="input-edit-org-description" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={editForm.control} name="excelFormat" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Excel deduction format *</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className="rounded-xl" data-testid="select-edit-org-format">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="faan">FAAN format</SelectItem>
-                      <SelectItem value="nama">NAMA format</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="text-xs">
-                    Changes apply to future uploads only — past upload records keep their original format.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )} />

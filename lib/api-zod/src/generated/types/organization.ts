@@ -5,7 +5,6 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { OrganizationExcelFormat } from "./organizationExcelFormat";
 
 export interface Organization {
   id: number;
@@ -13,7 +12,6 @@ export interface Organization {
   name: string;
   /** @nullable */
   description?: string | null;
-  excelFormat: OrganizationExcelFormat;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

@@ -266,7 +266,6 @@ export const ListOrganizationsResponseItem = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
-  excelFormat: zod.enum(["faan", "nama"]),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -287,11 +286,6 @@ export const CreateOrganizationBody = zod.object({
     .string()
     .optional()
     .describe("Optional one-line description shown on the sign-up screen."),
-  excelFormat: zod
-    .enum(["faan", "nama"])
-    .describe(
-      "Which Excel column layout this organization's monthly deduction file uses.",
-    ),
 });
 
 /**
@@ -304,7 +298,6 @@ export const UpdateOrganizationParams = zod.object({
 export const UpdateOrganizationBody = zod.object({
   name: zod.string().optional(),
   description: zod.string().nullish(),
-  excelFormat: zod.enum(["faan", "nama"]).optional(),
 });
 
 export const UpdateOrganizationResponse = zod.object({
@@ -312,7 +305,6 @@ export const UpdateOrganizationResponse = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
-  excelFormat: zod.enum(["faan", "nama"]),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -330,7 +322,6 @@ export const ActivateOrganizationResponse = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
-  excelFormat: zod.enum(["faan", "nama"]),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -348,7 +339,6 @@ export const DeactivateOrganizationResponse = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
-  excelFormat: zod.enum(["faan", "nama"]),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),

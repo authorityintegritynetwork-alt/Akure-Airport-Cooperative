@@ -5,7 +5,6 @@
  * Akure Airport Staff Cooperative Society API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateOrganizationBodyExcelFormat } from "./createOrganizationBodyExcelFormat";
 
 export interface CreateOrganizationBody {
   /** Short uppercase identifier, 2-16 chars, e.g. 'FAAN'. */
@@ -14,6 +13,4 @@ export interface CreateOrganizationBody {
   name: string;
   /** Optional one-line description shown on the sign-up screen. */
   description?: string;
-  /** Which Excel column layout this organization's monthly deduction file uses. */
-  excelFormat: CreateOrganizationBodyExcelFormat;
 }

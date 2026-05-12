@@ -8,7 +8,6 @@ import {
   organizationsTable,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
-import type { Organization as ExcelFormat } from "../lib/excelParser";
 import { requireAuth, requireAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
@@ -136,13 +135,12 @@ const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
 async function loadOrgOrFail(
   code: string,
   res: import("express").Response,
-): Promise<{ id: number; code: string; excelFormat: ExcelFormat; isActive: boolean } | null> {
+): Promise<{ id: number; code: string; isActive: boolean } | null> {
   const normalised = code.trim().toUpperCase();
   const [org] = await db
     .select({
       id: organizationsTable.id,
       code: organizationsTable.code,
-      excelFormat: organizationsTable.excelFormat,
       isActive: organizationsTable.isActive,
     })
     .from(organizationsTable)
@@ -155,7 +153,7 @@ async function loadOrgOrFail(
     res.status(400).json({ error: `Organization "${org.code}" is currently deactivated.` });
     return null;
   }
-  return { ...org, excelFormat: org.excelFormat as ExcelFormat };
+  return org;
 }
 
 async function loadMatcher(): Promise<NameMatcher> {
@@ -195,7 +193,7 @@ router.post(
     if (!org) return;
     try {
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
-      res.json({ sheets: summarizeSheets(wb, org.excelFormat) });
+      res.json({ sheets: summarizeSheets(wb) });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to read Excel file: ${err.message}` });
     }
@@ -224,7 +222,7 @@ router.post(
         return;
       }
 
-      const sheet = parseSheet(wb, sheetName, orgRecord.excelFormat);
+      const sheet = parseSheet(wb, sheetName);
       const matcher = await loadMatcher();
 
       const allMembers = await db
@@ -339,7 +337,7 @@ router.post(
         return;
       }
 
-      const sheet = parseSheet(wb, sheetName, orgRecord.excelFormat);
+      const sheet = parseSheet(wb, sheetName);
       const matcher = await loadMatcher();
 
       const allMembers = await db

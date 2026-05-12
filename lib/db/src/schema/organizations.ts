@@ -5,7 +5,6 @@ export const organizationsTable = pgTable("organizations", {
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
-  excelFormat: text("excel_format", { enum: ["faan", "nama"] }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
