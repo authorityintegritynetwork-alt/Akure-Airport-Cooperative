@@ -111,9 +111,18 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
     disburseLoan.mutateAsync({ id, data: { confirmationPhrase: phrase } }),
   );
 
+  function patchLoanInCache(updated: any) {
+    // Patch every cached list query for this endpoint regardless of filter params.
+    const prefix = getListLoansQueryKey({})[0];
+    queryClient.setQueriesData<any[]>({ queryKey: [prefix] }, (old) =>
+      old?.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)),
+    );
+  }
+
   async function handleApprove() {
     try {
-      await approveWithStepUp(loan.id);
+      const updated = await approveWithStepUp(loan.id);
+      if (updated && (updated as any).id) patchLoanInCache(updated);
       toast({ title: "Loan approved" });
       queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
     } catch (err: any) {
@@ -123,7 +132,8 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
 
   async function handleFastTrack() {
     try {
-      await fastTrackWithStepUp(loan.id);
+      const updated = await fastTrackWithStepUp(loan.id);
+      if (updated && (updated as any).id) patchLoanInCache(updated);
       toast({
         title: "Loan fast-tracked",
         description: "The loan is now ready for disbursement.",
@@ -137,7 +147,8 @@ function LoanRow({ loan, role }: { loan: any; role: string }) {
 
   async function handleReject() {
     try {
-      await rejectWithStepUp(loan.id, rejectReason);
+      const updated = await rejectWithStepUp(loan.id, rejectReason);
+      if (updated && (updated as any).id) patchLoanInCache(updated);
       toast({ title: "Loan rejected" });
       queryClient.invalidateQueries({ queryKey: getListLoansQueryKey({}) });
       setRejectDialogOpen(false);

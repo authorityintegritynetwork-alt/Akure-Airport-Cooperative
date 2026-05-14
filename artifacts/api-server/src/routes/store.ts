@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, storeItemsTable, storePurchasesTable, membersTable } from "@workspace/db";
 import { eq, and, ilike, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireMember, AuthRequest } from "../middlewares/auth";
+import { requireAuth, requireAdmin, requireMember, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
 import {
@@ -53,7 +53,7 @@ router.get("/store/items", requireAuth, async (req: AuthRequest, res): Promise<v
   res.json(items.map(formatItem));
 });
 
-router.post("/store/items", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.post("/store/items", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CreateStoreItemBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -93,7 +93,7 @@ router.get("/store/items/:id", requireAuth, async (req: AuthRequest, res): Promi
   res.json(formatItem(item));
 });
 
-router.patch("/store/items/:id", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.patch("/store/items/:id", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
   const parsed = UpdateStoreItemBody.safeParse(req.body);
@@ -116,14 +116,44 @@ router.patch("/store/items/:id", requireAuth, requireAdmin, async (req: AuthRequ
     return;
   }
 
+  await logAudit({
+    actorId: req.memberId,
+    action: "UPDATE_STORE_ITEM",
+    entity: "store_item",
+    entityId: id,
+    details: `Updated store item: ${item.name}`,
+  });
+
   res.json(formatItem(item));
 });
 
-router.delete("/store/items/:id", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+router.delete("/store/items/:id", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  await db.delete(storeItemsTable).where(eq(storeItemsTable.id, id));
+  let deleted: { id: number; name: string } | undefined;
+  try {
+    [deleted] = await db
+      .delete(storeItemsTable)
+      .where(eq(storeItemsTable.id, id))
+      .returning({ id: storeItemsTable.id, name: storeItemsTable.name });
+  } catch (err: any) {
+    const code = err?.code ?? err?.cause?.code;
+    if (code === "23503") {
+      res.status(409).json({ error: "Item has purchase history and cannot be deleted; mark it unavailable instead." });
+      return;
+    }
+    throw err;
+  }
+  if (deleted) {
+    await logAudit({
+      actorId: req.memberId,
+      action: "DELETE_STORE_ITEM",
+      entity: "store_item",
+      entityId: deleted.id,
+      details: `Deleted store item: ${deleted.name}`,
+    });
+  }
   res.sendStatus(204);
 });
 

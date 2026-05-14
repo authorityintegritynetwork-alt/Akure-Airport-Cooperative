@@ -107,17 +107,31 @@ export function SupportAdminPage() {
   }
 
   function changeStatus(id: number, status: string) {
+    const listPrefix = getListSupportTicketsQueryKey()[0];
+    const detailKey = getGetSupportTicketQueryKey(id);
+    // Snapshot every active list-query variant (filtered by status/assignee/category)
+    // so we can roll back precisely on error.
+    const prevLists = queryClient.getQueriesData<any[]>({ queryKey: [listPrefix] });
+    const prevDetail = queryClient.getQueryData<any>(detailKey);
+
+    queryClient.setQueriesData<any[]>({ queryKey: [listPrefix] }, (old) =>
+      old?.map((t) => (t.id === id ? { ...t, status } : t)),
+    );
+    if (prevDetail) {
+      queryClient.setQueryData(detailKey, { ...prevDetail, status });
+    }
+
     updateTicket.mutate(
       { id, data: { status: status as any } },
       {
         onSuccess: () => {
           toast({ title: `Marked ${STATUS_LABEL[status]?.label ?? status}` });
           invalidateAll();
-          queryClient.invalidateQueries({
-            queryKey: getGetSupportTicketQueryKey(id),
-          });
+          queryClient.invalidateQueries({ queryKey: detailKey });
         },
         onError: (err: any) => {
+          for (const [k, v] of prevLists) queryClient.setQueryData(k, v);
+          if (prevDetail) queryClient.setQueryData(detailKey, prevDetail);
           toast({
             title: "Update failed",
             description: err?.message,

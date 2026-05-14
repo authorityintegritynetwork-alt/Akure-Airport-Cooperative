@@ -292,15 +292,26 @@ router.post(
       .update(membersTable)
       .set({ organization: orgRow.code })
       .where(inArray(membersTable.id, memberIds))
-      .returning({ id: membersTable.id });
+      .returning({ id: membersTable.id, fullName: membersTable.fullName });
 
     await logAudit({
       actorId: req.memberId,
       action: "BULK_ASSIGN_ORGANIZATION",
       entity: "member",
       entityId: 0,
-      details: `Assigned ${orgRow.code} to ${updated.length} member(s): ${memberIds.join(",")}`,
+      details: `Assigned ${orgRow.code} to ${updated.length} member(s)`,
     });
+
+    // Per-member audit entries so each affected member's history is searchable.
+    for (const m of updated) {
+      await logAudit({
+        actorId: req.memberId,
+        action: "ASSIGN_ORGANIZATION",
+        entity: "member",
+        entityId: m.id,
+        details: `Assigned to ${orgRow.code} via bulk action: ${m.fullName}`,
+      });
+    }
 
     res.json({ updated: updated.length });
   },

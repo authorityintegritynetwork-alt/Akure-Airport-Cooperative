@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
@@ -88,6 +88,17 @@ app.use("/api/members", (req, res, next) => {
 });
 
 app.use("/api", router);
+
+// Sanitised global error handler for any error escaping API route handlers.
+// Logs the full error server-side; never leaks driver/internal messages to the client.
+app.use("/api", (err: any, req: Request, res: Response, _next: NextFunction) => {
+  (req as any).log?.error({ err }, "Unhandled error in API route");
+  if (res.headersSent) return;
+  const status = typeof err?.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 500;
+  res.status(status).json({
+    error: status === 500 ? "Internal server error" : (err?.publicMessage ?? "Request failed"),
+  });
+});
 
 const isDev = process.env.NODE_ENV !== "production";
 
