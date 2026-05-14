@@ -57,6 +57,14 @@ The `dev-start.mjs` script in `api-server/` starts both:
 - `treasurer` — disburses approved loans, manages financials
 - `member` — self-service: savings, loans, store purchases, notifications
 
+## Member Deletion Policy
+
+`DELETE /members/:id` (admin + step-up) **refuses with 409** if the member has any loans, transactions, store purchases, or upload records — admins must deactivate (`POST /members/:id/deactivate`) instead, preserving the financial trail. The route does an explicit pre-check and the schema also enforces the rule via `ON DELETE RESTRICT` foreign keys (and `ON DELETE SET NULL` on `support_tickets.assigned_to_member_id`). Transient data — notifications, OTP codes, step-up grants — cascades on delete.
+
+## Database Integrity Constraints
+
+All money columns (`numeric(15,2)`) and quantity counters carry Postgres `CHECK` constraints (`>= 0` for balances, `> 0` for loan amounts, store quantities, and tenure months). Hot filter columns — `member_id`, `loan_id`, `ticket_id`, `status`, `(year, month)`, `(year, month, organization)` — are indexed in the schema files under `lib/db/src/schema/`.
+
 ## Loan Approval Workflow
 
 1. Member applies → status: `pending`
@@ -131,7 +139,9 @@ Sensitive actions require a fresh email-OTP step-up within a 10-minute window. B
 
 **Required secrets:** `SMTP_USER` (Gmail address) and `SMTP_APP_PASSWORD` (16-character Google App Password).
 
-**Tables:** `otp_codes` (hashed codes, 10-min TTL, max 5 attempts) and `step_up_grants` (memberId + expiresAt).
+**Tables:** `otp_codes` (hashed codes, 10-min TTL, max 5 attempts per code) and `step_up_grants` (memberId + expiresAt).
+
+**Per-member lockout:** After 5 consecutive failed step-up verifications, the member's `members.stepUpLockedUntil` is set to `now() + 15 min` and `failedStepUpAttempts` is reset. While locked, both `/auth/step-up/request` and `/auth/step-up/verify` return `423 Locked` with a `Retry-After` header. A successful verification (or the lockout expiring) clears the counter — no admin reset required.
 
 **Sensitive actions:**
 - Loan approve / reject / disburse

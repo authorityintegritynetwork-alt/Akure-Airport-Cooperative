@@ -1,25 +1,41 @@
-import { pgTable, text, serial, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  timestamp,
+  integer,
+  boolean,
+  jsonb,
+  index,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membersTable } from "./members";
 
-export const broadcastsTable = pgTable("broadcasts", {
-  id: serial("id").primaryKey(),
-  senderMemberId: integer("sender_member_id")
-    .notNull()
-    .references(() => membersTable.id),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  category: text("category", {
-    enum: ["announcement", "policy", "maintenance", "urgent"],
-  })
-    .notNull()
-    .default("announcement"),
-  audience: jsonb("audience").notNull(),
-  recipientCount: integer("recipient_count").notNull().default(0),
-  sendEmail: boolean("send_email").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const broadcastsTable = pgTable(
+  "broadcasts",
+  {
+    id: serial("id").primaryKey(),
+    senderMemberId: integer("sender_member_id")
+      .notNull()
+      .references(() => membersTable.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    category: text("category", {
+      enum: ["announcement", "policy", "maintenance", "urgent"],
+    })
+      .notNull()
+      .default("announcement"),
+    audience: jsonb("audience").notNull(),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    sendEmail: boolean("send_email").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    senderIdx: index("broadcasts_sender_idx").on(t.senderMemberId),
+    createdIdx: index("broadcasts_created_idx").on(t.createdAt),
+  }),
+);
 
 export const insertBroadcastSchema = createInsertSchema(broadcastsTable).omit({
   id: true,

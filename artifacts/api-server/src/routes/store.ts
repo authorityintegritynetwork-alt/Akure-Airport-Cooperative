@@ -153,72 +153,113 @@ router.post("/store/purchases", requireAuth, requireMember, async (req: AuthRequ
     return;
   }
 
-  const [item] = await db.select().from(storeItemsTable).where(eq(storeItemsTable.id, parsed.data.storeItemId));
-  if (!item) {
-    res.status(404).json({ error: "Store item not found" });
+  type Result =
+    | { ok: true; purchase: any; itemName: string; memberName: string; totalPrice: number }
+    | { ok: false; status: number; error: string };
+
+  const result: Result = await db.transaction(async (tx) => {
+    // Lock the item row to prevent oversells under concurrent purchases.
+    const [item] = await tx
+      .select()
+      .from(storeItemsTable)
+      .where(eq(storeItemsTable.id, parsed.data.storeItemId))
+      .for("update");
+    if (!item) return { ok: false, status: 404, error: "Store item not found" } as const;
+    if (!item.isAvailable)
+      return { ok: false, status: 400, error: "Item is not available" } as const;
+    if (item.quantityAvailable < parsed.data.quantity)
+      return {
+        ok: false,
+        status: 400,
+        error: "Insufficient quantity available",
+      } as const;
+
+    const totalPrice = parseFloat(item.price) * parsed.data.quantity;
+
+    // Lock the member row too — we read+write balances on it.
+    const [member] = await tx
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, req.memberId!))
+      .for("update");
+    if (!member)
+      return { ok: false, status: 404, error: "Member not found" } as const;
+
+    let outstandingBalance = totalPrice;
+    if (
+      parsed.data.payFromSavings &&
+      parseFloat(member.savingsBalance) >= totalPrice
+    ) {
+      outstandingBalance = 0;
+      await tx
+        .update(membersTable)
+        .set({
+          savingsBalance: (
+            parseFloat(member.savingsBalance) - totalPrice
+          ).toString(),
+        })
+        .where(eq(membersTable.id, req.memberId!));
+    } else {
+      await tx
+        .update(membersTable)
+        .set({
+          totalStoreDebt: (
+            parseFloat(member.totalStoreDebt) + totalPrice
+          ).toString(),
+        })
+        .where(eq(membersTable.id, req.memberId!));
+    }
+
+    await tx
+      .update(storeItemsTable)
+      .set({ quantityAvailable: item.quantityAvailable - parsed.data.quantity })
+      .where(eq(storeItemsTable.id, item.id));
+
+    const [purchase] = await tx
+      .insert(storePurchasesTable)
+      .values({
+        memberId: req.memberId!,
+        storeItemId: item.id,
+        quantity: parsed.data.quantity,
+        unitPrice: item.price,
+        totalPrice: totalPrice.toString(),
+        outstandingBalance: outstandingBalance.toString(),
+        status: outstandingBalance === 0 ? "settled" : "outstanding",
+      })
+      .returning();
+
+    return {
+      ok: true,
+      purchase,
+      itemName: item.name,
+      memberName: member.fullName,
+      totalPrice,
+    } as const;
+  });
+
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-  if (!item.isAvailable) {
-    res.status(400).json({ error: "Item is not available" });
-    return;
-  }
-  if (item.quantityAvailable < parsed.data.quantity) {
-    res.status(400).json({ error: "Insufficient quantity available" });
-    return;
-  }
-
-  const totalPrice = parseFloat(item.price) * parsed.data.quantity;
-
-  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
-  let outstandingBalance = totalPrice;
-
-  if (parsed.data.payFromSavings && member && parseFloat(member.savingsBalance) >= totalPrice) {
-    outstandingBalance = 0;
-    await db
-      .update(membersTable)
-      .set({ savingsBalance: (parseFloat(member.savingsBalance) - totalPrice).toString() })
-      .where(eq(membersTable.id, req.memberId!));
-  } else {
-    await db
-      .update(membersTable)
-      .set({ totalStoreDebt: (parseFloat(member.totalStoreDebt) + totalPrice).toString() })
-      .where(eq(membersTable.id, req.memberId!));
-  }
-
-  await db
-    .update(storeItemsTable)
-    .set({ quantityAvailable: item.quantityAvailable - parsed.data.quantity })
-    .where(eq(storeItemsTable.id, item.id));
-
-  const [purchase] = await db
-    .insert(storePurchasesTable)
-    .values({
-      memberId: req.memberId!,
-      storeItemId: item.id,
-      quantity: parsed.data.quantity,
-      unitPrice: item.price,
-      totalPrice: totalPrice.toString(),
-      outstandingBalance: outstandingBalance.toString(),
-      status: outstandingBalance === 0 ? "settled" : "outstanding",
-    })
-    .returning();
 
   await logAudit({
     actorId: req.memberId,
     action: "STORE_PURCHASE",
     entity: "store_purchase",
-    entityId: purchase.id,
-    details: `Purchased ${parsed.data.quantity}x ${item.name} for ₦${totalPrice.toLocaleString()}`,
+    entityId: result.purchase.id,
+    details: `Purchased ${parsed.data.quantity}x ${result.itemName} for ₦${result.totalPrice.toLocaleString()}`,
   });
 
   await sendNotification({
     memberId: req.memberId!,
     type: "store_purchase",
     title: "Store Purchase Confirmed",
-    message: `Your purchase of ${parsed.data.quantity}x ${item.name} (₦${totalPrice.toLocaleString()}) has been recorded.`,
+    message: `Your purchase of ${parsed.data.quantity}x ${result.itemName} (₦${result.totalPrice.toLocaleString()}) has been recorded.`,
   });
 
-  res.status(201).json(formatPurchase(purchase, member?.fullName || "Unknown", item.name));
+  res
+    .status(201)
+    .json(formatPurchase(result.purchase, result.memberName, result.itemName));
 });
 
 router.get("/store/purchases/my", requireAuth, async (req: AuthRequest, res): Promise<void> => {

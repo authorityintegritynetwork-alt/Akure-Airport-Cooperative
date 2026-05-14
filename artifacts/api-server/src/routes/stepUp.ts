@@ -1,7 +1,13 @@
 import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
+import { z } from "zod";
 import { AuthRequest, requireAuth } from "../middlewares/auth";
-import { requestStepUpCode, verifyStepUpCode, hasActiveStepUpGrant } from "../lib/stepUp";
+import {
+  requestStepUpCode,
+  verifyStepUpCode,
+  hasActiveStepUpGrant,
+  StepUpLockedError,
+} from "../lib/stepUp";
 
 const router: IRouter = Router();
 
@@ -23,6 +29,13 @@ const verifyLimiter = rateLimit({
   message: { error: "Too many attempts. Please wait a minute." },
 });
 
+const verifyBodySchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Code must be exactly 6 digits"),
+});
+
 router.post(
   "/auth/step-up/request",
   requireAuth,
@@ -36,7 +49,16 @@ router.post(
       const result = await requestStepUpCode(req.memberId);
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: err?.message ?? "Failed to send verification code" });
+      if (err instanceof StepUpLockedError) {
+        res.setHeader("Retry-After", String(err.retryAfterSeconds));
+        res.status(423).json({
+          error: err.message,
+          retryAfterSeconds: err.retryAfterSeconds,
+        });
+        return;
+      }
+      req.log?.error({ err }, "step-up request failed");
+      res.status(500).json({ error: "Failed to send verification code" });
     }
   },
 );
@@ -50,17 +72,34 @@ router.post(
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    const code = typeof req.body?.code === "string" ? req.body.code : "";
-    if (!/^\d{6}$/.test(code)) {
+    const parsed = verifyBodySchema.safeParse(req.body);
+    if (!parsed.success) {
       res.status(400).json({ error: "Invalid code format" });
       return;
     }
-    const ok = await verifyStepUpCode(req.memberId, code, req.clerkSessionId);
-    if (!ok) {
-      res.status(400).json({ error: "Invalid or expired code" });
-      return;
+    try {
+      const ok = await verifyStepUpCode(
+        req.memberId,
+        parsed.data.code,
+        req.clerkSessionId,
+      );
+      if (!ok) {
+        res.status(400).json({ error: "Invalid or expired code" });
+        return;
+      }
+      res.json({ ok: true });
+    } catch (err: any) {
+      if (err instanceof StepUpLockedError) {
+        res.setHeader("Retry-After", String(err.retryAfterSeconds));
+        res.status(423).json({
+          error: err.message,
+          retryAfterSeconds: err.retryAfterSeconds,
+        });
+        return;
+      }
+      req.log?.error({ err }, "step-up verify failed");
+      res.status(500).json({ error: "Failed to verify code" });
     }
-    res.json({ ok: true });
   },
 );
 

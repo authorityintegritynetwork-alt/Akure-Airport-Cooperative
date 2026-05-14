@@ -1,74 +1,127 @@
-import { pgTable, text, serial, timestamp, numeric, integer } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  timestamp,
+  numeric,
+  integer,
+  check,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const membersTable = pgTable("members", {
-  id: serial("id").primaryKey(),
-  clerkUserId: text("clerk_user_id").unique(),
-  fullName: text("full_name").notNull(),
-  email: text("email").notNull().unique(),
-  phone: text("phone"),
-  staffId: text("staff_id"),
-  role: text("role", {
-    enum: ["member", "admin", "financial_auditor", "treasurer", "super_admin"],
-  })
-    .notNull()
-    .default("member"),
-  status: text("status", { enum: ["pending", "active", "inactive"] })
-    .notNull()
-    .default("pending"),
-  organization: text("organization").notNull().default("faan"),
-  savingsBalance: numeric("savings_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  providentBalance: numeric("provident_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  christmasBalance: numeric("christmas_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  realLoanBalance: numeric("real_loan_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  emergencyLoanBalance: numeric("emergency_loan_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  totalLoanBalance: numeric("total_loan_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  electronicsDebt: numeric("electronics_debt", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  sElectronicsDebt: numeric("s_electronics_debt", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  furnitureDebt: numeric("furniture_debt", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  commodityDebt: numeric("commodity_debt", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  ghlFormDebt: numeric("ghl_form_debt", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  fireFundBalance: numeric("fire_fund_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  fuelVentureBalance: numeric("fuel_venture_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  landLoanBalance: numeric("land_loan_balance", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  totalStoreDebt: numeric("total_store_debt", { precision: 15, scale: 2 })
-    .notNull()
-    .default("0"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const membersTable = pgTable(
+  "members",
+  {
+    id: serial("id").primaryKey(),
+    clerkUserId: text("clerk_user_id").unique(),
+    fullName: text("full_name").notNull(),
+    email: text("email").notNull().unique(),
+    phone: text("phone"),
+    staffId: text("staff_id"),
+    role: text("role", {
+      enum: ["member", "admin", "financial_auditor", "treasurer", "super_admin"],
+    })
+      .notNull()
+      .default("member"),
+    status: text("status", { enum: ["pending", "active", "inactive"] })
+      .notNull()
+      .default("pending"),
+    organization: text("organization").notNull().default("FAAN"),
+    savingsBalance: numeric("savings_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    providentBalance: numeric("provident_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    christmasBalance: numeric("christmas_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    realLoanBalance: numeric("real_loan_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    emergencyLoanBalance: numeric("emergency_loan_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    totalLoanBalance: numeric("total_loan_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    electronicsDebt: numeric("electronics_debt", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    sElectronicsDebt: numeric("s_electronics_debt", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    furnitureDebt: numeric("furniture_debt", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    commodityDebt: numeric("commodity_debt", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    ghlFormDebt: numeric("ghl_form_debt", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    fireFundBalance: numeric("fire_fund_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    fuelVentureBalance: numeric("fuel_venture_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    landLoanBalance: numeric("land_loan_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    totalStoreDebt: numeric("total_store_debt", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
+    failedStepUpAttempts: integer("failed_step_up_attempts").notNull().default(0),
+    stepUpLockedUntil: timestamp("step_up_locked_until", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => ({
+    savingsNonNeg: check("members_savings_non_neg", sql`${t.savingsBalance} >= 0`),
+    providentNonNeg: check("members_provident_non_neg", sql`${t.providentBalance} >= 0`),
+    christmasNonNeg: check("members_christmas_non_neg", sql`${t.christmasBalance} >= 0`),
+    realLoanNonNeg: check("members_real_loan_non_neg", sql`${t.realLoanBalance} >= 0`),
+    emergencyLoanNonNeg: check(
+      "members_emergency_loan_non_neg",
+      sql`${t.emergencyLoanBalance} >= 0`,
+    ),
+    totalLoanNonNeg: check("members_total_loan_non_neg", sql`${t.totalLoanBalance} >= 0`),
+    electronicsDebtNonNeg: check(
+      "members_electronics_debt_non_neg",
+      sql`${t.electronicsDebt} >= 0`,
+    ),
+    sElectronicsDebtNonNeg: check(
+      "members_s_electronics_debt_non_neg",
+      sql`${t.sElectronicsDebt} >= 0`,
+    ),
+    furnitureDebtNonNeg: check(
+      "members_furniture_debt_non_neg",
+      sql`${t.furnitureDebt} >= 0`,
+    ),
+    commodityDebtNonNeg: check(
+      "members_commodity_debt_non_neg",
+      sql`${t.commodityDebt} >= 0`,
+    ),
+    ghlFormDebtNonNeg: check("members_ghl_form_debt_non_neg", sql`${t.ghlFormDebt} >= 0`),
+    fireFundNonNeg: check("members_fire_fund_non_neg", sql`${t.fireFundBalance} >= 0`),
+    fuelVentureNonNeg: check(
+      "members_fuel_venture_non_neg",
+      sql`${t.fuelVentureBalance} >= 0`,
+    ),
+    landLoanNonNeg: check("members_land_loan_non_neg", sql`${t.landLoanBalance} >= 0`),
+    storeDebtNonNeg: check("members_store_debt_non_neg", sql`${t.totalStoreDebt} >= 0`),
+    failedStepUpsNonNeg: check(
+      "members_failed_step_ups_non_neg",
+      sql`${t.failedStepUpAttempts} >= 0`,
+    ),
+  }),
+);
 
 export const insertMemberSchema = createInsertSchema(membersTable).omit({
   id: true,

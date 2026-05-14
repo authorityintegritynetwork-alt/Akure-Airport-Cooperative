@@ -378,16 +378,50 @@ router.delete(
       return;
     }
 
-    try {
-      await db.transaction(async (tx) => {
-        await tx.delete(notificationsTable).where(eq(notificationsTable.memberId, id));
-        await tx.delete(transactionsTable).where(eq(transactionsTable.memberId, id));
-        await tx.delete(loansTable).where(eq(loansTable.memberId, id));
-        await tx.delete(storePurchasesTable).where(eq(storePurchasesTable.memberId, id));
-        await tx.delete(uploadRecordsTable).where(eq(uploadRecordsTable.uploadedBy, id));
-        await tx.delete(membersTable).where(eq(membersTable.id, id));
+    // Refuse deletion if the member has any financial / audit history.
+    // Co-op records (loans, transactions, store purchases, uploads, broadcasts,
+    // support tickets/messages) must be preserved, so the member must be
+    // deactivated rather than deleted.
+    const [counts] = await db
+      .select({
+        loans: sql<number>`(select count(*)::int from ${loansTable} where ${loansTable.memberId} = ${id})`,
+        transactions: sql<number>`(select count(*)::int from ${transactionsTable} where ${transactionsTable.memberId} = ${id})`,
+        purchases: sql<number>`(select count(*)::int from ${storePurchasesTable} where ${storePurchasesTable.memberId} = ${id})`,
+        uploads: sql<number>`(select count(*)::int from ${uploadRecordsTable} where ${uploadRecordsTable.uploadedBy} = ${id})`,
+      })
+      .from(membersTable)
+      .where(eq(membersTable.id, id));
+
+    const blockers: string[] = [];
+    if ((counts?.loans ?? 0) > 0) blockers.push(`${counts!.loans} loan(s)`);
+    if ((counts?.transactions ?? 0) > 0)
+      blockers.push(`${counts!.transactions} transaction(s)`);
+    if ((counts?.purchases ?? 0) > 0)
+      blockers.push(`${counts!.purchases} store purchase(s)`);
+    if ((counts?.uploads ?? 0) > 0)
+      blockers.push(`${counts!.uploads} upload record(s)`);
+
+    if (blockers.length > 0) {
+      const reason = `Member has financial history (${blockers.join(", ")}). Deactivate instead.`;
+      await logAudit({
+        actorId: req.memberId,
+        action: "DELETE_MEMBER_FAILED",
+        entity: "member",
+        entityId: id,
+        details: `Refused delete of ${member.fullName}: ${reason}`,
       });
+      res.status(409).json({ error: reason });
+      return;
+    }
+
+    try {
+      // Cascade rules in the schema take care of transient data
+      // (notifications, otp_codes, step_up_grants).  If a new restricted FK
+      // ever points at members, Postgres will raise 23503 and we surface that.
+      await db.delete(membersTable).where(eq(membersTable.id, id));
     } catch (err: any) {
+      const code = err?.code ?? err?.cause?.code;
+      const isFkViolation = code === "23503";
       await logAudit({
         actorId: req.memberId,
         action: "DELETE_MEMBER_FAILED",
@@ -395,7 +429,11 @@ router.delete(
         entityId: id,
         details: `Failed to delete member ${member.fullName}: ${err.message}`,
       });
-      res.status(409).json({ error: err.message || "Cannot delete member" });
+      res.status(isFkViolation ? 409 : 500).json({
+        error: isFkViolation
+          ? "Member is referenced by other records. Deactivate instead."
+          : "Failed to delete member",
+      });
       return;
     }
 

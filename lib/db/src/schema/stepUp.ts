@@ -7,7 +7,7 @@ export const otpCodesTable = pgTable(
     id: serial("id").primaryKey(),
     memberId: integer("member_id")
       .notNull()
-      .references(() => membersTable.id),
+      .references(() => membersTable.id, { onDelete: "cascade" }),
     purpose: text("purpose").notNull().default("step_up"),
     codeHash: text("code_hash").notNull(),
     attempts: integer("attempts").notNull().default(0),
@@ -28,7 +28,7 @@ export const stepUpGrantsTable = pgTable(
     id: serial("id").primaryKey(),
     memberId: integer("member_id")
       .notNull()
-      .references(() => membersTable.id),
+      .references(() => membersTable.id, { onDelete: "cascade" }),
     clerkSessionId: text("clerk_session_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

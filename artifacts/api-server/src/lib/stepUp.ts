@@ -1,11 +1,13 @@
 import { randomInt, createHash, timingSafeEqual } from "node:crypto";
 import { db, otpCodesTable, stepUpGrantsTable, membersTable } from "@workspace/db";
-import { and, eq, gt, isNull, desc } from "drizzle-orm";
+import { and, eq, gt, isNull, desc, sql } from "drizzle-orm";
 import { sendMail } from "./mailer";
 
 const CODE_TTL_MIN = 10;
 const GRANT_TTL_MIN = 10;
-const MAX_ATTEMPTS = 5;
+const MAX_OTP_ATTEMPTS = 5;
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_MIN = 15;
 
 function hashCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -15,7 +17,40 @@ function generateCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
+export class StepUpLockedError extends Error {
+  retryAfterSeconds: number;
+  constructor(retryAfterSeconds: number) {
+    super(
+      `Too many failed verification attempts. Try again in ${Math.ceil(
+        retryAfterSeconds / 60,
+      )} minute(s).`,
+    );
+    this.name = "StepUpLockedError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+async function assertNotLockedOut(memberId: number): Promise<void> {
+  const [member] = await db
+    .select({ stepUpLockedUntil: membersTable.stepUpLockedUntil })
+    .from(membersTable)
+    .where(eq(membersTable.id, memberId))
+    .limit(1);
+  if (!member?.stepUpLockedUntil) return;
+  const remainingMs = member.stepUpLockedUntil.getTime() - Date.now();
+  if (remainingMs > 0) {
+    throw new StepUpLockedError(Math.ceil(remainingMs / 1000));
+  }
+  // Lockout expired — clear the flag and reset counter.
+  await db
+    .update(membersTable)
+    .set({ stepUpLockedUntil: null, failedStepUpAttempts: 0 })
+    .where(eq(membersTable.id, memberId));
+}
+
 export async function requestStepUpCode(memberId: number): Promise<{ sentTo: string }> {
+  await assertNotLockedOut(memberId);
+
   const [member] = await db
     .select()
     .from(membersTable)
@@ -62,6 +97,8 @@ export async function verifyStepUpCode(
   code: string,
   clerkSessionId?: string,
 ): Promise<boolean> {
+  await assertNotLockedOut(memberId);
+
   const now = new Date();
   const [latest] = await db
     .select()
@@ -77,19 +114,35 @@ export async function verifyStepUpCode(
     .orderBy(desc(otpCodesTable.createdAt))
     .limit(1);
 
-  if (!latest) return false;
-  if (latest.attempts >= MAX_ATTEMPTS) return false;
+  if (!latest) {
+    await registerFailure(memberId);
+    return false;
+  }
+  if (latest.attempts >= MAX_OTP_ATTEMPTS) {
+    await registerFailure(memberId);
+    return false;
+  }
 
   const expected = Buffer.from(latest.codeHash, "hex");
   const provided = Buffer.from(hashCode(code), "hex");
-  const ok = expected.length === provided.length && timingSafeEqual(expected, provided);
+  const ok =
+    expected.length === provided.length && timingSafeEqual(expected, provided);
 
   await db
     .update(otpCodesTable)
     .set({ attempts: latest.attempts + 1, ...(ok ? { usedAt: now } : {}) })
     .where(eq(otpCodesTable.id, latest.id));
 
-  if (!ok) return false;
+  if (!ok) {
+    await registerFailure(memberId);
+    return false;
+  }
+
+  // Success — reset failure counter and any stale lockout.
+  await db
+    .update(membersTable)
+    .set({ failedStepUpAttempts: 0, stepUpLockedUntil: null })
+    .where(eq(membersTable.id, memberId));
 
   const grantExpiresAt = new Date(Date.now() + GRANT_TTL_MIN * 60_000);
   await db.insert(stepUpGrantsTable).values({
@@ -98,6 +151,18 @@ export async function verifyStepUpCode(
     expiresAt: grantExpiresAt,
   });
   return true;
+}
+
+async function registerFailure(memberId: number): Promise<void> {
+  // Atomic increment-or-trip in a single statement so concurrent failed
+  // verifies can't race-undercount the threshold.
+  await db
+    .update(membersTable)
+    .set({
+      failedStepUpAttempts: sql`CASE WHEN ${membersTable.failedStepUpAttempts} + 1 >= ${LOCKOUT_THRESHOLD} THEN 0 ELSE ${membersTable.failedStepUpAttempts} + 1 END`,
+      stepUpLockedUntil: sql`CASE WHEN ${membersTable.failedStepUpAttempts} + 1 >= ${LOCKOUT_THRESHOLD} THEN now() + (${LOCKOUT_MIN} || ' minutes')::interval ELSE ${membersTable.stepUpLockedUntil} END`,
+    })
+    .where(eq(membersTable.id, memberId));
 }
 
 export async function hasActiveStepUpGrant(

@@ -60,35 +60,49 @@ async function resolveAudience(audience: BroadcastAudience): Promise<
     .where(inArray(membersTable.id, audience.memberIds));
 }
 
-async function formatSummary(row: typeof broadcastsTable.$inferSelect) {
-  const [sender] = await db
-    .select({ fullName: membersTable.fullName })
-    .from(membersTable)
-    .where(eq(membersTable.id, row.senderMemberId))
-    .limit(1);
+function shapeSummary(row: {
+  broadcast: typeof broadcastsTable.$inferSelect;
+  senderName: string | null;
+  readCount: number | null;
+}) {
+  const b = row.broadcast;
+  return {
+    id: b.id,
+    title: b.title,
+    message: b.message,
+    category: b.category,
+    audience: b.audience as BroadcastAudience,
+    recipientCount: b.recipientCount,
+    readCount: row.readCount ?? 0,
+    sendEmail: b.sendEmail,
+    senderName: row.senderName ?? null,
+    createdAt: b.createdAt,
+  };
+}
 
-  const [readRow] = await db
-    .select({ readCount: sql<number>`count(*) filter (where ${notificationsTable.isRead})::int` })
-    .from(notificationsTable)
-    .where(
+async function loadSummary(broadcastId: number) {
+  const [row] = await db
+    .select({
+      broadcast: broadcastsTable,
+      senderName: membersTable.fullName,
+      readCount: sql<number>`coalesce(count(${notificationsTable.id}) filter (where ${notificationsTable.isRead}), 0)::int`,
+    })
+    .from(broadcastsTable)
+    .leftJoin(membersTable, eq(membersTable.id, broadcastsTable.senderMemberId))
+    .leftJoin(
+      notificationsTable,
       and(
         eq(notificationsTable.type, "announcement"),
-        eq(notificationsTable.link, `/my-notifications?broadcast=${row.id}`),
+        eq(
+          notificationsTable.link,
+          sql`'/my-notifications?broadcast=' || ${broadcastsTable.id}::text`,
+        ),
       ),
-    );
-
-  return {
-    id: row.id,
-    title: row.title,
-    message: row.message,
-    category: row.category,
-    audience: row.audience as BroadcastAudience,
-    recipientCount: row.recipientCount,
-    readCount: readRow?.readCount ?? 0,
-    sendEmail: row.sendEmail,
-    senderName: sender?.fullName ?? null,
-    createdAt: row.createdAt,
-  };
+    )
+    .where(eq(broadcastsTable.id, broadcastId))
+    .groupBy(broadcastsTable.id, membersTable.fullName)
+    .limit(1);
+  return row ? shapeSummary(row) : null;
 }
 
 router.get(
@@ -96,13 +110,29 @@ router.get(
   requireAuth,
   requireAdminOnly,
   async (_req: AuthRequest, res): Promise<void> => {
+    // Single round-trip: broadcasts + sender name + read counts.
     const rows = await db
-      .select()
+      .select({
+        broadcast: broadcastsTable,
+        senderName: membersTable.fullName,
+        readCount: sql<number>`coalesce(count(${notificationsTable.id}) filter (where ${notificationsTable.isRead}), 0)::int`,
+      })
       .from(broadcastsTable)
+      .leftJoin(membersTable, eq(membersTable.id, broadcastsTable.senderMemberId))
+      .leftJoin(
+        notificationsTable,
+        and(
+          eq(notificationsTable.type, "announcement"),
+          eq(
+            notificationsTable.link,
+            sql`'/my-notifications?broadcast=' || ${broadcastsTable.id}::text`,
+          ),
+        ),
+      )
+      .groupBy(broadcastsTable.id, membersTable.fullName)
       .orderBy(desc(broadcastsTable.createdAt))
       .limit(100);
-    const summaries = await Promise.all(rows.map((r) => formatSummary(r)));
-    res.json(summaries);
+    res.json(rows.map(shapeSummary));
   },
 );
 
@@ -176,7 +206,7 @@ router.post(
       }),
     });
 
-    const summary = await formatSummary(broadcast);
+    const summary = await loadSummary(broadcast.id);
     res.status(201).json(summary);
   },
 );
@@ -203,7 +233,11 @@ router.get(
       return;
     }
 
-    const summary = await formatSummary(row);
+    const summary = await loadSummary(row.id);
+    if (!summary) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     const link = `/my-notifications?broadcast=${row.id}`;
 
     const recipients = await db
