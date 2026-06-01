@@ -6,3 +6,9 @@ id = "7xz87mYnLvQYK_gmzUWsp"
 uri = "file://deliverables/AACSMS_Unified_Deduction_Template.xlsx"
 type = "table"
 title = "AACSMS Unified Monthly Deduction Template"
+
+[[outputs]]
+id = "Bme9G4f81dB4r2k_ENGCw"
+uri = "file://docs/app-overview.md"
+type = "text"
+title = "Akure Airport Co-operative — Application Overview"
