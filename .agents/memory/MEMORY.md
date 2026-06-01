@@ -1,1 +1,2 @@
 - [Auth role guards](auth-role-guards.md) — `requireAdmin` includes auditor+treasurer; use `requireAdminOnly` for balance/membership mutations.
+- [Testing step-up flows](testing-step-up-flows.md) — pass OTP gate in tests by DB-overriding `otp_codes.code_hash`; 10-min grant means 2nd action won't re-prompt (not a bug).
