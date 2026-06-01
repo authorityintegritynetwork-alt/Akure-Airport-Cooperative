@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useSearch } from "wouter";
 import {
   useListMembers,
-  useActivateMember,
   useDeactivateMember,
   useCreateMember,
   useUpdateMember,
@@ -66,6 +65,7 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet";
+import { ClaimOpeningBalanceDialog } from "@/components/claim-opening-balance-dialog";
 
 const createMemberSchema = z.object({
   fullName: z.string().min(2, "Full name required"),
@@ -111,6 +111,7 @@ export function MembersPage() {
   const [editingMember, setEditingMember] = useState<any | null>(null);
   const [deletingMember, setDeletingMember] = useState<any | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [approvingMember, setApprovingMember] = useState<{ id: number; fullName: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -130,7 +131,6 @@ export function MembersPage() {
     query: { queryKey: getListMembersQueryKey(params) },
   });
 
-  const activateMember = useActivateMember();
   const deactivateMember = useDeactivateMember();
   const createMember = useCreateMember();
   const updateMember = useUpdateMember();
@@ -206,18 +206,6 @@ export function MembersPage() {
     resolver: zodResolver(createMemberSchema),
     defaultValues: { fullName: "", email: "", phone: "", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
   });
-
-  function handleActivate(id: number) {
-    activateMember.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          toast({ title: "Member activated" });
-          queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === '/api/members' });
-        },
-      },
-    );
-  }
 
   function handleDeactivate(id: number) {
     deactivateMember.mutate(
@@ -704,10 +692,10 @@ export function MembersPage() {
                       variant="ghost"
                       size="sm"
                       className="flex-1 rounded-lg gap-1.5 text-xs h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                      onClick={() => handleActivate(member.id)}
+                      onClick={() => setApprovingMember({ id: member.id, fullName: member.fullName })}
                       data-testid={`button-activate-${member.id}`}
                     >
-                      <UserCheck className="w-3.5 h-3.5" /> Activate
+                      <UserCheck className="w-3.5 h-3.5" /> Approve
                     </Button>
                   )}
                   {member.status === "active" && (
@@ -880,6 +868,14 @@ export function MembersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ClaimOpeningBalanceDialog
+        member={approvingMember}
+        open={approvingMember != null}
+        onOpenChange={(v) => {
+          if (!v) setApprovingMember(null);
+        }}
+      />
     </div>
   );
 }

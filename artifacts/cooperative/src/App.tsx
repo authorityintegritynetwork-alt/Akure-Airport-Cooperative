@@ -20,6 +20,7 @@ import { MyPurchasesPage } from "./pages/my-purchases";
 import { NotificationsPage } from "./pages/notifications";
 import { MembersPage } from "./pages/members";
 import { MemberDetailPage } from "./pages/member-detail";
+import { OpeningBalancesPage } from "./pages/opening-balances";
 import { LoansAdminPage } from "./pages/loans-admin";
 import { UploadPage, UploadHistoryPage } from "./pages/upload";
 import { StoreAdminPage } from "./pages/store-admin";
@@ -255,6 +256,9 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/members">
             <ProtectedRoute component={MembersPage} />
+          </Route>
+          <Route path="/opening-balances">
+            <ProtectedRoute component={OpeningBalancesPage} />
           </Route>
           <Route path="/loans">
             <ProtectedRoute component={LoansAdminPage} />

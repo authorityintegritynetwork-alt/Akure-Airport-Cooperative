@@ -433,6 +433,101 @@ paths:
               schema:
                 $ref: "#/components/schemas/MemberSummary"
 
+  # ── OPENING BALANCES ─────────────────────────────────────────────────────────
+  /opening-balances:
+    get:
+      operationId: listOpeningBalances
+      tags: [opening-balances]
+      summary: List opening-balance holding rows (Admin+)
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [unclaimed, claimed, needs_reconcile]
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpeningBalance"
+
+  /members/{id}/opening-balance-suggestion:
+    get:
+      operationId: getOpeningBalanceSuggestion
+      tags: [opening-balances]
+      summary: Suggest unclaimed opening-balance rows matching a member by name (Admin+)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpeningBalanceSuggestion"
+
+  /members/{id}/claim-opening-balance:
+    post:
+      operationId: claimOpeningBalance
+      tags: [opening-balances]
+      summary: Apply an opening-balance row to a member and activate them (Admin+, step-up)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpeningBalanceClaimInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "403": { description: Step-up reverification required }
+        "404": { description: Member or opening balance not found }
+        "409": { description: Opening balance already claimed }
+
+  /opening-balances/{id}/reconcile:
+    post:
+      operationId: reconcileOpeningBalance
+      tags: [opening-balances]
+      summary: Resolve a flagged opening-balance row by discarding it (Admin+, step-up)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpeningBalance"
+        "404": { description: Opening balance not found }
+
   # ── SAVINGS ──────────────────────────────────────────────────────────────────
   /savings/my:
     get:
@@ -1551,6 +1646,119 @@ components:
         - totalStoreDebt
         - createdAt
         - updatedAt
+
+    OpeningBalance:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        organization:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [unclaimed, claimed, needs_reconcile]
+        linkedMemberId:
+          type: ["integer", "null"]
+        reconcileNote:
+          type: ["string", "null"]
+        savingsBalance:
+          type: number
+        providentBalance:
+          type: number
+        christmasBalance:
+          type: number
+        realLoanBalance:
+          type: number
+        emergencyLoanBalance:
+          type: number
+        totalLoanBalance:
+          type: number
+        electronicsDebt:
+          type: number
+        sElectronicsDebt:
+          type: number
+        furnitureDebt:
+          type: number
+        commodityDebt:
+          type: number
+        ghlFormDebt:
+          type: number
+        fireFundBalance:
+          type: number
+        fuelVentureBalance:
+          type: number
+        landLoanBalance:
+          type: number
+        totalStoreDebt:
+          type: number
+        claimedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - fullName
+        - status
+        - savingsBalance
+        - providentBalance
+        - christmasBalance
+        - realLoanBalance
+        - emergencyLoanBalance
+        - totalLoanBalance
+        - electronicsDebt
+        - sElectronicsDebt
+        - furnitureDebt
+        - commodityDebt
+        - ghlFormDebt
+        - fireFundBalance
+        - fuelVentureBalance
+        - landLoanBalance
+        - totalStoreDebt
+        - createdAt
+        - updatedAt
+
+    OpeningBalanceMatch:
+      type: object
+      properties:
+        openingBalance:
+          $ref: "#/components/schemas/OpeningBalance"
+        confidence:
+          type: string
+          enum: [exact, fuzzy, manual, none]
+      required:
+        - openingBalance
+        - confidence
+
+    OpeningBalanceSuggestion:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningBalanceMatch"
+      required:
+        - memberId
+        - memberName
+        - suggestions
+
+    OpeningBalanceClaimInput:
+      type: object
+      properties:
+        openingBalanceId:
+          type: integer
+      required:
+        - openingBalanceId
 
     MemberProfile:
       type: object

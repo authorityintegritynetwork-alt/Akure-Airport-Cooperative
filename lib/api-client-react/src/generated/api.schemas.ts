@@ -59,6 +59,71 @@ export interface Member {
   updatedAt: string;
 }
 
+export type OpeningBalanceStatus =
+  (typeof OpeningBalanceStatus)[keyof typeof OpeningBalanceStatus];
+
+export const OpeningBalanceStatus = {
+  unclaimed: "unclaimed",
+  claimed: "claimed",
+  needs_reconcile: "needs_reconcile",
+} as const;
+
+export interface OpeningBalance {
+  id: number;
+  fullName: string;
+  /** @nullable */
+  organization?: string | null;
+  status: OpeningBalanceStatus;
+  /** @nullable */
+  linkedMemberId?: number | null;
+  /** @nullable */
+  reconcileNote?: string | null;
+  savingsBalance: number;
+  providentBalance: number;
+  christmasBalance: number;
+  realLoanBalance: number;
+  emergencyLoanBalance: number;
+  totalLoanBalance: number;
+  electronicsDebt: number;
+  sElectronicsDebt: number;
+  furnitureDebt: number;
+  commodityDebt: number;
+  ghlFormDebt: number;
+  fireFundBalance: number;
+  fuelVentureBalance: number;
+  landLoanBalance: number;
+  totalStoreDebt: number;
+  /** @nullable */
+  claimedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type OpeningBalanceMatchConfidence =
+  (typeof OpeningBalanceMatchConfidence)[keyof typeof OpeningBalanceMatchConfidence];
+
+export const OpeningBalanceMatchConfidence = {
+  exact: "exact",
+  fuzzy: "fuzzy",
+  manual: "manual",
+  none: "none",
+} as const;
+
+export interface OpeningBalanceMatch {
+  openingBalance: OpeningBalance;
+  confidence: OpeningBalanceMatchConfidence;
+}
+
+export interface OpeningBalanceSuggestion {
+  memberId: number;
+  memberName: string;
+  suggestions: OpeningBalanceMatch[];
+}
+
+export interface OpeningBalanceClaimInput {
+  openingBalanceId: number;
+}
+
 export type MemberProfileRole =
   (typeof MemberProfileRole)[keyof typeof MemberProfileRole];
 
@@ -943,6 +1008,20 @@ export type ListOrganizationsParams = {
 export type BulkAssignOrganization200 = {
   updated: number;
 };
+
+export type ListOpeningBalancesParams = {
+  status?: ListOpeningBalancesStatus;
+  search?: string;
+};
+
+export type ListOpeningBalancesStatus =
+  (typeof ListOpeningBalancesStatus)[keyof typeof ListOpeningBalancesStatus];
+
+export const ListOpeningBalancesStatus = {
+  unclaimed: "unclaimed",
+  claimed: "claimed",
+  needs_reconcile: "needs_reconcile",
+} as const;
 
 export type ListTransactionsParams = {
   memberId?: number;

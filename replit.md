@@ -104,6 +104,25 @@ Treasurer/Admin uploads monthly deduction Excel file.
 System matches by full name → credits member savings accounts.
 Store repayments tracked only via Excel upload.
 
+## Opening Balances (preloaded member balances)
+
+Existing balances are preloaded into a holding table (`opening_balances`) so a member who registers later inherits their real balance instead of starting at zero. The table mirrors the members' balance columns (all `numeric(15,2)`, `CHECK >= 0`) plus `status` (`unclaimed` / `claimed` / `needs_reconcile`), `linkedMemberId` (FK → members, `ON DELETE SET NULL`), `reconcileNote`, and `claimedAt`. Schema: `lib/db/src/schema/openingBalances.ts`.
+
+**Claim at the approval gate (name match, admin-confirmed):**
+- When an admin approves a pending member, the UI fetches `GET /members/:id/opening-balance-suggestion` — name-matched candidates (`NameMatcher` + surname-token-overlap fallback) shown as **"pending verification"** for the admin to confirm.
+- `POST /members/:id/claim-opening-balance` (**admin-only + step-up**) **SETs** the member's balances from the chosen row (these are starting balances, not deltas), activates the member, writes one `opening_balance` transaction per non-zero bucket, and marks the opening row `claimed` + `linkedMemberId`. Guards (in a row-locked tx): member must be `pending`; opening row must still be `unclaimed` and unlinked — otherwise `409` (prevents overwriting an active member or re-claiming).
+- No match → admin activates the member as **brand-new (zero)** via the normal activate path. Unmatched members stay `pending` until an admin links a record or marks them brand-new.
+
+**Monthly deduction upload also keeps unclaimed rows current** (`uploads.ts`):
+- After applying deductions to registered members, a second pass matches the same rows by name against still-`unclaimed` opening rows and applies the deltas (current-balance-only; no carried history).
+- If a monthly row matches **both** a registered member **and** an unclaimed opening row, the member is credited and the opening row is flagged `needs_reconcile` (never double-applied). Response surfaces `openingBalancesUpdated` / `openingBalancesFlagged`.
+
+**Admin view** (`/opening-balances`, admin nav): lists rows with status/search filters; flagged (`needs_reconcile`) rows expose a **Resolve** action → `POST /opening-balances/:id/reconcile` (**admin-only + step-up**) which discards the duplicate (only `needs_reconcile` rows; idempotent, `409` otherwise).
+
+- `GET /opening-balances` and the suggestion endpoint are admin-tier (`requireAdmin`) read-only; claim/reconcile are `requireAdminOnly` (admin + super_admin) since they mutate balances/membership.
+- `transactions.type` enum includes `opening_balance`.
+- Phase 1 (the one-time opening-balance spreadsheet **import** parser, format TBD) is deferred — rows are currently seeded/managed directly.
+
 ## Organizations (Employers)
 
 Employers (e.g. FAAN, NAMA, NIMET, NCAA) are configured at runtime by admins via `/organizations`.

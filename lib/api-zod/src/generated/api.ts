@@ -464,6 +464,167 @@ export const GetMemberSummaryResponse = zod.object({
 });
 
 /**
+ * @summary List opening-balance holding rows (Admin+)
+ */
+export const ListOpeningBalancesQueryParams = zod.object({
+  status: zod.enum(["unclaimed", "claimed", "needs_reconcile"]).optional(),
+  search: zod.coerce.string().optional(),
+});
+
+export const ListOpeningBalancesResponseItem = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  organization: zod.string().nullish(),
+  status: zod.enum(["unclaimed", "claimed", "needs_reconcile"]),
+  linkedMemberId: zod.number().nullish(),
+  reconcileNote: zod.string().nullish(),
+  savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
+  totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
+  fireFundBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
+  totalStoreDebt: zod.number(),
+  claimedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListOpeningBalancesResponse = zod.array(
+  ListOpeningBalancesResponseItem,
+);
+
+/**
+ * @summary Suggest unclaimed opening-balance rows matching a member by name (Admin+)
+ */
+export const GetOpeningBalanceSuggestionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOpeningBalanceSuggestionResponse = zod.object({
+  memberId: zod.number(),
+  memberName: zod.string(),
+  suggestions: zod.array(
+    zod.object({
+      openingBalance: zod.object({
+        id: zod.number(),
+        fullName: zod.string(),
+        organization: zod.string().nullish(),
+        status: zod.enum(["unclaimed", "claimed", "needs_reconcile"]),
+        linkedMemberId: zod.number().nullish(),
+        reconcileNote: zod.string().nullish(),
+        savingsBalance: zod.number(),
+        providentBalance: zod.number(),
+        christmasBalance: zod.number(),
+        realLoanBalance: zod.number(),
+        emergencyLoanBalance: zod.number(),
+        totalLoanBalance: zod.number(),
+        electronicsDebt: zod.number(),
+        sElectronicsDebt: zod.number(),
+        furnitureDebt: zod.number(),
+        commodityDebt: zod.number(),
+        ghlFormDebt: zod.number(),
+        fireFundBalance: zod.number(),
+        fuelVentureBalance: zod.number(),
+        landLoanBalance: zod.number(),
+        totalStoreDebt: zod.number(),
+        claimedAt: zod.coerce.date().nullish(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      }),
+      confidence: zod.enum(["exact", "fuzzy", "manual", "none"]),
+    }),
+  ),
+});
+
+/**
+ * @summary Apply an opening-balance row to a member and activate them (Admin+, step-up)
+ */
+export const ClaimOpeningBalanceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ClaimOpeningBalanceBody = zod.object({
+  openingBalanceId: zod.number(),
+});
+
+export const ClaimOpeningBalanceResponse = zod.object({
+  id: zod.number(),
+  clerkUserId: zod.string().nullish(),
+  fullName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  staffId: zod.string().nullish(),
+  role: zod.enum([
+    "member",
+    "admin",
+    "financial_auditor",
+    "treasurer",
+    "super_admin",
+  ]),
+  status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.string(),
+  savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
+  totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
+  fireFundBalance: zod.number(),
+  totalStoreDebt: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Resolve a flagged opening-balance row by discarding it (Admin+, step-up)
+ */
+export const ReconcileOpeningBalanceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ReconcileOpeningBalanceResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  organization: zod.string().nullish(),
+  status: zod.enum(["unclaimed", "claimed", "needs_reconcile"]),
+  linkedMemberId: zod.number().nullish(),
+  reconcileNote: zod.string().nullish(),
+  savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
+  totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
+  fireFundBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
+  totalStoreDebt: zod.number(),
+  claimedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Get current member savings balance
  */
 export const GetMySavingsResponse = zod.object({

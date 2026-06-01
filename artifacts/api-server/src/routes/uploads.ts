@@ -6,6 +6,7 @@ import {
   uploadRecordsTable,
   loansTable,
   organizationsTable,
+  openingBalancesTable,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
@@ -405,6 +406,9 @@ router.post(
         let skipped = 0;
         const errors: string[] = [];
         const notifications: Array<{ memberId: number; total: number }> = [];
+        // Track which sheet rows matched a registered member so the opening
+        // balance pass below can detect (and flag) double matches.
+        const memberMatchedRows = new Set<number>();
 
         for (const row of sheet.rows) {
           const baseMatch = matcher.match(row.rawName);
@@ -419,6 +423,7 @@ router.post(
           }
 
           const memberId = finalMatch.memberId;
+          memberMatchedRows.add(row.rowNumber);
 
           // Lock the member row for the duration of this row's processing.
           const lockedRows = await tx.execute<{ id: number; organization: string }>(
@@ -523,6 +528,73 @@ router.post(
           }
         }
 
+        // ── Opening-balance pass ────────────────────────────────────────────
+        // Deductions must also flow into still-unclaimed opening balances so a
+        // member who registers later inherits the post-deduction figure. Match
+        // by name against unclaimed rows only. If a sheet row already matched a
+        // registered member, flag the duplicate opening row for admin review
+        // instead of double-applying.
+        let openingProcessed = 0;
+        let openingFlagged = 0;
+        const unclaimedOpenings = await tx
+          .select({ id: openingBalancesTable.id, fullName: openingBalancesTable.fullName })
+          .from(openingBalancesTable)
+          .where(eq(openingBalancesTable.status, "unclaimed"))
+          .for("update");
+
+        if (unclaimedOpenings.length > 0) {
+          const obMatcher = new NameMatcher(unclaimedOpenings);
+          for (const row of sheet.rows) {
+            const obMatch = obMatcher.match(row.rawName);
+            if (obMatch.memberId == null) continue;
+            const openingId = obMatch.memberId;
+
+            if (memberMatchedRows.has(row.rowNumber)) {
+              await tx
+                .update(openingBalancesTable)
+                .set({
+                  status: "needs_reconcile",
+                  reconcileNote: `Monthly deduction for ${parsed.data.month} ${parsed.data.year} also matched a registered member ("${row.rawName}"). Applied to the member; this row was left untouched for review.`,
+                })
+                .where(eq(openingBalancesTable.id, openingId));
+              openingFlagged++;
+              continue;
+            }
+
+            const obDeltas: Record<string, number> = {};
+            let obTouched = false;
+            for (const cat of ALL_CATEGORIES) {
+              const amt = row.amounts[cat];
+              if (!amt || amt <= 0) continue;
+              const cfg = CATEGORY_CONFIG[cat];
+              const signed = cfg.direction === "credit" ? amt : -amt;
+              obDeltas[cfg.balanceField as string] =
+                (obDeltas[cfg.balanceField as string] || 0) + signed;
+              obTouched = true;
+            }
+
+            if (!obTouched) continue;
+
+            const obSet: Record<string, any> = {};
+            for (const [field, delta] of Object.entries(obDeltas)) {
+              const col = (openingBalancesTable as any)[field];
+              if (delta >= 0) {
+                obSet[field] = sql`${col} + ${delta.toString()}::numeric`;
+              } else {
+                obSet[field] = sql`GREATEST(0, ${col} - ${Math.abs(delta).toString()}::numeric)`;
+              }
+            }
+            obSet.totalLoanBalance = sql`${openingBalancesTable.realLoanBalance} + ${openingBalancesTable.emergencyLoanBalance}`;
+            obSet.totalStoreDebt = sql`${openingBalancesTable.electronicsDebt} + ${openingBalancesTable.sElectronicsDebt} + ${openingBalancesTable.commodityDebt} + ${openingBalancesTable.ghlFormDebt}`;
+
+            await tx
+              .update(openingBalancesTable)
+              .set(obSet)
+              .where(eq(openingBalancesTable.id, openingId));
+            openingProcessed++;
+          }
+        }
+
         await tx
           .update(uploadRecordsTable)
           .set({
@@ -532,7 +604,15 @@ router.post(
           })
           .where(eq(uploadRecordsTable.id, uploadRecord.id));
 
-        return { uploadRecord, processed, skipped, errors, notifications };
+        return {
+          uploadRecord,
+          processed,
+          skipped,
+          errors,
+          notifications,
+          openingProcessed,
+          openingFlagged,
+        };
       });
 
       if ("__duplicate" in result && result.__duplicate) {
@@ -543,7 +623,8 @@ router.post(
         return;
       }
 
-      const { uploadRecord, processed, skipped, errors, notifications } = result;
+      const { uploadRecord, processed, skipped, errors, notifications, openingProcessed, openingFlagged } =
+        result;
 
       // Notifications are sent post-commit so that a rollback never leaves
       // members notified about transactions that did not actually persist.
@@ -561,7 +642,7 @@ router.post(
         action: "PROCESS_EXCEL_UPLOAD",
         entity: "upload_record",
         entityId: uploadRecord.id,
-        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year}: ${processed} processed, ${skipped} skipped`,
+        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year}: ${processed} processed, ${skipped} skipped, ${openingProcessed} opening balance(s) updated, ${openingFlagged} flagged for review`,
       });
 
       res.json({
@@ -569,6 +650,8 @@ router.post(
         processed,
         skipped,
         errors,
+        openingBalancesUpdated: openingProcessed,
+        openingBalancesFlagged: openingFlagged,
       });
     } catch (err: any) {
       console.error("Process error", err);

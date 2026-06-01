@@ -1,0 +1,1 @@
+- [Auth role guards](auth-role-guards.md) — `requireAdmin` includes auditor+treasurer; use `requireAdminOnly` for balance/membership mutations.

@@ -8,6 +8,7 @@ export * from "./notifications";
 export * from "./audit";
 export * from "./settings";
 export * from "./uploads";
+export * from "./openingBalances";
 export * from "./stepUp";
 export * from "./broadcasts";
 export * from "./support";

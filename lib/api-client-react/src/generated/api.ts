@@ -49,6 +49,7 @@ import type {
   ListMembersParams,
   ListMyTransactionsParams,
   ListNotificationsParams,
+  ListOpeningBalancesParams,
   ListOrganizationsParams,
   ListStoreItemsParams,
   ListStorePurchasesParams,
@@ -65,6 +66,9 @@ import type {
   MemberProfile,
   MemberSummary,
   Notification,
+  OpeningBalance,
+  OpeningBalanceClaimInput,
+  OpeningBalanceSuggestion,
   Organization,
   RegisterMemberBody,
   RequestStepUpCode200,
@@ -1794,6 +1798,370 @@ export function useGetMemberSummary<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List opening-balance holding rows (Admin+)
+ */
+export const getListOpeningBalancesUrl = (
+  params?: ListOpeningBalancesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/opening-balances?${stringifiedParams}`
+    : `/api/opening-balances`;
+};
+
+export const listOpeningBalances = async (
+  params?: ListOpeningBalancesParams,
+  options?: RequestInit,
+): Promise<OpeningBalance[]> => {
+  return customFetch<OpeningBalance[]>(getListOpeningBalancesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListOpeningBalancesQueryKey = (
+  params?: ListOpeningBalancesParams,
+) => {
+  return [`/api/opening-balances`, ...(params ? [params] : [])] as const;
+};
+
+export const getListOpeningBalancesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOpeningBalances>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOpeningBalancesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOpeningBalances>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListOpeningBalancesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOpeningBalances>>
+  > = ({ signal }) =>
+    listOpeningBalances(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOpeningBalances>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOpeningBalancesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOpeningBalances>>
+>;
+export type ListOpeningBalancesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List opening-balance holding rows (Admin+)
+ */
+
+export function useListOpeningBalances<
+  TData = Awaited<ReturnType<typeof listOpeningBalances>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOpeningBalancesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOpeningBalances>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOpeningBalancesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Suggest unclaimed opening-balance rows matching a member by name (Admin+)
+ */
+export const getGetOpeningBalanceSuggestionUrl = (id: number) => {
+  return `/api/members/${id}/opening-balance-suggestion`;
+};
+
+export const getOpeningBalanceSuggestion = async (
+  id: number,
+  options?: RequestInit,
+): Promise<OpeningBalanceSuggestion> => {
+  return customFetch<OpeningBalanceSuggestion>(
+    getGetOpeningBalanceSuggestionUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetOpeningBalanceSuggestionQueryKey = (id: number) => {
+  return [`/api/members/${id}/opening-balance-suggestion`] as const;
+};
+
+export const getGetOpeningBalanceSuggestionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetOpeningBalanceSuggestionQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>
+  > = ({ signal }) =>
+    getOpeningBalanceSuggestion(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOpeningBalanceSuggestionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>
+>;
+export type GetOpeningBalanceSuggestionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Suggest unclaimed opening-balance rows matching a member by name (Admin+)
+ */
+
+export function useGetOpeningBalanceSuggestion<
+  TData = Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOpeningBalanceSuggestion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOpeningBalanceSuggestionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Apply an opening-balance row to a member and activate them (Admin+, step-up)
+ */
+export const getClaimOpeningBalanceUrl = (id: number) => {
+  return `/api/members/${id}/claim-opening-balance`;
+};
+
+export const claimOpeningBalance = async (
+  id: number,
+  openingBalanceClaimInput: OpeningBalanceClaimInput,
+  options?: RequestInit,
+): Promise<Member> => {
+  return customFetch<Member>(getClaimOpeningBalanceUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(openingBalanceClaimInput),
+  });
+};
+
+export const getClaimOpeningBalanceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof claimOpeningBalance>>,
+    TError,
+    { id: number; data: BodyType<OpeningBalanceClaimInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof claimOpeningBalance>>,
+  TError,
+  { id: number; data: BodyType<OpeningBalanceClaimInput> },
+  TContext
+> => {
+  const mutationKey = ["claimOpeningBalance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof claimOpeningBalance>>,
+    { id: number; data: BodyType<OpeningBalanceClaimInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return claimOpeningBalance(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClaimOpeningBalanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof claimOpeningBalance>>
+>;
+export type ClaimOpeningBalanceMutationBody =
+  BodyType<OpeningBalanceClaimInput>;
+export type ClaimOpeningBalanceMutationError = ErrorType<void>;
+
+/**
+ * @summary Apply an opening-balance row to a member and activate them (Admin+, step-up)
+ */
+export const useClaimOpeningBalance = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof claimOpeningBalance>>,
+    TError,
+    { id: number; data: BodyType<OpeningBalanceClaimInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof claimOpeningBalance>>,
+  TError,
+  { id: number; data: BodyType<OpeningBalanceClaimInput> },
+  TContext
+> => {
+  return useMutation(getClaimOpeningBalanceMutationOptions(options));
+};
+
+/**
+ * @summary Resolve a flagged opening-balance row by discarding it (Admin+, step-up)
+ */
+export const getReconcileOpeningBalanceUrl = (id: number) => {
+  return `/api/opening-balances/${id}/reconcile`;
+};
+
+export const reconcileOpeningBalance = async (
+  id: number,
+  options?: RequestInit,
+): Promise<OpeningBalance> => {
+  return customFetch<OpeningBalance>(getReconcileOpeningBalanceUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getReconcileOpeningBalanceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reconcileOpeningBalance>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reconcileOpeningBalance>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["reconcileOpeningBalance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reconcileOpeningBalance>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return reconcileOpeningBalance(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReconcileOpeningBalanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reconcileOpeningBalance>>
+>;
+
+export type ReconcileOpeningBalanceMutationError = ErrorType<void>;
+
+/**
+ * @summary Resolve a flagged opening-balance row by discarding it (Admin+, step-up)
+ */
+export const useReconcileOpeningBalance = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reconcileOpeningBalance>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reconcileOpeningBalance>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getReconcileOpeningBalanceMutationOptions(options));
+};
 
 /**
  * @summary Get current member savings balance

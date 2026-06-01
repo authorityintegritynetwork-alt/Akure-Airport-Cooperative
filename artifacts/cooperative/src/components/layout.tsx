@@ -102,6 +102,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {navItem("/members", <Users className="w-4 h-4" />, "Members")}
+                    {navItem("/opening-balances", <Wallet className="w-4 h-4" />, "Opening Balances")}
                     {navItem("/loans", <CreditCard className="w-4 h-4" />, "All Loans")}
                     {navItem("/upload", <FileSpreadsheet className="w-4 h-4" />, "Upload Deductions")}
                     {navItem("/store-admin", <ShoppingCart className="w-4 h-4" />, "Store Admin")}
