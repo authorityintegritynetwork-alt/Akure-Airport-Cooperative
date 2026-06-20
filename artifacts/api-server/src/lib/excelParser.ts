@@ -380,18 +380,46 @@ const MONTH_NAMES: Record<string, string> = {
   dec: "December", december: "December",
 };
 
+// Month-name regex fragment (full names and 3-letter abbreviations)
+const MONTH_RE_FRAGMENT =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+
+// Primary: parse sheet name in the convention MONTHYEAR (e.g. "NOVEMBER2025").
+// Accepts any separator (none, space, dash, underscore) between month and year.
+const NAME_RE = new RegExp(
+  `^.*?(${MONTH_RE_FRAGMENT})[\\s\\-_]*(\\d{4}).*$`,
+  "i",
+);
+
+/**
+ * Try to detect month+year from the sheet name first (convention: MONTHYEAR,
+ * e.g. "NOVEMBER2025"). Returns null if the name doesn't match.
+ */
+export function detectMonthYearFromName(
+  sheetName: string,
+): { month: string; year: number } | null {
+  const m = sheetName.match(NAME_RE);
+  if (!m) return null;
+  const fullMonth = MONTH_NAMES[m[1].toLowerCase()];
+  if (!fullMonth) return null;
+  const year = parseInt(m[2], 10);
+  if (year < 2000 || year > 2100) return null;
+  return { month: fullMonth, year };
+}
+
 /**
  * Scan the first 15 rows of a sheet's raw cell values for a month+year
  * combination (e.g. "November 2025", "NOV-25", "Nov 2025").
- * Returns { month: "November", year: 2025 } or null if not found.
+ * Used as a fallback when the sheet name doesn't follow the convention.
  */
 export function detectMonthYear(
   rows: unknown[][],
 ): { month: string; year: number } | null {
   const scanRows = Math.min(rows.length, 15);
-
-  // Pattern: optional sep, month-word, optional sep, 2- or 4-digit year
-  const RE = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[^a-z0-9]*(\d{2,4})\b/i;
+  const RE = new RegExp(
+    `\\b(${MONTH_RE_FRAGMENT})[^a-z0-9]*(\\d{2,4})\\b`,
+    "i",
+  );
 
   for (let r = 0; r < scanRows; r++) {
     const row = rows[r];
@@ -430,7 +458,8 @@ export function summarizeSheets(
     const dataRowCount = header
       ? Math.max(0, rows.length - header.headerRowIndex - 1)
       : 0;
-    const detected = detectMonthYear(rows);
+    // Prefer sheet-name detection (NOVEMBER2025 convention); fall back to cell scan
+    const detected = detectMonthYearFromName(name) ?? detectMonthYear(rows);
     return {
       name,
       rowCount: dataRowCount,
