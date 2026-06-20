@@ -336,10 +336,12 @@ router.post(
           const baseMatch = matcher.match(row.rawName);
           const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
 
+          let rowWasAutoCreated = false;
           if (finalMatch.memberId == null) {
             // Auto-create a pending member so deductions are never silently lost.
             // If an unclaimed opening balance row matches by name, copy its
             // balance columns onto the new member and mark that OB as claimed.
+            rowWasAutoCreated = true;
             const newMemberId = await (async () => {
               const obMatch = obMatcher.match(row.rawName);
               const obRow =
@@ -528,10 +530,14 @@ router.post(
               .set(setClauses)
               .where(eq(membersTable.id, memberId));
 
-            notifications.push({ memberId, total: row.computedTotal });
-            processed++;
+            // Only notify and count as "processed" for existing matched members.
+            // Auto-created rows are tracked separately via autoCreated counter.
+            if (!rowWasAutoCreated) {
+              notifications.push({ memberId, total: row.computedTotal });
+              processed++;
+            }
           } else {
-            skipped++;
+            if (!rowWasAutoCreated) skipped++;
           }
         }
 
@@ -543,11 +549,18 @@ router.post(
         // are not silently double-counted.
         let openingFlagged = 0;
 
-        if (unclaimedOpenings.length > 0) {
+        // Build a Set of still-unclaimed OB IDs for O(1) lookup.
+        // The auto-create loop above splices claimed entries from unclaimedOpenings,
+        // so this set correctly excludes OBs that were already claimed.
+        const stillUnclaimedIds = new Set(unclaimedOpenings.map((r) => r.id));
+
+        if (stillUnclaimedIds.size > 0) {
           for (const row of sheet.rows) {
             if (!memberMatchedRows.has(row.rowNumber)) continue;
             const obMatch = obMatcher.match(row.rawName);
             if (obMatch.memberId == null) continue;
+            // Skip if this OB was already claimed by the auto-create step above.
+            if (!stillUnclaimedIds.has(obMatch.memberId)) continue;
             await tx
               .update(openingBalancesTable)
               .set({
