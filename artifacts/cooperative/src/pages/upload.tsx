@@ -66,6 +66,7 @@ export function UploadPage() {
   const [previewData, setPreviewData] = useState<any>(null);
   const [manualMatches, setManualMatches] = useState<Record<number, number>>({});
   const [uploading, setUploading] = useState(false);
+  const [showAllSheets, setShowAllSheets] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -119,10 +120,13 @@ export function UploadPage() {
         data: { fileObjectPath: objectPath, organization },
       });
       setSheets(sheetResult.sheets);
-      const firstValid = sheetResult.sheets.find((s) => s.looksValid);
-      if (sheetResult.sheets.length === 1 && firstValid) {
-        setChosenSheet(firstValid.name);
-        await loadPreview(objectPath, firstValid.name, {});
+      // Always default to the LAST valid sheet — workbooks grow chronologically
+      // so the most recent month is always at the end.
+      const validSheets = sheetResult.sheets.filter((s) => s.looksValid);
+      const lastValid = validSheets[validSheets.length - 1];
+      if (lastValid) {
+        setChosenSheet(lastValid.name);
+        await loadPreview(objectPath, lastValid.name, {});
       } else {
         setStage("pickSheet");
       }
@@ -353,38 +357,72 @@ export function UploadPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Step 2 — Pick a sheet</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Workbook contains {sheets.length} sheet{sheets.length === 1 ? "" : "s"}.
-              Choose the one with this month's deductions.
+              Workbook has {sheets.length} sheet{sheets.length === 1 ? "" : "s"}.
+              {sheets.length > 15 && " Showing the most recent ones — "}
+              {sheets.length > 15 && (
+                <button
+                  type="button"
+                  className="underline text-primary"
+                  onClick={() => setShowAllSheets((v) => !v)}
+                >
+                  {showAllSheets ? "show recent only" : `show all ${sheets.length}`}
+                </button>
+              )}
             </p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {sheets.map((s) => (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => handlePickSheet(s.name)}
-                  disabled={preview.isPending}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border border-border/70 hover:bg-muted/40 hover:border-primary/40 text-left disabled:opacity-50 transition-colors"
-                  data-testid={`sheet-${s.name}`}
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{s.name}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {s.rowCount} data row{s.rowCount === 1 ? "" : "s"} detected
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {s.looksValid ? (
-                      <Badge variant="secondary" className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[10px]">Valid</Badge>
-                    ) : (
-                      <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">No data</Badge>
-                    )}
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const validSheets = sheets.filter((s) => s.looksValid);
+              const lastValidName = validSheets[validSheets.length - 1]?.name;
+              const displayed = showAllSheets
+                ? sheets
+                : sheets.length > 15
+                ? sheets.slice(-15)
+                : sheets;
+              return (
+                <div className="space-y-2">
+                  {displayed.map((s) => {
+                    const isRecommended = s.name === lastValidName;
+                    return (
+                      <button
+                        key={s.name}
+                        type="button"
+                        onClick={() => handlePickSheet(s.name)}
+                        disabled={preview.isPending}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left disabled:opacity-50 transition-colors ${
+                          isRecommended
+                            ? "border-primary/50 bg-primary/5 hover:bg-primary/10"
+                            : "border-border/70 hover:bg-muted/40 hover:border-primary/40"
+                        }`}
+                        data-testid={`sheet-${s.name}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm truncate">{s.name}</p>
+                            {isRecommended && (
+                              <Badge variant="default" className="rounded-full text-[10px] py-0 px-1.5 shrink-0">
+                                Most recent
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {s.rowCount} data row{s.rowCount === 1 ? "" : "s"} detected
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {s.looksValid ? (
+                            <Badge variant="secondary" className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[10px]">Valid</Badge>
+                          ) : (
+                            <Badge variant="outline" className="rounded-full text-[10px] text-muted-foreground">No data</Badge>
+                          )}
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
@@ -395,8 +433,17 @@ export function UploadPage() {
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <CardTitle className="text-base">Step 3 — Review & confirm</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1 truncate">
+                <p className="text-xs text-muted-foreground mt-1">
                   Sheet: <span className="font-medium">{previewData.sheetName}</span> · {previewData.totalRows} rows
+                  {sheets.length > 1 && (
+                    <button
+                      type="button"
+                      className="ml-2 underline text-primary"
+                      onClick={() => setStage("pickSheet")}
+                    >
+                      Wrong sheet?
+                    </button>
+                  )}
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5 justify-end">
