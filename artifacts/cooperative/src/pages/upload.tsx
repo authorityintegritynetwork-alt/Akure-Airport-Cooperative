@@ -57,6 +57,7 @@ export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
   const [year, setYear] = useState(new Date().getFullYear());
+  const [selectedOrgCode, setSelectedOrgCode] = useState<string>("");
   const [organization, setOrganization] = useState<string>("");
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
@@ -76,8 +77,11 @@ export function UploadPage() {
   const { data: members } = useListMembers({ status: "active" });
   const { data: orgList } = useListOrganizations();
   useEffect(() => {
-    if (!organization && orgList?.length) setOrganization(orgList[0].excelFormat);
-  }, [orgList]);
+    if (!selectedOrgCode && orgList?.length) {
+      setSelectedOrgCode(orgList[0].code);
+      setOrganization(orgList[0].excelFormat);
+    }
+  }, [orgList, selectedOrgCode]);
 
   const memberOptions = useMemo(
     () =>
@@ -231,7 +235,7 @@ export function UploadPage() {
               Monthly Deductions
             </p>
             <h1 className="text-xl sm:text-2xl font-bold mt-0.5 leading-tight">
-              Upload {organization.toUpperCase()} sheet
+              Upload {selectedOrgCode || "—"} sheet
             </h1>
             <p className="text-xs text-white/80 mt-1">
               Members are matched by full name and tagged automatically.
@@ -291,9 +295,9 @@ export function UploadPage() {
                   <button
                     key={o.id}
                     type="button"
-                    onClick={() => setOrganization(o.excelFormat)}
+                    onClick={() => { setSelectedOrgCode(o.code); setOrganization(o.excelFormat); }}
                     className={`border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
-                      organization === o.excelFormat
+                      selectedOrgCode === o.code
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-background hover:bg-muted border-border/60"
                     }`}
@@ -344,7 +348,7 @@ export function UploadPage() {
 
             <Button
               onClick={handleUpload}
-              disabled={!file || uploading || listSheets.isPending}
+              disabled={!file || !organization || uploading || listSheets.isPending}
               className="w-full rounded-xl h-11"
               data-testid="button-upload-preview"
             >

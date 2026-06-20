@@ -301,6 +301,7 @@ export const UpdateOrganizationParams = zod.object({
 export const UpdateOrganizationBody = zod.object({
   name: zod.string().optional(),
   description: zod.string().nullish(),
+  excelFormat: zod.enum(["faan", "nama"]).optional(),
 });
 
 export const UpdateOrganizationResponse = zod.object({
@@ -308,6 +309,7 @@ export const UpdateOrganizationResponse = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
+  excelFormat: zod.string(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),

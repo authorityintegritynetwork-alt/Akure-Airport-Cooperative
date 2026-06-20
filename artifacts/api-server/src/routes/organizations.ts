@@ -145,6 +145,7 @@ router.patch(
     if (parsed.data.name != null) update.name = parsed.data.name.trim();
     if (parsed.data.description !== undefined)
       update.description = parsed.data.description?.trim() || null;
+    if (parsed.data.excelFormat != null) update.excelFormat = parsed.data.excelFormat;
 
     if (Object.keys(update).length === 0) {
       res.json(current);

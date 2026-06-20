@@ -60,6 +60,7 @@ type CreateForm = z.infer<typeof createSchema>;
 const editSchema = z.object({
   name: z.string().min(2, "Display name required"),
   description: z.string().optional(),
+  excelFormat: z.enum(["faan", "nama"]),
 });
 type EditForm = z.infer<typeof editSchema>;
 
@@ -105,6 +106,7 @@ export function OrganizationsPage() {
     editForm.reset({
       name: org.name ?? "",
       description: org.description ?? "",
+      excelFormat: (org.excelFormat ?? "faan") as "faan" | "nama",
     });
     setEditing(org);
   }
@@ -148,6 +150,7 @@ export function OrganizationsPage() {
       await updateWithStepUp(editing.id, {
         name: data.name.trim(),
         description: data.description?.trim() || null,
+        excelFormat: data.excelFormat,
       });
       toast({ title: "Organization updated" });
       invalidate();
@@ -413,6 +416,32 @@ export function OrganizationsPage() {
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl><Input className="rounded-xl" data-testid="input-edit-org-description" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={editForm.control} name="excelFormat" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Excel deduction format *</FormLabel>
+                  <FormDescription className="text-xs">
+                    Which column layout does this employer's payroll sheet use?
+                  </FormDescription>
+                  <div className="flex gap-2 pt-1">
+                    {(["faan", "nama"] as const).map((fmt) => (
+                      <button
+                        key={fmt}
+                        type="button"
+                        onClick={() => field.onChange(fmt)}
+                        className={`flex-1 border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                          field.value === fmt
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "bg-background hover:bg-muted border-border/60"
+                        }`}
+                        data-testid={`edit-org-format-${fmt}`}
+                      >
+                        {fmt.toUpperCase()} format
+                      </button>
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )} />

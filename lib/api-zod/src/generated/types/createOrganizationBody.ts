@@ -14,5 +14,5 @@ export interface CreateOrganizationBody {
   /** Optional one-line description shown on the sign-up screen. */
   description?: string;
   /** Excel deduction format: 'faan' or 'nama'. */
-  excelFormat: string;
+  excelFormat: "faan" | "nama";
 }
