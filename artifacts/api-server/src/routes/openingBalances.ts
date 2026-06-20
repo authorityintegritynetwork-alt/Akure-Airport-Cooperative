@@ -300,13 +300,11 @@ router.post(
 const ObUploadPreviewBody = z.object({
   fileObjectPath: z.string().min(1),
   sheetName: z.string().optional(),
-  organization: z.string().min(1),
 });
 
 const ObUploadProcessBody = z.object({
   fileObjectPath: z.string().min(1),
   sheetName: z.string().optional(),
-  organization: z.string().min(1),
   replaceExisting: z.boolean().optional().default(false),
 });
 
@@ -320,16 +318,6 @@ router.post(
     const parsed = ObUploadPreviewBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
-      return;
-    }
-
-    const normalizedOrg = parsed.data.organization.trim().toUpperCase();
-    const [org] = await db
-      .select({ id: organizationsTable.id, code: organizationsTable.code })
-      .from(organizationsTable)
-      .where(eq(organizationsTable.code, normalizedOrg));
-    if (!org) {
-      res.status(400).json({ error: `Unknown organization "${parsed.data.organization}".` });
       return;
     }
 
@@ -385,16 +373,6 @@ router.post(
       return;
     }
 
-    const normalizedOrg = parsed.data.organization.trim().toUpperCase();
-    const [org] = await db
-      .select({ id: organizationsTable.id, code: organizationsTable.code })
-      .from(organizationsTable)
-      .where(eq(organizationsTable.code, normalizedOrg));
-    if (!org) {
-      res.status(400).json({ error: `Unknown organization "${parsed.data.organization}".` });
-      return;
-    }
-
     try {
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
@@ -412,7 +390,7 @@ router.post(
         for (const row of sheet.rows) {
           if (!row.rawName.trim()) { skipped++; continue; }
 
-          // Check for existing unclaimed row with same name + org to avoid duplicates
+          // Check for existing unclaimed row with same name to avoid duplicates
           if (!parsed.data.replaceExisting) {
             const existing = await tx
               .select({ id: openingBalancesTable.id })
@@ -420,7 +398,6 @@ router.post(
               .where(
                 and(
                   ilike(openingBalancesTable.fullName, row.rawName.trim()),
-                  eq(openingBalancesTable.organization, normalizedOrg),
                   eq(openingBalancesTable.status, "unclaimed"),
                 ),
               );
@@ -448,7 +425,6 @@ router.post(
 
           await tx.insert(openingBalancesTable).values({
             fullName: row.rawName.trim(),
-            organization: normalizedOrg,
             status: "unclaimed",
             savingsBalance: savingsBalance.toString(),
             providentBalance: providentBalance.toString(),
@@ -475,7 +451,7 @@ router.post(
         action: "IMPORT_OPENING_BALANCES",
         entity: "opening_balance",
         entityId: 0,
-        details: `Bulk-imported opening balances from "${sheetName}" for org ${normalizedOrg}: ${inserted} inserted, ${skipped} skipped.`,
+        details: `Bulk-imported opening balances from "${sheetName}": ${inserted} inserted, ${skipped} skipped.`,
       });
 
       res.json({ inserted, skipped });

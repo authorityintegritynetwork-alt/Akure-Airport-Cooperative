@@ -6,7 +6,6 @@ import type { ErrorType } from "./custom-fetch";
 export interface ObUploadPreviewBody {
   fileObjectPath: string;
   sheetName?: string;
-  organization: string;
 }
 
 export interface ObUploadPreviewRow {
@@ -40,7 +39,6 @@ export interface ObUploadPreviewResult {
 export interface ObUploadProcessBody {
   fileObjectPath: string;
   sheetName?: string;
-  organization: string;
   replaceExisting?: boolean;
 }
 

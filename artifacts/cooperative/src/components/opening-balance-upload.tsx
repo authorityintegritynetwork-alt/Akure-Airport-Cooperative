@@ -8,14 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useStepUpAction } from "@/lib/step-up";
 import { formatCurrency } from "@/lib/format";
@@ -30,7 +22,6 @@ import {
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type Org = "FAAN" | "NAMA";
 type Stage = "select" | "pickSheet" | "preview";
 
 const BALANCE_COLS: { key: keyof ObUploadPreviewRow; label: string }[] = [
@@ -53,7 +44,6 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [organization, setOrganization] = useState<Org>("FAAN");
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean }[]>([]);
@@ -101,10 +91,7 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
 
       setUploadedPath(objectPath);
 
-      const result = await previewMutation.mutateAsync({
-        fileObjectPath: objectPath,
-        organization,
-      });
+      const result = await previewMutation.mutateAsync({ fileObjectPath: objectPath });
 
       setSheets(result.sheets);
 
@@ -126,11 +113,7 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
     if (!uploadedPath) return;
     setChosenSheet(sheetName);
     try {
-      const result = await previewMutation.mutateAsync({
-        fileObjectPath: uploadedPath,
-        sheetName,
-        organization,
-      });
+      const result = await previewMutation.mutateAsync({ fileObjectPath: uploadedPath, sheetName });
       setPreviewData({ totalRows: result.totalRows, rows: result.rows });
       setStage("preview");
     } catch (err: any) {
@@ -144,7 +127,6 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
       const result = await processWithStepUp({
         fileObjectPath: uploadedPath,
         sheetName: chosenSheet,
-        organization,
       });
       toast({
         title: "Opening balances imported",
@@ -179,32 +161,17 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
             Upload your Excel sheet containing the October 2025 opening balances. Each row
             should have a member name and balance columns (Savings, Provident, Christmas,
             Real Loan, Emergency Loan, store debts, etc.). These will be held as unclaimed
-            records until each member registers.
+            records until each member registers — matched by name.
           </p>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Organisation</label>
-              <Select value={organization} onValueChange={(v) => setOrganization(v as Org)}>
-                <SelectTrigger className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FAAN">FAAN</SelectItem>
-                  <SelectItem value="NAMA">NAMA</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="gap-2"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              {uploading ? "Uploading & reading…" : "Choose Excel file"}
-            </Button>
-          </div>
+          <Button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            {uploading ? "Uploading & reading…" : "Choose Excel file"}
+          </Button>
 
           <input
             ref={fileRef}
@@ -283,7 +250,6 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
                   {warnRows.length} warnings
                 </Badge>
               )}
-              <Badge variant="outline">{organization}</Badge>
             </div>
           </div>
         </CardHeader>
@@ -369,7 +335,7 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Rows that already exist (same name + organisation, unclaimed) will be skipped automatically.
+            Rows that already exist (same name, unclaimed) will be skipped automatically.
             You will be asked to confirm with a security code before the import is saved.
           </p>
         </CardContent>
