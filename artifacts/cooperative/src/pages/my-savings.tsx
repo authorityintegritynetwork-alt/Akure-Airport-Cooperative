@@ -1,15 +1,18 @@
-import { useGetMySavings, useListMyTransactions, getListMyTransactionsQueryKey } from "@workspace/api-client-react";
+import { useGetMySavings, useGetProfile, useListMyTransactions, getListMyTransactionsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Wallet, TrendingUp, Calendar } from "lucide-react";
+import { Wallet, TrendingUp, Calendar, BookOpen } from "lucide-react";
 
 export function MySavingsPage() {
   const { data: savings, isLoading: savingsLoading } = useGetMySavings();
+  const { data: profile } = useGetProfile();
   const { data: transactions, isLoading: txLoading } = useListMyTransactions(
     { type: "savings" },
     { query: { queryKey: getListMyTransactionsQueryKey({ type: "savings" }) } },
   );
+
+  const bookSavings = profile?.obSavingsBalance != null ? Number(profile.obSavingsBalance) : null;
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -34,9 +37,9 @@ export function MySavingsPage() {
           <div className="absolute -bottom-12 -left-8 w-52 h-52 rounded-full bg-white/5 blur-3xl" />
 
           <div className="relative flex items-start justify-between">
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-white/75 font-semibold uppercase tracking-wider">
-                Current Savings Balance
+                Current Balance
               </p>
               <p className="text-3xl sm:text-4xl font-bold mt-2 tabular-nums tracking-tight">
                 {formatCurrency(savings?.balance ?? 0)}
@@ -52,6 +55,16 @@ export function MySavingsPage() {
               <Wallet className="w-6 h-6" />
             </div>
           </div>
+
+          {bookSavings != null && (
+            <div className="relative mt-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3 flex items-center gap-3">
+              <BookOpen className="w-4 h-4 shrink-0 text-white/80" />
+              <div>
+                <p className="text-[10px] text-white/70 uppercase tracking-wide font-semibold">Book Balance</p>
+                <p className="text-base font-bold tabular-nums">{formatCurrency(bookSavings)}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

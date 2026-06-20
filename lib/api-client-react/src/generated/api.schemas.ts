@@ -55,6 +55,38 @@ export interface Member {
   ghlFormDebt: number;
   fireFundBalance: number;
   totalStoreDebt: number;
+  /** @nullable */
+  obSavingsBalance?: number | null;
+  /** @nullable */
+  obProvidentBalance?: number | null;
+  /** @nullable */
+  obChristmasBalance?: number | null;
+  /** @nullable */
+  obRealLoanBalance?: number | null;
+  /** @nullable */
+  obEmergencyLoanBalance?: number | null;
+  /** @nullable */
+  obTotalLoanBalance?: number | null;
+  /** @nullable */
+  obElectronicsDebt?: number | null;
+  /** @nullable */
+  obSElectronicsDebt?: number | null;
+  /** @nullable */
+  obFurnitureDebt?: number | null;
+  /** @nullable */
+  obCommodityDebt?: number | null;
+  /** @nullable */
+  obGhlFormDebt?: number | null;
+  /** @nullable */
+  obFireFundBalance?: number | null;
+  /** @nullable */
+  obFuelVentureBalance?: number | null;
+  /** @nullable */
+  obLandLoanBalance?: number | null;
+  /** @nullable */
+  obTotalStoreDebt?: number | null;
+  /** @nullable */
+  obUploadedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,6 +204,38 @@ export interface MemberProfile {
   landLoanBalance?: number;
   organization?: string;
   createdAt: string;
+  /** @nullable */
+  obSavingsBalance?: number | null;
+  /** @nullable */
+  obProvidentBalance?: number | null;
+  /** @nullable */
+  obChristmasBalance?: number | null;
+  /** @nullable */
+  obRealLoanBalance?: number | null;
+  /** @nullable */
+  obEmergencyLoanBalance?: number | null;
+  /** @nullable */
+  obTotalLoanBalance?: number | null;
+  /** @nullable */
+  obElectronicsDebt?: number | null;
+  /** @nullable */
+  obSElectronicsDebt?: number | null;
+  /** @nullable */
+  obFurnitureDebt?: number | null;
+  /** @nullable */
+  obCommodityDebt?: number | null;
+  /** @nullable */
+  obGhlFormDebt?: number | null;
+  /** @nullable */
+  obFireFundBalance?: number | null;
+  /** @nullable */
+  obFuelVentureBalance?: number | null;
+  /** @nullable */
+  obLandLoanBalance?: number | null;
+  /** @nullable */
+  obTotalStoreDebt?: number | null;
+  /** @nullable */
+  obUploadedAt?: string | null;
 }
 
 export interface RegisterMemberBody {

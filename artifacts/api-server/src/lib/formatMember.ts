@@ -14,8 +14,29 @@ type MemberRow = {
   totalStoreDebt: string;
   fuelVentureBalance: string;
   landLoanBalance: string;
+  obSavingsBalance?: string | null;
+  obProvidentBalance?: string | null;
+  obChristmasBalance?: string | null;
+  obRealLoanBalance?: string | null;
+  obEmergencyLoanBalance?: string | null;
+  obTotalLoanBalance?: string | null;
+  obElectronicsDebt?: string | null;
+  obSElectronicsDebt?: string | null;
+  obFurnitureDebt?: string | null;
+  obCommodityDebt?: string | null;
+  obGhlFormDebt?: string | null;
+  obFireFundBalance?: string | null;
+  obFuelVentureBalance?: string | null;
+  obLandLoanBalance?: string | null;
+  obTotalStoreDebt?: string | null;
   [k: string]: any;
 };
+
+function parseOb(v: string | null | undefined): number | null {
+  if (v == null) return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
 
 export function formatMember<T extends MemberRow>(m: T) {
   return {
@@ -35,5 +56,20 @@ export function formatMember<T extends MemberRow>(m: T) {
     totalStoreDebt: parseFloat(m.totalStoreDebt),
     fuelVentureBalance: parseFloat(m.fuelVentureBalance),
     landLoanBalance: parseFloat(m.landLoanBalance),
+    obSavingsBalance: parseOb(m.obSavingsBalance),
+    obProvidentBalance: parseOb(m.obProvidentBalance),
+    obChristmasBalance: parseOb(m.obChristmasBalance),
+    obRealLoanBalance: parseOb(m.obRealLoanBalance),
+    obEmergencyLoanBalance: parseOb(m.obEmergencyLoanBalance),
+    obTotalLoanBalance: parseOb(m.obTotalLoanBalance),
+    obElectronicsDebt: parseOb(m.obElectronicsDebt),
+    obSElectronicsDebt: parseOb(m.obSElectronicsDebt),
+    obFurnitureDebt: parseOb(m.obFurnitureDebt),
+    obCommodityDebt: parseOb(m.obCommodityDebt),
+    obGhlFormDebt: parseOb(m.obGhlFormDebt),
+    obFireFundBalance: parseOb(m.obFireFundBalance),
+    obFuelVentureBalance: parseOb(m.obFuelVentureBalance),
+    obLandLoanBalance: parseOb(m.obLandLoanBalance),
+    obTotalStoreDebt: parseOb(m.obTotalStoreDebt),
   };
 }

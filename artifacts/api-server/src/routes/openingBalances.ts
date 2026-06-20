@@ -300,13 +300,40 @@ router.post(
 const ObUploadPreviewBody = z.object({
   fileObjectPath: z.string().min(1),
   sheetName: z.string().optional(),
+  organization: z.string().optional(),
 });
 
 const ObUploadProcessBody = z.object({
   fileObjectPath: z.string().min(1),
   sheetName: z.string().optional(),
-  replaceExisting: z.boolean().optional().default(false),
+  organization: z.string().optional(),
 });
+
+// Helper: compute all balance values from parsed row amounts
+function computeObValues(row: { amounts: Record<string, number> }) {
+  const savingsBalance = row.amounts.savings ?? 0;
+  const providentBalance = row.amounts.provident ?? 0;
+  const christmasBalance = row.amounts.christmas ?? 0;
+  const realLoanBalance = row.amounts.realLoan ?? 0;
+  const emergencyLoanBalance = row.amounts.emergencyLoan ?? 0;
+  const totalLoanBalance = realLoanBalance + emergencyLoanBalance;
+  const electronicsDebt = row.amounts.electronics ?? 0;
+  const sElectronicsDebt = row.amounts.sElectronics ?? 0;
+  const furnitureDebt = row.amounts.furniture ?? 0;
+  const commodityDebt = row.amounts.commodity ?? 0;
+  const ghlFormDebt = row.amounts.ghlForm ?? 0;
+  const totalStoreDebt = electronicsDebt + sElectronicsDebt + commodityDebt + ghlFormDebt;
+  const fireFundBalance = row.amounts.fire ?? 0;
+  const fuelVentureBalance = row.amounts.fuelVenture ?? 0;
+  const landLoanBalance = row.amounts.landLoan ?? 0;
+  return {
+    savingsBalance, providentBalance, christmasBalance,
+    realLoanBalance, emergencyLoanBalance, totalLoanBalance,
+    electronicsDebt, sElectronicsDebt, furnitureDebt,
+    commodityDebt, ghlFormDebt, totalStoreDebt,
+    fireFundBalance, fuelVentureBalance, landLoanBalance,
+  };
+}
 
 // ── Preview: parse Excel, show what would be imported ───────────────────────
 
@@ -359,7 +386,15 @@ router.post(
   },
 );
 
-// ── Process: insert rows into opening_balances table ────────────────────────
+// ── Process: supersede all existing rows and sync member book balances ───────
+//
+// Every upload is a full replacement:
+//   1. All existing opening_balance rows for the organisation are deleted
+//      (regardless of claimed/unclaimed status).
+//   2. New rows are inserted from the sheet.
+//   3. For each row, if a registered member's name matches, their ob_* snapshot
+//      columns are updated so they immediately see the new book balances.
+//      This covers both pending and active members.
 
 router.post(
   "/uploads/opening-balances/process",
@@ -382,67 +417,87 @@ router.post(
       }
 
       const sheet = parseSheet(wb, sheetName);
+      const org = parsed.data.organization?.trim().toUpperCase() || null;
+
+      // Load all members for name-matching (to sync ob_* columns)
+      const allMembers = await db
+        .select({ id: membersTable.id, fullName: membersTable.fullName })
+        .from(membersTable);
+      const { NameMatcher } = await import("../lib/nameMatcher");
+      const matcher = new NameMatcher(allMembers);
 
       let inserted = 0;
       let skipped = 0;
+      let membersSynced = 0;
+      const uploadedAt = new Date();
 
       await db.transaction(async (tx) => {
+        // Step 1: Delete all existing opening_balance rows for this org
+        // (or all rows if no org specified — global sheet)
+        if (org) {
+          await tx
+            .delete(openingBalancesTable)
+            .where(eq(openingBalancesTable.organization, org));
+        } else {
+          // No org filter — wipe everything and replace with the new sheet
+          await tx.delete(openingBalancesTable);
+        }
+
+        // Step 2: Insert new rows and sync ob_* on matched members
         for (const row of sheet.rows) {
-          if (!row.rawName.trim()) { skipped++; continue; }
+          const name = row.rawName.trim();
+          if (!name) { skipped++; continue; }
 
-          // Check for existing unclaimed row with same name to avoid duplicates
-          if (!parsed.data.replaceExisting) {
-            const existing = await tx
-              .select({ id: openingBalancesTable.id })
-              .from(openingBalancesTable)
-              .where(
-                and(
-                  ilike(openingBalancesTable.fullName, row.rawName.trim()),
-                  eq(openingBalancesTable.status, "unclaimed"),
-                ),
-              );
-            if (existing.length > 0) { skipped++; continue; }
-          }
-
-          // Compute balance values from parsed amounts.
-          // Credits (savings/provident/christmas/fire) are stored as positive.
-          // Debts (loans, store) are stored as positive amounts owed.
-          const savingsBalance = row.amounts.savings;
-          const providentBalance = row.amounts.provident;
-          const christmasBalance = row.amounts.christmas;
-          const realLoanBalance = row.amounts.realLoan;
-          const emergencyLoanBalance = row.amounts.emergencyLoan;
-          const totalLoanBalance = realLoanBalance + emergencyLoanBalance;
-          const electronicsDebt = row.amounts.electronics;
-          const sElectronicsDebt = row.amounts.sElectronics;
-          const furnitureDebt = row.amounts.furniture;
-          const commodityDebt = row.amounts.commodity;
-          const ghlFormDebt = row.amounts.ghlForm;
-          const totalStoreDebt = electronicsDebt + sElectronicsDebt + commodityDebt + ghlFormDebt;
-          const fireFundBalance = row.amounts.fire;
-          const fuelVentureBalance = row.amounts.fuelVenture;
-          const landLoanBalance = row.amounts.landLoan;
+          const vals = computeObValues(row);
 
           await tx.insert(openingBalancesTable).values({
-            fullName: row.rawName.trim(),
+            fullName: name,
+            organization: org,
             status: "unclaimed",
-            savingsBalance: savingsBalance.toString(),
-            providentBalance: providentBalance.toString(),
-            christmasBalance: christmasBalance.toString(),
-            realLoanBalance: realLoanBalance.toString(),
-            emergencyLoanBalance: emergencyLoanBalance.toString(),
-            totalLoanBalance: totalLoanBalance.toString(),
-            electronicsDebt: electronicsDebt.toString(),
-            sElectronicsDebt: sElectronicsDebt.toString(),
-            furnitureDebt: furnitureDebt.toString(),
-            commodityDebt: commodityDebt.toString(),
-            ghlFormDebt: ghlFormDebt.toString(),
-            totalStoreDebt: totalStoreDebt.toString(),
-            fireFundBalance: fireFundBalance.toString(),
-            fuelVentureBalance: fuelVentureBalance.toString(),
-            landLoanBalance: landLoanBalance.toString(),
+            savingsBalance: vals.savingsBalance.toString(),
+            providentBalance: vals.providentBalance.toString(),
+            christmasBalance: vals.christmasBalance.toString(),
+            realLoanBalance: vals.realLoanBalance.toString(),
+            emergencyLoanBalance: vals.emergencyLoanBalance.toString(),
+            totalLoanBalance: vals.totalLoanBalance.toString(),
+            electronicsDebt: vals.electronicsDebt.toString(),
+            sElectronicsDebt: vals.sElectronicsDebt.toString(),
+            furnitureDebt: vals.furnitureDebt.toString(),
+            commodityDebt: vals.commodityDebt.toString(),
+            ghlFormDebt: vals.ghlFormDebt.toString(),
+            totalStoreDebt: vals.totalStoreDebt.toString(),
+            fireFundBalance: vals.fireFundBalance.toString(),
+            fuelVentureBalance: vals.fuelVentureBalance.toString(),
+            landLoanBalance: vals.landLoanBalance.toString(),
           });
           inserted++;
+
+          // Step 3: Sync ob_* snapshot columns on any matched member
+          const match = matcher.match(name);
+          if (match.memberId != null) {
+            await tx
+              .update(membersTable)
+              .set({
+                obSavingsBalance: vals.savingsBalance.toString(),
+                obProvidentBalance: vals.providentBalance.toString(),
+                obChristmasBalance: vals.christmasBalance.toString(),
+                obRealLoanBalance: vals.realLoanBalance.toString(),
+                obEmergencyLoanBalance: vals.emergencyLoanBalance.toString(),
+                obTotalLoanBalance: vals.totalLoanBalance.toString(),
+                obElectronicsDebt: vals.electronicsDebt.toString(),
+                obSElectronicsDebt: vals.sElectronicsDebt.toString(),
+                obFurnitureDebt: vals.furnitureDebt.toString(),
+                obCommodityDebt: vals.commodityDebt.toString(),
+                obGhlFormDebt: vals.ghlFormDebt.toString(),
+                obFireFundBalance: vals.fireFundBalance.toString(),
+                obFuelVentureBalance: vals.fuelVentureBalance.toString(),
+                obLandLoanBalance: vals.landLoanBalance.toString(),
+                obTotalStoreDebt: vals.totalStoreDebt.toString(),
+                obUploadedAt: uploadedAt,
+              } as any)
+              .where(eq(membersTable.id, match.memberId));
+            membersSynced++;
+          }
         }
       });
 
@@ -451,10 +506,10 @@ router.post(
         action: "IMPORT_OPENING_BALANCES",
         entity: "opening_balance",
         entityId: 0,
-        details: `Bulk-imported opening balances from "${sheetName}": ${inserted} inserted, ${skipped} skipped.`,
+        details: `Superseded opening balances from "${sheetName}"${org ? ` (${org})` : ""}: ${inserted} inserted, ${skipped} skipped, ${membersSynced} member book balances updated.`,
       });
 
-      res.json({ inserted, skipped });
+      res.json({ inserted, skipped, membersSynced });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to process file: ${err.message}` });
     }

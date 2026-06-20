@@ -122,9 +122,10 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
         fileObjectPath: uploadedPath,
         sheetName: chosenSheet,
       });
+      const synced = (result as any).membersSynced ?? 0;
       toast({
-        title: "Opening balances imported",
-        description: `${result.inserted} records added, ${result.skipped} skipped (already exist).`,
+        title: "Opening balances updated",
+        description: `${result.inserted} records imported${synced > 0 ? `, ${synced} member book balance${synced === 1 ? "" : "s"} updated` : ""}.`,
       });
       queryClient.invalidateQueries({
         predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/opening-balances",
@@ -147,16 +148,22 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Upload className="w-4 h-4" />
-            Import Opening Balances (October 2025)
+            Import Opening Balances
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Upload your Excel sheet containing the October 2025 opening balances. Each row
-            should have a member name and balance columns (Savings, Provident, Christmas,
-            Real Loan, Emergency Loan, store debts, etc.). These will be held as unclaimed
-            records until each member registers — matched by name.
+            Upload the Excel sheet containing the current opening balances. This will
+            replace all existing opening balance records and update the book balance for
+            any member whose name matches a row in the sheet. Each row should have a
+            member name and balance columns (Savings, Provident, Christmas, Real Loan,
+            Emergency Loan, store debts, etc.).
           </p>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <strong>Note:</strong> Uploading a new sheet replaces all existing opening
+            balance records and refreshes the book balance shown to every matched member.
+          </div>
 
           <Button
             onClick={() => fileRef.current?.click()}

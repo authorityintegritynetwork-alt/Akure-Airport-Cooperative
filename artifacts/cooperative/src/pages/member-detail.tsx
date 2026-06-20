@@ -180,18 +180,21 @@ export function MemberDetailPage() {
           icon={<Wallet className="w-5 h-5" />}
           label="Savings"
           value={formatCurrency(member.savingsBalance)}
+          bookValue={member.obSavingsBalance != null ? formatCurrency(member.obSavingsBalance) : null}
           tone="success"
         />
         <BalanceTile
           icon={<CreditCard className="w-5 h-5" />}
           label="Loan Bal."
           value={formatCurrency(member.totalLoanBalance)}
+          bookValue={member.obTotalLoanBalance != null ? formatCurrency(member.obTotalLoanBalance) : null}
           tone="warning"
         />
         <BalanceTile
           icon={<ShoppingBag className="w-5 h-5" />}
           label="Store Debt"
           value={formatCurrency(member.totalStoreDebt)}
+          bookValue={member.obTotalStoreDebt != null ? formatCurrency(member.obTotalStoreDebt) : null}
           tone="info"
         />
       </div>
@@ -319,11 +322,13 @@ function BalanceTile({
   icon,
   label,
   value,
+  bookValue,
   tone,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  bookValue?: string | null;
   tone: "success" | "warning" | "info";
 }) {
   const toneClass = {
@@ -345,6 +350,11 @@ function BalanceTile({
         <p className="text-sm sm:text-lg font-bold tabular-nums truncate mt-0.5">
           {value}
         </p>
+        {bookValue != null && (
+          <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+            Book: {bookValue}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

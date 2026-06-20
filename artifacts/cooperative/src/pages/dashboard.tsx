@@ -626,6 +626,9 @@ function MemberDashboard({ profile }: { profile: any }) {
           <div className="grid gap-2.5 grid-cols-2 lg:grid-cols-3">
             {balanceCards.map((b) => {
               const value = Number(profile[b.key] ?? 0);
+              const obKey = "ob" + b.key.charAt(0).toUpperCase() + b.key.slice(1);
+              const bookValue = profile[obKey] != null ? Number(profile[obKey]) : null;
+              const hasBook = bookValue != null;
               const isCredit = b.direction === "credit";
               const isZero = value === 0;
               return (
@@ -671,6 +674,11 @@ function MemberDashboard({ profile }: { profile: any }) {
                   >
                     {formatCurrency(value)}
                   </p>
+                  {hasBook && (
+                    <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
+                      Book: {formatCurrency(bookValue)}
+                    </p>
+                  )}
                 </div>
               );
             })}
