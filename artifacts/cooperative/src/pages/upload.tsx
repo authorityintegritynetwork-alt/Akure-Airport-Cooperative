@@ -192,7 +192,7 @@ export function UploadPage() {
     }
   }
 
-  async function handleProcess(skipErrors: boolean) {
+  async function handleProcess() {
     if (!uploadedPath || !chosenSheet) return;
     try {
       const result: any = await processWithStepUp({
@@ -201,15 +201,18 @@ export function UploadPage() {
         month,
         year,
         organization,
-        skipErrors,
         manualMatches: Object.entries(manualMatches).map(([rowNumber, memberId]) => ({
           rowNumber: Number(rowNumber),
           memberId,
         })),
       });
+      const parts: string[] = [];
+      if ((result.processed ?? 0) > 0) parts.push(`${result.processed} matched`);
+      if ((result.autoCreated ?? 0) > 0) parts.push(`${result.autoCreated} auto-created`);
+      if ((result.skipped ?? 0) > 0) parts.push(`${result.skipped} skipped`);
       toast({
         title: "Upload processed",
-        description: `${result.processed ?? 0} members processed, ${result.skipped ?? 0} skipped.`,
+        description: parts.join(", ") + " members.",
       });
       queryClient.invalidateQueries({ queryKey: getListUploadHistoryQueryKey() });
       reset();
@@ -542,11 +545,11 @@ export function UploadPage() {
                   {previewData.rows.map((row: any) => {
                     const isUnmatched = row.matchedMemberId == null;
                     const rowClass = isUnmatched
-                      ? "bg-destructive/5"
+                      ? "bg-amber-50 dark:bg-amber-500/5"
                       : row.orgMismatch
-                      ? "bg-amber-100"
+                      ? "bg-amber-100 dark:bg-amber-500/10"
                       : row.totalMismatch
-                      ? "bg-amber-50"
+                      ? "bg-amber-50 dark:bg-amber-500/5"
                       : "";
                     return (
                       <tr
@@ -558,22 +561,35 @@ export function UploadPage() {
                         <td className="p-2 font-medium">{row.rawName}</td>
                         <td className="p-2">
                           {isUnmatched ? (
-                            <select
-                              className="w-full border border-input rounded px-1 py-1 text-xs bg-background"
-                              value={manualMatches[row.rowNumber] ?? ""}
-                              onChange={(e) =>
-                                handleAssignMember(
-                                  row.rowNumber,
-                                  e.target.value ? parseInt(e.target.value) : null,
-                                )
-                              }
-                              data-testid={`assign-row-${row.rowNumber}`}
-                            >
-                              <option value="">— Assign member —</option>
-                              {memberOptions.map((m) => (
-                                <option key={m.id} value={m.id}>{m.label}</option>
-                              ))}
-                            </select>
+                            <div className="space-y-1">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] py-0 px-1.5 rounded-full ${
+                                  row.hasOpeningBalance
+                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                                    : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+                                }`}
+                                data-testid={`auto-create-badge-${row.rowNumber}`}
+                              >
+                                {row.hasOpeningBalance ? "Will auto-create (OB linked)" : "Will auto-create (no OB)"}
+                              </Badge>
+                              <select
+                                className="w-full border border-input rounded px-1 py-1 text-xs bg-background"
+                                value={manualMatches[row.rowNumber] ?? ""}
+                                onChange={(e) =>
+                                  handleAssignMember(
+                                    row.rowNumber,
+                                    e.target.value ? parseInt(e.target.value) : null,
+                                  )
+                                }
+                                data-testid={`assign-row-${row.rowNumber}`}
+                              >
+                                <option value="">— Or assign existing member —</option>
+                                {memberOptions.map((m) => (
+                                  <option key={m.id} value={m.id}>{m.label}</option>
+                                ))}
+                              </select>
+                            </div>
                           ) : (
                             <div className="flex items-center gap-1">
                               <span>{row.matchedMemberName}</span>
@@ -616,7 +632,7 @@ export function UploadPage() {
                         </td>
                         <td className="p-2 text-center">
                           {isUnmatched ? (
-                            <AlertCircle className="w-4 h-4 text-destructive mx-auto" />
+                            <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" />
                           ) : (
                             <CheckCircle className="w-4 h-4 text-primary mx-auto" />
                           )}
@@ -630,24 +646,17 @@ export function UploadPage() {
 
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => handleProcess(false)}
-                disabled={process.isPending || previewData.unmatchedRows > 0}
+                onClick={() => handleProcess()}
+                disabled={process.isPending}
                 className="rounded-xl flex-1 min-w-[200px] h-11"
                 data-testid="button-process-upload"
               >
-                {process.isPending ? "Processing..." : `Process ${previewData.matchedRows} Members`}
+                {process.isPending
+                  ? "Processing..."
+                  : previewData.unmatchedRows > 0
+                  ? `Process ${previewData.matchedRows} matched + ${previewData.unmatchedRows} auto-create`
+                  : `Process ${previewData.matchedRows} Members`}
               </Button>
-              {previewData.unmatchedRows > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => handleProcess(true)}
-                  disabled={process.isPending}
-                  className="rounded-xl flex-1 min-w-[200px] h-11"
-                  data-testid="button-process-skip-errors"
-                >
-                  Skip {previewData.unmatchedRows} unmatched & process the rest
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>

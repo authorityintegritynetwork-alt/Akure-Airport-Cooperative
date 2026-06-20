@@ -499,6 +499,8 @@ export interface ExcelRowPreview {
   totalMismatch: boolean;
   errors: string[];
   warnings: string[];
+  /** null for matched rows; true/false for unmatched rows */
+  hasOpeningBalance?: boolean | null;
 }
 
 export interface ExcelUploadPreview {
@@ -528,7 +530,9 @@ export interface ExcelUploadResult {
   uploadRecordId: number;
   processed: number;
   skipped: number;
+  autoCreated: number;
   errors: string[];
+  openingBalancesFlagged?: number;
 }
 
 export type UploadRecordStatus =

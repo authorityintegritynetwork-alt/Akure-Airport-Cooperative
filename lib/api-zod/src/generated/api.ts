@@ -774,6 +774,7 @@ export const PreviewExcelUploadResponse = zod.object({
       totalMismatch: zod.boolean(),
       errors: zod.array(zod.string()),
       warnings: zod.array(zod.string()),
+      hasOpeningBalance: zod.boolean().nullish(),
     }),
   ),
 });
@@ -803,7 +804,9 @@ export const ProcessExcelUploadResponse = zod.object({
   uploadRecordId: zod.number(),
   processed: zod.number(),
   skipped: zod.number(),
+  autoCreated: zod.number(),
   errors: zod.array(zod.string()),
+  openingBalancesFlagged: zod.number().optional(),
 });
 
 /**

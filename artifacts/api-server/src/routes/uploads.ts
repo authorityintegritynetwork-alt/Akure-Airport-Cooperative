@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { randomUUID } from "crypto";
 import {
   db,
   membersTable,
@@ -150,6 +151,13 @@ router.post(
             eq(uploadRecordsTable.status, "processed"),
           ),
         );
+      // For unmatched rows, check whether an unclaimed opening balance exists — surfaced in preview UI
+      const unclaimedObPreview = await db
+        .select({ id: openingBalancesTable.id, fullName: openingBalancesTable.fullName })
+        .from(openingBalancesTable)
+        .where(eq(openingBalancesTable.status, "unclaimed"));
+      const obPreviewMatcher = new NameMatcher(unclaimedObPreview);
+
       const previewRows = sheet.rows.map((row) => {
         const baseMatch = matcher.match(row.rawName);
         const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
@@ -163,6 +171,11 @@ router.post(
             `Member is tagged as ${memberOrg} but this upload is for ${uploadOrg}.`,
           );
         }
+        // null for matched rows; true/false for unmatched rows
+        const hasOpeningBalance =
+          finalMatch.memberId == null
+            ? obPreviewMatcher.match(row.rawName).memberId != null
+            : null;
         return {
           rowNumber: row.rowNumber,
           rawName: row.rawName,
@@ -189,6 +202,7 @@ router.post(
           totalMismatch: row.totalMismatch,
           errors: row.errors,
           warnings,
+          hasOpeningBalance,
         };
       });
 
@@ -302,25 +316,120 @@ router.post(
 
         let processed = 0;
         let skipped = 0;
+        let autoCreated = 0;
         const errors: string[] = [];
         const notifications: Array<{ memberId: number; total: number }> = [];
         // Track which sheet rows matched a registered member so the opening
         // balance pass below can detect (and flag) double matches.
         const memberMatchedRows = new Set<number>();
 
+        // Pre-load unclaimed OB rows once for the entire transaction (FOR UPDATE
+        // so concurrent processes see a stable snapshot).
+        const unclaimedOpenings = await tx
+          .select({ id: openingBalancesTable.id, fullName: openingBalancesTable.fullName })
+          .from(openingBalancesTable)
+          .where(eq(openingBalancesTable.status, "unclaimed"))
+          .for("update");
+        const obMatcher = new NameMatcher(unclaimedOpenings);
+
         for (const row of sheet.rows) {
           const baseMatch = matcher.match(row.rawName);
           const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
 
           if (finalMatch.memberId == null) {
-            skipped++;
-            if (!parsed.data.skipErrors) {
-              errors.push(`Row ${row.rowNumber}: no member matched for "${row.rawName}"`);
-            }
-            continue;
+            // Auto-create a pending member so deductions are never silently lost.
+            // If an unclaimed opening balance row matches by name, copy its
+            // balance columns onto the new member and mark that OB as claimed.
+            const newMemberId = await (async () => {
+              const obMatch = obMatcher.match(row.rawName);
+              const obRow =
+                obMatch.memberId != null
+                  ? unclaimedOpenings.find((r) => r.id === obMatch.memberId)
+                  : null;
+
+              // Fetch full OB row data if we have a match
+              let obData: (typeof openingBalancesTable.$inferSelect) | null = null;
+              if (obRow != null) {
+                const rows = await tx
+                  .select()
+                  .from(openingBalancesTable)
+                  .where(eq(openingBalancesTable.id, obRow.id))
+                  .for("update");
+                obData = rows[0] ?? null;
+              }
+
+              const placeholderEmail = `unmatched-${randomUUID()}@placeholder.aacsms.internal`;
+              const [newMember] = await tx
+                .insert(membersTable)
+                .values({
+                  fullName: row.rawName,
+                  email: placeholderEmail,
+                  organization: uploadOrg,
+                  status: "pending",
+                  // Copy opening balance columns if we have an OB row
+                  ...(obData != null
+                    ? {
+                        obSavingsBalance: obData.savingsBalance,
+                        obProvidentBalance: obData.providentBalance,
+                        obChristmasBalance: obData.christmasBalance,
+                        obRealLoanBalance: obData.realLoanBalance,
+                        obEmergencyLoanBalance: obData.emergencyLoanBalance,
+                        obTotalLoanBalance: obData.totalLoanBalance,
+                        obElectronicsDebt: obData.electronicsDebt,
+                        obSElectronicsDebt: obData.sElectronicsDebt,
+                        obFurnitureDebt: obData.furnitureDebt,
+                        obCommodityDebt: obData.commodityDebt,
+                        obGhlFormDebt: obData.ghlFormDebt,
+                        obFireFundBalance: obData.fireFundBalance,
+                        obFuelVentureBalance: obData.fuelVentureBalance,
+                        obLandLoanBalance: obData.landLoanBalance,
+                        obTotalStoreDebt: obData.totalStoreDebt,
+                        obUploadedAt: obData.createdAt,
+                        // Seed live balances from OB so the member starts with correct totals
+                        savingsBalance: obData.savingsBalance,
+                        providentBalance: obData.providentBalance,
+                        christmasBalance: obData.christmasBalance,
+                        realLoanBalance: obData.realLoanBalance,
+                        emergencyLoanBalance: obData.emergencyLoanBalance,
+                        totalLoanBalance: obData.totalLoanBalance,
+                        electronicsDebt: obData.electronicsDebt,
+                        sElectronicsDebt: obData.sElectronicsDebt,
+                        furnitureDebt: obData.furnitureDebt,
+                        commodityDebt: obData.commodityDebt,
+                        ghlFormDebt: obData.ghlFormDebt,
+                        fireFundBalance: obData.fireFundBalance,
+                        fuelVentureBalance: obData.fuelVentureBalance,
+                        landLoanBalance: obData.landLoanBalance,
+                        totalStoreDebt: obData.totalStoreDebt,
+                      }
+                    : {}),
+                })
+                .returning({ id: membersTable.id });
+
+              if (obData != null) {
+                await tx
+                  .update(openingBalancesTable)
+                  .set({
+                    status: "claimed",
+                    linkedMemberId: newMember.id,
+                    claimedAt: new Date(),
+                  })
+                  .where(eq(openingBalancesTable.id, obData.id));
+                // Remove from unclaimedOpenings so the OB pass below won't
+                // try to flag it a second time.
+                const idx = unclaimedOpenings.findIndex((r) => r.id === obData!.id);
+                if (idx !== -1) unclaimedOpenings.splice(idx, 1);
+              }
+
+              autoCreated++;
+              return newMember.id;
+            })();
+
+            // Re-assign memberId and fall through to transaction processing.
+            (finalMatch as { memberId: number | null }).memberId = newMemberId;
           }
 
-          const memberId = finalMatch.memberId;
+          const memberId = finalMatch.memberId!;
           memberMatchedRows.add(row.rowNumber);
 
           // Lock the member row for the duration of this row's processing.
@@ -426,70 +535,27 @@ router.post(
           }
         }
 
-        // ── Opening-balance pass ────────────────────────────────────────────
-        // Deductions must also flow into still-unclaimed opening balances so a
-        // member who registers later inherits the post-deduction figure. Match
-        // by name against unclaimed rows only. If a sheet row already matched a
-        // registered member, flag the duplicate opening row for admin review
-        // instead of double-applying.
-        let openingProcessed = 0;
+        // ── Opening-balance reconcile pass ──────────────────────────────────
+        // Unmatched rows now auto-create members and claim their OB directly
+        // in the main loop above. This pass only handles the remaining edge
+        // case: a sheet row matched a *registered* member but an unclaimed OB
+        // row also matches the same name — flag those for admin review so they
+        // are not silently double-counted.
         let openingFlagged = 0;
-        const unclaimedOpenings = await tx
-          .select({ id: openingBalancesTable.id, fullName: openingBalancesTable.fullName })
-          .from(openingBalancesTable)
-          .where(eq(openingBalancesTable.status, "unclaimed"))
-          .for("update");
 
         if (unclaimedOpenings.length > 0) {
-          const obMatcher = new NameMatcher(unclaimedOpenings);
           for (const row of sheet.rows) {
+            if (!memberMatchedRows.has(row.rowNumber)) continue;
             const obMatch = obMatcher.match(row.rawName);
             if (obMatch.memberId == null) continue;
-            const openingId = obMatch.memberId;
-
-            if (memberMatchedRows.has(row.rowNumber)) {
-              await tx
-                .update(openingBalancesTable)
-                .set({
-                  status: "needs_reconcile",
-                  reconcileNote: `Monthly deduction for ${parsed.data.month} ${parsed.data.year} also matched a registered member ("${row.rawName}"). Applied to the member; this row was left untouched for review.`,
-                })
-                .where(eq(openingBalancesTable.id, openingId));
-              openingFlagged++;
-              continue;
-            }
-
-            const obDeltas: Record<string, number> = {};
-            let obTouched = false;
-            for (const cat of ALL_CATEGORIES) {
-              const amt = row.amounts[cat];
-              if (!amt || amt <= 0) continue;
-              const cfg = CATEGORY_CONFIG[cat];
-              const signed = cfg.direction === "credit" ? amt : -amt;
-              obDeltas[cfg.balanceField as string] =
-                (obDeltas[cfg.balanceField as string] || 0) + signed;
-              obTouched = true;
-            }
-
-            if (!obTouched) continue;
-
-            const obSet: Record<string, any> = {};
-            for (const [field, delta] of Object.entries(obDeltas)) {
-              const col = (openingBalancesTable as any)[field];
-              if (delta >= 0) {
-                obSet[field] = sql`${col} + ${delta.toString()}::numeric`;
-              } else {
-                obSet[field] = sql`GREATEST(0, ${col} - ${Math.abs(delta).toString()}::numeric)`;
-              }
-            }
-            obSet.totalLoanBalance = sql`${openingBalancesTable.realLoanBalance} + ${openingBalancesTable.emergencyLoanBalance}`;
-            obSet.totalStoreDebt = sql`${openingBalancesTable.electronicsDebt} + ${openingBalancesTable.sElectronicsDebt} + ${openingBalancesTable.commodityDebt} + ${openingBalancesTable.ghlFormDebt}`;
-
             await tx
               .update(openingBalancesTable)
-              .set(obSet)
-              .where(eq(openingBalancesTable.id, openingId));
-            openingProcessed++;
+              .set({
+                status: "needs_reconcile",
+                reconcileNote: `Monthly deduction for ${parsed.data.month} ${parsed.data.year} also matched a registered member ("${row.rawName}"). Applied to the member; this row was left untouched for review.`,
+              })
+              .where(eq(openingBalancesTable.id, obMatch.memberId));
+            openingFlagged++;
           }
         }
 
@@ -506,9 +572,9 @@ router.post(
           uploadRecord,
           processed,
           skipped,
+          autoCreated,
           errors,
           notifications,
-          openingProcessed,
           openingFlagged,
         };
       });
@@ -521,7 +587,7 @@ router.post(
         return;
       }
 
-      const { uploadRecord, processed, skipped, errors, notifications, openingProcessed, openingFlagged } =
+      const { uploadRecord, processed, skipped, autoCreated, errors, notifications, openingFlagged } =
         result;
 
       // Notifications are sent post-commit so that a rollback never leaves
@@ -540,15 +606,15 @@ router.post(
         action: "PROCESS_EXCEL_UPLOAD",
         entity: "upload_record",
         entityId: uploadRecord.id,
-        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year}: ${processed} processed, ${skipped} skipped, ${openingProcessed} opening balance(s) updated, ${openingFlagged} flagged for review`,
+        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year}: ${processed} processed, ${autoCreated} auto-created, ${skipped} skipped, ${openingFlagged} OB rows flagged for review`,
       });
 
       res.json({
         uploadRecordId: uploadRecord.id,
         processed,
         skipped,
+        autoCreated,
         errors,
-        openingBalancesUpdated: openingProcessed,
         openingBalancesFlagged: openingFlagged,
       });
     } catch (err: any) {
