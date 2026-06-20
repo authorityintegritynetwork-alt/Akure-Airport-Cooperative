@@ -1,5 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
+import { mkdirSync } from "fs";
+import { randomUUID } from "crypto";
+import multer from "multer";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -9,6 +12,36 @@ import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+const UPLOAD_DIR = "/tmp/cooperative-uploads";
+mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const diskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, _file, cb) => cb(null, `${randomUUID()}.xlsx`),
+});
+const uploadMiddleware = multer({
+  storage: diskStorage,
+  limits: { fileSize: 30 * 1024 * 1024 },
+});
+
+/**
+ * POST /storage/uploads/file
+ *
+ * Direct multipart file upload (bypasses GCS presigned URLs).
+ * Used for Excel uploads where GCS sidecar signing is unavailable.
+ */
+router.post(
+  "/storage/uploads/file",
+  uploadMiddleware.single("file"),
+  (req: Request, res: Response): void => {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    res.json({ objectPath: req.file.path });
+  },
+);
 
 /**
  * POST /storage/uploads/request-url

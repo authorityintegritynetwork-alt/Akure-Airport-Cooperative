@@ -74,20 +74,14 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
     if (!file) return;
     setUploading(true);
     try {
-      const urlResp = await fetch(`${basePath}/api/storage/uploads/request-url`, {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadResp = await fetch(`${basePath}/api/storage/uploads/file`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        body: formData,
       });
-      if (!urlResp.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = await urlResp.json();
-
-      const putResp = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!putResp.ok) throw new Error("Failed to upload file");
+      if (!uploadResp.ok) throw new Error("Failed to upload file");
+      const { objectPath } = await uploadResp.json();
 
       setUploadedPath(objectPath);
 

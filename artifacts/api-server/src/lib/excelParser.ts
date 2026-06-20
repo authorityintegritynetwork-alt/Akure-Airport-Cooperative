@@ -306,6 +306,11 @@ export function parseSheet(
 }
 
 export async function downloadWorkbook(fileObjectPath: string): Promise<xlsx.WorkBook> {
+  if (fileObjectPath.startsWith("/tmp/")) {
+    const { readFile } = await import("fs/promises");
+    const buf = await readFile(fileObjectPath);
+    return xlsx.read(buf, { type: "buffer" });
+  }
   const svc = new ObjectStorageService();
   const normalized = fileObjectPath.startsWith("/objects/")
     ? fileObjectPath
