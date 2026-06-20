@@ -252,6 +252,7 @@ export interface Organization {
   name: string;
   /** @nullable */
   description?: string | null;
+  excelFormat: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -264,12 +265,15 @@ export interface CreateOrganizationBody {
   name: string;
   /** Optional one-line description shown on the sign-up screen. */
   description?: string;
+  /** Excel deduction format: 'faan' or 'nama'. */
+  excelFormat: "faan" | "nama";
 }
 
 export interface UpdateOrganizationBody {
   name?: string;
   /** @nullable */
   description?: string | null;
+  excelFormat?: "faan" | "nama";
 }
 
 export interface LoanProduct {
