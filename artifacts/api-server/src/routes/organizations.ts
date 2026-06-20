@@ -97,6 +97,7 @@ router.post(
         code,
         name: parsed.data.name.trim(),
         description: parsed.data.description?.trim() || null,
+        excelFormat: parsed.data.excelFormat,
         isActive: true,
       })
       .returning();

@@ -53,6 +53,7 @@ const createSchema = z.object({
     ),
   name: z.string().min(2, "Display name required"),
   description: z.string().optional(),
+  excelFormat: z.enum(["faan", "nama"], { required_error: "Please select an Excel format" }),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
@@ -92,7 +93,7 @@ export function OrganizationsPage() {
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { code: "", name: "", description: "" },
+    defaultValues: { code: "", name: "", description: "", excelFormat: "faan" },
   });
 
   const editForm = useForm<EditForm>({
@@ -125,6 +126,7 @@ export function OrganizationsPage() {
         code: data.code.trim().toUpperCase().replace(/\s+/g, "_"),
         name: data.name.trim(),
         description: data.description?.trim() || undefined,
+        excelFormat: data.excelFormat,
       });
       toast({ title: "Organization created" });
       invalidate();
@@ -275,6 +277,32 @@ export function OrganizationsPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={createForm.control} name="excelFormat" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Excel deduction format *</FormLabel>
+                      <FormDescription className="text-xs">
+                        Which column layout does this employer's payroll sheet use?
+                      </FormDescription>
+                      <div className="flex gap-2 pt-1">
+                        {(["faan", "nama"] as const).map((fmt) => (
+                          <button
+                            key={fmt}
+                            type="button"
+                            onClick={() => field.onChange(fmt)}
+                            className={`flex-1 border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                              field.value === fmt
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                : "bg-background hover:bg-muted border-border/60"
+                            }`}
+                            data-testid={`org-format-${fmt}`}
+                          >
+                            {fmt.toUpperCase()} format
+                          </button>
+                        ))}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                   <Button
                     type="submit"
                     className="w-full rounded-xl h-11"
@@ -329,6 +357,9 @@ export function OrganizationsPage() {
                   </span>
                 </div>
                 <p className="text-sm font-medium mt-0.5 truncate">{org.name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Excel format: <span className="font-semibold uppercase">{org.excelFormat}</span>
+                </p>
                 {org.description && (
                   <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{org.description}</p>
                 )}

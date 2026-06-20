@@ -286,6 +286,9 @@ export const CreateOrganizationBody = zod.object({
     .string()
     .optional()
     .describe("Optional one-line description shown on the sign-up screen."),
+  excelFormat: zod
+    .enum(["faan", "nama"])
+    .describe("Excel deduction format: 'faan' or 'nama'."),
 });
 
 /**

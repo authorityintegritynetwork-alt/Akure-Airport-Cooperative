@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useListExcelSheets,
   usePreviewExcelUpload,
   useProcessExcelUpload,
   useListUploadHistory,
   useListMembers,
+  useListOrganizations,
   getListUploadHistoryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,8 +33,6 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-type Org = "faan" | "nama";
-
 // Unified column list — same template for every organisation. Columns the
 // uploaded sheet does not carry are simply skipped (parser tolerates absent
 // headers). The org dropdown is kept for audit/duplicate-guard purposes only.
@@ -58,7 +57,7 @@ export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [organization, setOrganization] = useState<Org>("faan");
+  const [organization, setOrganization] = useState<string>("");
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean }[]>([]);
@@ -75,6 +74,10 @@ export function UploadPage() {
   const process = useProcessExcelUpload();
   const processWithStepUp = useStepUpAction((data: any) => process.mutateAsync({ data }));
   const { data: members } = useListMembers({ status: "active" });
+  const { data: orgList } = useListOrganizations();
+  useEffect(() => {
+    if (!organization && orgList?.length) setOrganization(orgList[0].excelFormat);
+  }, [orgList]);
 
   const memberOptions = useMemo(
     () =>
@@ -283,20 +286,20 @@ export function UploadPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organization</label>
-              <div className="flex gap-2 mt-1.5">
-                {(["faan", "nama"] as Org[]).map((o) => (
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {(orgList ?? []).map((o) => (
                   <button
-                    key={o}
+                    key={o.id}
                     type="button"
-                    onClick={() => setOrganization(o)}
-                    className={`flex-1 border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
-                      organization === o
+                    onClick={() => setOrganization(o.excelFormat)}
+                    className={`border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      organization === o.excelFormat
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-background hover:bg-muted border-border/60"
                     }`}
-                    data-testid={`org-${o}`}
+                    data-testid={`org-${o.code.toLowerCase()}`}
                   >
-                    {o.toUpperCase()}
+                    {o.code}
                   </button>
                 ))}
               </div>

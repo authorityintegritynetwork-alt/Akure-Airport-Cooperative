@@ -12,6 +12,7 @@ export interface Organization {
   name: string;
   /** @nullable */
   description?: string | null;
+  excelFormat: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
