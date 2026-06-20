@@ -60,7 +60,7 @@ export const ORG_CATEGORIES: Record<Organization, DeductionCategory[]> = {
 
 const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
   savings: ["savings", "saving"],
-  provident: ["prov", "provident"],
+  provident: ["prov", "prov.", "provident"],
   christmas: ["xmass", "xmas", "christmas"],
   realLoan: [
     "real loan",
@@ -116,7 +116,7 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
     "g/hl/f",
   ],
   fire: ["fire", "fire fund", "fire contribution", "fire/fund"],
-  fuelVenture: ["f/vent", "f vent", "fvent", "fuel vent", "fuel venture", "fuel-venture"],
+  fuelVenture: ["f/v", "f/vent", "f vent", "fvent", "fuel vent", "fuel venture", "fuel-venture"],
   landLoan: ["land", "land loan", "land/loan"],
 };
 
