@@ -22,6 +22,15 @@ import {
 } from "@workspace/api-zod";
 import { NameMatcher } from "../lib/nameMatcher";
 import { formatMember } from "../lib/formatMember";
+import {
+  ALL_CATEGORIES,
+  CATEGORY_CONFIG,
+  downloadWorkbook,
+  parseSheet,
+  summarizeSheets,
+} from "../lib/excelParser";
+import { z } from "zod";
+import { organizationsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -283,6 +292,196 @@ router.post(
     });
 
     res.json(formatMember(result.member));
+  },
+);
+
+// ── Zod schemas for opening-balance bulk upload ─────────────────────────────
+
+const ObUploadPreviewBody = z.object({
+  fileObjectPath: z.string().min(1),
+  sheetName: z.string().optional(),
+  organization: z.string().min(1),
+});
+
+const ObUploadProcessBody = z.object({
+  fileObjectPath: z.string().min(1),
+  sheetName: z.string().optional(),
+  organization: z.string().min(1),
+  replaceExisting: z.boolean().optional().default(false),
+});
+
+// ── Preview: parse Excel, show what would be imported ───────────────────────
+
+router.post(
+  "/uploads/opening-balances/preview",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const parsed = ObUploadPreviewBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const normalizedOrg = parsed.data.organization.trim().toUpperCase();
+    const [org] = await db
+      .select({ id: organizationsTable.id, code: organizationsTable.code })
+      .from(organizationsTable)
+      .where(eq(organizationsTable.code, normalizedOrg));
+    if (!org) {
+      res.status(400).json({ error: `Unknown organization "${parsed.data.organization}".` });
+      return;
+    }
+
+    try {
+      const wb = await downloadWorkbook(parsed.data.fileObjectPath);
+      const sheetName = parsed.data.sheetName || wb.SheetNames[0];
+      if (!wb.SheetNames.includes(sheetName)) {
+        res.status(400).json({ error: `Sheet "${sheetName}" not found in workbook.` });
+        return;
+      }
+
+      const sheets = summarizeSheets(wb);
+      const sheet = parseSheet(wb, sheetName);
+
+      const rows = sheet.rows.map((row) => {
+        const values: Record<string, number> = {};
+        for (const cat of ALL_CATEGORIES) {
+          values[cat] = row.amounts[cat];
+        }
+        return {
+          rowNumber: row.rowNumber,
+          rawName: row.rawName,
+          ...values,
+          total: row.computedTotal,
+          warnings: row.warnings,
+          errors: row.errors,
+        };
+      });
+
+      res.json({
+        sheetName,
+        sheets,
+        totalRows: rows.length,
+        rows,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: `Failed to read Excel file: ${err.message}` });
+    }
+  },
+);
+
+// ── Process: insert rows into opening_balances table ────────────────────────
+
+router.post(
+  "/uploads/opening-balances/process",
+  requireAuth,
+  requireAdminOnly,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const parsed = ObUploadProcessBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const normalizedOrg = parsed.data.organization.trim().toUpperCase();
+    const [org] = await db
+      .select({ id: organizationsTable.id, code: organizationsTable.code })
+      .from(organizationsTable)
+      .where(eq(organizationsTable.code, normalizedOrg));
+    if (!org) {
+      res.status(400).json({ error: `Unknown organization "${parsed.data.organization}".` });
+      return;
+    }
+
+    try {
+      const wb = await downloadWorkbook(parsed.data.fileObjectPath);
+      const sheetName = parsed.data.sheetName || wb.SheetNames[0];
+      if (!wb.SheetNames.includes(sheetName)) {
+        res.status(400).json({ error: `Sheet "${sheetName}" not found in workbook.` });
+        return;
+      }
+
+      const sheet = parseSheet(wb, sheetName);
+
+      let inserted = 0;
+      let skipped = 0;
+
+      await db.transaction(async (tx) => {
+        for (const row of sheet.rows) {
+          if (!row.rawName.trim()) { skipped++; continue; }
+
+          // Check for existing unclaimed row with same name + org to avoid duplicates
+          if (!parsed.data.replaceExisting) {
+            const existing = await tx
+              .select({ id: openingBalancesTable.id })
+              .from(openingBalancesTable)
+              .where(
+                and(
+                  ilike(openingBalancesTable.fullName, row.rawName.trim()),
+                  eq(openingBalancesTable.organization, normalizedOrg),
+                  eq(openingBalancesTable.status, "unclaimed"),
+                ),
+              );
+            if (existing.length > 0) { skipped++; continue; }
+          }
+
+          // Compute balance values from parsed amounts.
+          // Credits (savings/provident/christmas/fire) are stored as positive.
+          // Debts (loans, store) are stored as positive amounts owed.
+          const savingsBalance = row.amounts.savings;
+          const providentBalance = row.amounts.provident;
+          const christmasBalance = row.amounts.christmas;
+          const realLoanBalance = row.amounts.realLoan;
+          const emergencyLoanBalance = row.amounts.emergencyLoan;
+          const totalLoanBalance = realLoanBalance + emergencyLoanBalance;
+          const electronicsDebt = row.amounts.electronics;
+          const sElectronicsDebt = row.amounts.sElectronics;
+          const furnitureDebt = row.amounts.furniture;
+          const commodityDebt = row.amounts.commodity;
+          const ghlFormDebt = row.amounts.ghlForm;
+          const totalStoreDebt = electronicsDebt + sElectronicsDebt + commodityDebt + ghlFormDebt;
+          const fireFundBalance = row.amounts.fire;
+          const fuelVentureBalance = row.amounts.fuelVenture;
+          const landLoanBalance = row.amounts.landLoan;
+
+          await tx.insert(openingBalancesTable).values({
+            fullName: row.rawName.trim(),
+            organization: normalizedOrg,
+            status: "unclaimed",
+            savingsBalance: savingsBalance.toString(),
+            providentBalance: providentBalance.toString(),
+            christmasBalance: christmasBalance.toString(),
+            realLoanBalance: realLoanBalance.toString(),
+            emergencyLoanBalance: emergencyLoanBalance.toString(),
+            totalLoanBalance: totalLoanBalance.toString(),
+            electronicsDebt: electronicsDebt.toString(),
+            sElectronicsDebt: sElectronicsDebt.toString(),
+            furnitureDebt: furnitureDebt.toString(),
+            commodityDebt: commodityDebt.toString(),
+            ghlFormDebt: ghlFormDebt.toString(),
+            totalStoreDebt: totalStoreDebt.toString(),
+            fireFundBalance: fireFundBalance.toString(),
+            fuelVentureBalance: fuelVentureBalance.toString(),
+            landLoanBalance: landLoanBalance.toString(),
+          });
+          inserted++;
+        }
+      });
+
+      await logAudit({
+        actorId: req.memberId,
+        action: "IMPORT_OPENING_BALANCES",
+        entity: "opening_balance",
+        entityId: 0,
+        details: `Bulk-imported opening balances from "${sheetName}" for org ${normalizedOrg}: ${inserted} inserted, ${skipped} skipped.`,
+      });
+
+      res.json({ inserted, skipped });
+    } catch (err: any) {
+      res.status(400).json({ error: `Failed to process file: ${err.message}` });
+    }
   },
 );
 

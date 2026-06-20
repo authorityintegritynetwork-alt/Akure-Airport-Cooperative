@@ -6,6 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(__dirname, "../..");
 
 const VITE_PORT = process.env.VITE_PORT || "5173";
+const API_PORT = process.env.PORT || "3000";
 
 function startProcess(cmd, args, env = {}) {
   const proc = spawn(cmd, args, {
@@ -34,6 +35,7 @@ const apiProcess = startProcess(
   {
     NODE_ENV: "development",
     VITE_PORT,
+    PORT: API_PORT,
   },
 );
 

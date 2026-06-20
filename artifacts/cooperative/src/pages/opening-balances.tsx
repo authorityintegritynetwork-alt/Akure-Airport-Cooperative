@@ -29,6 +29,7 @@ import {
 import {
   OpeningBalanceSummary,
 } from "@/components/claim-opening-balance-dialog";
+import { OpeningBalanceUpload } from "@/components/opening-balance-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useStepUpAction } from "@/lib/step-up";
 import { Wallet, Search, AlertTriangle } from "lucide-react";
@@ -99,6 +100,15 @@ export function OpeningBalancesPage() {
           </p>
         </div>
       </div>
+
+      <OpeningBalanceUpload
+        onImported={() =>
+          queryClient.invalidateQueries({
+            predicate: (q) =>
+              Array.isArray(q.queryKey) && q.queryKey[0] === "/api/opening-balances",
+          })
+        }
+      />
 
       <Card>
         <CardHeader className="pb-3">

@@ -315,6 +315,43 @@ export async function downloadWorkbook(fileObjectPath: string): Promise<xlsx.Wor
   return xlsx.read(buf, { type: "buffer" });
 }
 
+export interface CategoryConfig {
+  txType:
+    | "savings"
+    | "provident"
+    | "christmas"
+    | "real_loan_repayment"
+    | "emergency_loan_repayment"
+    | "electronics_repayment"
+    | "s_electronics_repayment"
+    | "furniture_repayment"
+    | "commodity_repayment"
+    | "ghl_form_repayment"
+    | "fire"
+    | "fuel_venture_repayment"
+    | "land_loan_repayment";
+  balanceField: string;
+  direction: "credit" | "debit";
+  label: string;
+  loanStatus?: "real" | "emergency";
+}
+
+export const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
+  savings: { txType: "savings", balanceField: "savingsBalance", direction: "credit", label: "Savings" },
+  provident: { txType: "provident", balanceField: "providentBalance", direction: "credit", label: "Provision" },
+  christmas: { txType: "christmas", balanceField: "christmasBalance", direction: "credit", label: "Christmas Savings" },
+  realLoan: { txType: "real_loan_repayment", balanceField: "realLoanBalance", direction: "debit", label: "Real Loan Repayment", loanStatus: "real" },
+  emergencyLoan: { txType: "emergency_loan_repayment", balanceField: "emergencyLoanBalance", direction: "debit", label: "Emergency Loan Repayment", loanStatus: "emergency" },
+  electronics: { txType: "electronics_repayment", balanceField: "electronicsDebt", direction: "debit", label: "Electronics Repayment" },
+  sElectronics: { txType: "s_electronics_repayment", balanceField: "sElectronicsDebt", direction: "debit", label: "Small Electronics Repayment" },
+  furniture: { txType: "furniture_repayment", balanceField: "furnitureDebt", direction: "debit", label: "Furniture Repayment" },
+  commodity: { txType: "commodity_repayment", balanceField: "commodityDebt", direction: "debit", label: "Commodity Repayment" },
+  ghlForm: { txType: "ghl_form_repayment", balanceField: "ghlFormDebt", direction: "debit", label: "Loan Form Cost Repayment" },
+  fire: { txType: "fire", balanceField: "fireFundBalance", direction: "credit", label: "Fire Fund Contribution" },
+  fuelVenture: { txType: "fuel_venture_repayment", balanceField: "fuelVentureBalance", direction: "debit", label: "Fuel Venture Loan Repayment" },
+  landLoan: { txType: "land_loan_repayment", balanceField: "landLoanBalance", direction: "debit", label: "Land Loan Repayment" },
+};
+
 export interface SheetSummary {
   name: string;
   rowCount: number;
