@@ -112,7 +112,11 @@ export function UploadPage() {
         method: "POST",
         body: formData,
       });
-      if (!uploadResp.ok) throw new Error("Failed to upload file");
+      if (!uploadResp.ok) {
+        let detail = `Server returned ${uploadResp.status}`;
+        try { const d = await uploadResp.json(); if (d?.error) detail = d.error; } catch {}
+        throw new Error(`Failed to upload file: ${detail}`);
+      }
       const { objectPath } = await uploadResp.json();
 
       setUploadedPath(objectPath);
