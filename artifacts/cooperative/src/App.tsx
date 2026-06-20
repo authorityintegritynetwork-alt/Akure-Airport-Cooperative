@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser, useAuth } from '@clerk/react';
 import { InstallBanner } from "@/components/install-banner";
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { StepUpProvider, StepUpGate } from "@/lib/step-up";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
 
 import { LandingPage, PendingApproval } from "./pages/landing";
 import { AppLayout } from "./components/layout";
@@ -209,6 +210,20 @@ function ScopedInstallBanner() {
   return <InstallBanner scopeKey={scopeKey} />;
 }
 
+/**
+ * Registers a Clerk token getter so every API request carries an
+ * Authorization: Bearer header. This is required on non-localhost deployments
+ * (e.g. Koyeb) where Clerk dev-instance cookies are not set on the app domain.
+ */
+function ClerkTokenSync() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [getToken]);
+  return null;
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -221,6 +236,7 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <ClerkTokenSync />
         <ClerkQueryClientCacheInvalidator />
         <ScopedInstallBanner />
         <StepUpProvider>
