@@ -61,7 +61,7 @@ export function UploadPage() {
   const [organization, setOrganization] = useState<string>("");
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
-  const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean }[]>([]);
+  const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean; detectedMonth?: string; detectedYear?: number }[]>([]);
   const [chosenSheet, setChosenSheet] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [manualMatches, setManualMatches] = useState<Record<number, number>>({});
@@ -125,13 +125,18 @@ export function UploadPage() {
         data: { fileObjectPath: objectPath, organization },
       });
       setSheets(sheetResult.sheets);
-      // Always default to the LAST valid sheet — workbooks grow chronologically
-      // so the most recent month is always at the end.
+      // Prefer the sheet whose detected month+year matches the selected period.
+      // Fall back to the last valid sheet if none match; show the picker if none are valid.
       const validSheets = sheetResult.sheets.filter((s) => s.looksValid);
-      const lastValid = validSheets[validSheets.length - 1];
-      if (lastValid) {
-        setChosenSheet(lastValid.name);
-        await loadPreview(objectPath, lastValid.name, {});
+      const matchingSheet = validSheets.find(
+        (s) =>
+          s.detectedMonth?.toLowerCase() === month.toLowerCase() &&
+          s.detectedYear === year,
+      );
+      const targetSheet = matchingSheet ?? validSheets[validSheets.length - 1];
+      if (targetSheet) {
+        setChosenSheet(targetSheet.name);
+        await loadPreview(objectPath, targetSheet.name, {});
       } else {
         setStage("pickSheet");
       }
@@ -378,6 +383,11 @@ export function UploadPage() {
           <CardContent>
             {(() => {
               const validSheets = sheets.filter((s) => s.looksValid);
+              const matchingSheet = validSheets.find(
+                (s) =>
+                  s.detectedMonth?.toLowerCase() === month.toLowerCase() &&
+                  s.detectedYear === year,
+              );
               const lastValidName = validSheets[validSheets.length - 1]?.name;
               const displayed = showAllSheets
                 ? sheets
@@ -387,7 +397,9 @@ export function UploadPage() {
               return (
                 <div className="space-y-2">
                   {displayed.map((s) => {
-                    const isRecommended = s.name === lastValidName;
+                    const isMonthMatch = !!matchingSheet && s.name === matchingSheet.name;
+                    const isFallback = !matchingSheet && s.name === lastValidName;
+                    const highlighted = isMonthMatch || isFallback;
                     return (
                       <button
                         key={s.name}
@@ -395,22 +407,30 @@ export function UploadPage() {
                         onClick={() => handlePickSheet(s.name)}
                         disabled={preview.isPending}
                         className={`w-full flex items-center justify-between p-3 rounded-xl border text-left disabled:opacity-50 transition-colors ${
-                          isRecommended
+                          highlighted
                             ? "border-primary/50 bg-primary/5 hover:bg-primary/10"
                             : "border-border/70 hover:bg-muted/40 hover:border-primary/40"
                         }`}
                         data-testid={`sheet-${s.name}`}
                       >
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-sm truncate">{s.name}</p>
-                            {isRecommended && (
+                            {isMonthMatch && (
+                              <Badge variant="default" className="rounded-full text-[10px] py-0 px-1.5 shrink-0">
+                                {month} {year}
+                              </Badge>
+                            )}
+                            {isFallback && (
                               <Badge variant="default" className="rounded-full text-[10px] py-0 px-1.5 shrink-0">
                                 Most recent
                               </Badge>
                             )}
                           </div>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {s.detectedMonth && s.detectedYear
+                              ? `${s.detectedMonth} ${s.detectedYear} · `
+                              : ""}
                             {s.rowCount} data row{s.rowCount === 1 ? "" : "s"} detected
                           </p>
                         </div>
@@ -446,10 +466,35 @@ export function UploadPage() {
                       className="ml-2 underline text-primary"
                       onClick={() => setStage("pickSheet")}
                     >
-                      Wrong sheet?
+                      Switch sheet
                     </button>
                   )}
                 </p>
+                {(() => {
+                  const current = sheets.find((s) => s.name === previewData.sheetName);
+                  const monthMismatch =
+                    current?.detectedMonth &&
+                    current?.detectedYear &&
+                    (current.detectedMonth.toLowerCase() !== month.toLowerCase() ||
+                      current.detectedYear !== year);
+                  if (!monthMismatch) return null;
+                  return (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      This sheet contains <span className="font-medium">{current!.detectedMonth} {current!.detectedYear}</span> data,
+                      but you selected <span className="font-medium">{month} {year}</span>.
+                      {sheets.length > 1 && (
+                        <button
+                          type="button"
+                          className="underline text-primary ml-0.5"
+                          onClick={() => setStage("pickSheet")}
+                        >
+                          Switch sheet
+                        </button>
+                      )}
+                    </p>
+                  );
+                })()}
               </div>
               <div className="flex flex-wrap gap-1.5 justify-end">
                 <Badge className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" variant="outline">

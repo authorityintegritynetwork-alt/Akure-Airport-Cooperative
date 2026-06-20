@@ -713,6 +713,8 @@ export const ListExcelSheetsResponse = zod.object({
       name: zod.string(),
       rowCount: zod.number(),
       looksValid: zod.boolean(),
+      detectedMonth: zod.string().optional(),
+      detectedYear: zod.number().optional(),
     }),
   ),
 });

@@ -361,6 +361,57 @@ export interface SheetSummary {
   name: string;
   rowCount: number;
   looksValid: boolean;
+  detectedMonth?: string;
+  detectedYear?: number;
+}
+
+const MONTH_NAMES: Record<string, string> = {
+  jan: "January", january: "January",
+  feb: "February", february: "February",
+  mar: "March", march: "March",
+  apr: "April", april: "April",
+  may: "May",
+  jun: "June", june: "June",
+  jul: "July", july: "July",
+  aug: "August", august: "August",
+  sep: "September", sept: "September", september: "September",
+  oct: "October", october: "October",
+  nov: "November", november: "November",
+  dec: "December", december: "December",
+};
+
+/**
+ * Scan the first 15 rows of a sheet's raw cell values for a month+year
+ * combination (e.g. "November 2025", "NOV-25", "Nov 2025").
+ * Returns { month: "November", year: 2025 } or null if not found.
+ */
+export function detectMonthYear(
+  rows: unknown[][],
+): { month: string; year: number } | null {
+  const scanRows = Math.min(rows.length, 15);
+
+  // Pattern: optional sep, month-word, optional sep, 2- or 4-digit year
+  const RE = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[^a-z0-9]*(\d{2,4})\b/i;
+
+  for (let r = 0; r < scanRows; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    for (const cell of row) {
+      if (cell == null) continue;
+      const text = String(cell).trim();
+      if (!text) continue;
+      const m = text.match(RE);
+      if (!m) continue;
+      const monthKey = m[1].toLowerCase();
+      const fullMonth = MONTH_NAMES[monthKey];
+      if (!fullMonth) continue;
+      let year = parseInt(m[2], 10);
+      if (year < 100) year += year >= 50 ? 1900 : 2000;
+      if (year < 2000 || year > 2100) continue;
+      return { month: fullMonth, year };
+    }
+  }
+  return null;
 }
 
 export function summarizeSheets(
@@ -379,10 +430,12 @@ export function summarizeSheets(
     const dataRowCount = header
       ? Math.max(0, rows.length - header.headerRowIndex - 1)
       : 0;
+    const detected = detectMonthYear(rows);
     return {
       name,
       rowCount: dataRowCount,
       looksValid: !!header,
+      ...(detected ? { detectedMonth: detected.month, detectedYear: detected.year } : {}),
     };
   });
 }

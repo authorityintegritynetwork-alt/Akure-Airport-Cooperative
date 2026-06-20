@@ -438,6 +438,8 @@ export interface ExcelSheetInfo {
   name: string;
   rowCount: number;
   looksValid: boolean;
+  detectedMonth?: string;
+  detectedYear?: number;
 }
 
 export interface ExcelSheetsResult {
