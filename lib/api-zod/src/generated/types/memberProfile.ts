@@ -34,6 +34,36 @@ export interface MemberProfile {
   totalStoreDebt: number;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
+  /** @nullable */
+  obSavingsBalance?: number | null;
+  /** @nullable */
+  obProvidentBalance?: number | null;
+  /** @nullable */
+  obChristmasBalance?: number | null;
+  /** @nullable */
+  obRealLoanBalance?: number | null;
+  /** @nullable */
+  obEmergencyLoanBalance?: number | null;
+  /** @nullable */
+  obTotalLoanBalance?: number | null;
+  /** @nullable */
+  obElectronicsDebt?: number | null;
+  /** @nullable */
+  obSElectronicsDebt?: number | null;
+  /** @nullable */
+  obFurnitureDebt?: number | null;
+  /** @nullable */
+  obCommodityDebt?: number | null;
+  /** @nullable */
+  obGhlFormDebt?: number | null;
+  /** @nullable */
+  obFireFundBalance?: number | null;
+  /** @nullable */
+  obFuelVentureBalance?: number | null;
+  /** @nullable */
+  obLandLoanBalance?: number | null;
+  /** @nullable */
+  obTotalStoreDebt?: number | null;
   organization?: string;
   createdAt: Date;
 }

@@ -6,10 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ExcelSheetInfo {
-  name: string;
-  rowCount: number;
-  looksValid: boolean;
-  detectedMonth?: string;
-  detectedYear?: number;
+export interface BalanceTimelineSnapshot {
+  savings: number;
+  loan: number;
+  store: number;
 }

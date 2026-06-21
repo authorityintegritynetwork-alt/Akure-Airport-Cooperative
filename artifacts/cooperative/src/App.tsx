@@ -24,6 +24,7 @@ import { MemberDetailPage } from "./pages/member-detail";
 import { OpeningBalancesPage } from "./pages/opening-balances";
 import { LoansAdminPage } from "./pages/loans-admin";
 import { UploadPage, UploadHistoryPage } from "./pages/upload";
+import { UploadedMonthsPage } from "./pages/uploaded-months";
 import { StoreAdminPage } from "./pages/store-admin";
 import { AuditLogsPage } from "./pages/audit-logs";
 import { SettingsPage } from "./pages/settings";
@@ -294,6 +295,9 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/upload-history">
             <ProtectedRoute component={UploadHistoryPage} />
+          </Route>
+          <Route path="/uploaded-months">
+            <ProtectedRoute component={UploadedMonthsPage} />
           </Route>
           <Route path="/store-admin">
             <ProtectedRoute component={StoreAdminPage} />

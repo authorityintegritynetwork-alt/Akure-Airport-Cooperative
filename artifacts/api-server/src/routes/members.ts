@@ -771,4 +771,179 @@ router.get("/members/:id/summary", requireAuth, async (req: AuthRequest, res): P
   });
 });
 
+// ── BALANCE TIMELINE ────────────────────────────────────────────────────────
+// Per-member journey: opening balance snapshot → each uploaded month → current
+// live balance, with savings/loan/store running totals.
+const MONTH_ORDER: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+const SAVINGS_CREDIT_TYPES = new Set([
+  "savings", "provident", "christmas", "fire",
+]);
+const LOAN_DEBIT_TYPES = new Set([
+  "real_loan_repayment", "emergency_loan_repayment", "loan_repayment",
+  "fuel_venture_repayment", "land_loan_repayment",
+]);
+const STORE_DEBIT_TYPES = new Set([
+  "electronics_repayment", "s_electronics_repayment", "furniture_repayment",
+  "commodity_repayment", "ghl_form_repayment", "store_repayment",
+]);
+
+const TX_LABELS: Record<string, string> = {
+  savings: "Savings", provident: "Provident", christmas: "Christmas",
+  fire: "Fire Fund", real_loan_repayment: "Real Loan Repayment",
+  emergency_loan_repayment: "Emergency Loan Repayment",
+  loan_repayment: "Loan Repayment",
+  fuel_venture_repayment: "Fuel Venture Repayment",
+  land_loan_repayment: "Land Loan Repayment",
+  electronics_repayment: "Electronics Repayment",
+  s_electronics_repayment: "Staff Electronics Repayment",
+  furniture_repayment: "Furniture Repayment",
+  commodity_repayment: "Commodity Repayment",
+  ghl_form_repayment: "GHL Form Repayment",
+  store_repayment: "Store Repayment",
+};
+
+router.get(
+  "/members/:id/balance-timeline",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) {
+      res.status(400).json({ error: "Invalid member id" });
+      return;
+    }
+
+    const [member] = await db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, id));
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+
+    const num = (v: string | null | undefined): number =>
+      v == null ? 0 : parseFloat(v) || 0;
+
+    const opening = {
+      savings:
+        num(member.obSavingsBalance) +
+        num(member.obProvidentBalance) +
+        num(member.obChristmasBalance) +
+        num(member.obFireFundBalance),
+      loan: num(member.obTotalLoanBalance),
+      store: num(member.obTotalStoreDebt),
+    };
+
+    const current = {
+      savings:
+        num(member.savingsBalance) +
+        num(member.providentBalance) +
+        num(member.christmasBalance) +
+        num(member.fireFundBalance),
+      loan: num(member.totalLoanBalance),
+      store: num(member.totalStoreDebt),
+    };
+
+    const txns = await db
+      .select({
+        type: transactionsTable.type,
+        amount: transactionsTable.amount,
+        month: transactionsTable.month,
+        year: transactionsTable.year,
+      })
+      .from(transactionsTable)
+      .where(eq(transactionsTable.memberId, id));
+
+    type PeriodAgg = {
+      year: number;
+      month: string;
+      savingsAdded: number;
+      loanRepaid: number;
+      storeRepaid: number;
+      items: Map<string, { amount: number; direction: "credit" | "debit" }>;
+    };
+    const periodMap = new Map<string, PeriodAgg>();
+
+    for (const t of txns) {
+      if (t.type === "opening_balance") continue;
+      if (!t.month || t.year == null) continue;
+      const key = `${t.year}-${t.month}`;
+      let p = periodMap.get(key);
+      if (!p) {
+        p = {
+          year: t.year,
+          month: t.month,
+          savingsAdded: 0,
+          loanRepaid: 0,
+          storeRepaid: 0,
+          items: new Map(),
+        };
+        periodMap.set(key, p);
+      }
+      const amt = num(t.amount);
+      let direction: "credit" | "debit" = "credit";
+      if (SAVINGS_CREDIT_TYPES.has(t.type)) {
+        p.savingsAdded += amt;
+        direction = "credit";
+      } else if (LOAN_DEBIT_TYPES.has(t.type)) {
+        p.loanRepaid += amt;
+        direction = "debit";
+      } else if (STORE_DEBIT_TYPES.has(t.type)) {
+        p.storeRepaid += amt;
+        direction = "debit";
+      } else {
+        continue;
+      }
+      const existing = p.items.get(t.type);
+      if (existing) existing.amount += amt;
+      else p.items.set(t.type, { amount: amt, direction });
+    }
+
+    const sorted = Array.from(periodMap.values()).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return (
+        (MONTH_ORDER[a.month.toLowerCase()] || 0) -
+        (MONTH_ORDER[b.month.toLowerCase()] || 0)
+      );
+    });
+
+    let runSavings = opening.savings;
+    let runLoan = opening.loan;
+    let runStore = opening.store;
+    const periods = sorted.map((p) => {
+      runSavings += p.savingsAdded;
+      runLoan = Math.max(0, runLoan - p.loanRepaid);
+      runStore = Math.max(0, runStore - p.storeRepaid);
+      return {
+        year: p.year,
+        month: p.month,
+        label: `${p.month} ${p.year}`,
+        savingsAdded: p.savingsAdded,
+        loanRepaid: p.loanRepaid,
+        storeRepaid: p.storeRepaid,
+        running: { savings: runSavings, loan: runLoan, store: runStore },
+        items: Array.from(p.items.entries()).map(([type, v]) => ({
+          label: TX_LABELS[type] || type,
+          amount: v.amount,
+          direction: v.direction,
+        })),
+      };
+    });
+
+    res.json({
+      memberId: member.id,
+      fullName: member.fullName,
+      opening,
+      periods,
+      current,
+    });
+  },
+);
+
 export default router;

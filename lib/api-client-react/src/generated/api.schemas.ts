@@ -56,6 +56,36 @@ export interface Member {
   ghlFormDebt: number;
   fireFundBalance: number;
   totalStoreDebt: number;
+  /** @nullable */
+  obSavingsBalance?: number | null;
+  /** @nullable */
+  obProvidentBalance?: number | null;
+  /** @nullable */
+  obChristmasBalance?: number | null;
+  /** @nullable */
+  obRealLoanBalance?: number | null;
+  /** @nullable */
+  obEmergencyLoanBalance?: number | null;
+  /** @nullable */
+  obTotalLoanBalance?: number | null;
+  /** @nullable */
+  obElectronicsDebt?: number | null;
+  /** @nullable */
+  obSElectronicsDebt?: number | null;
+  /** @nullable */
+  obFurnitureDebt?: number | null;
+  /** @nullable */
+  obCommodityDebt?: number | null;
+  /** @nullable */
+  obGhlFormDebt?: number | null;
+  /** @nullable */
+  obFireFundBalance?: number | null;
+  /** @nullable */
+  obFuelVentureBalance?: number | null;
+  /** @nullable */
+  obLandLoanBalance?: number | null;
+  /** @nullable */
+  obTotalStoreDebt?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -171,6 +201,36 @@ export interface MemberProfile {
   totalStoreDebt: number;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
+  /** @nullable */
+  obSavingsBalance?: number | null;
+  /** @nullable */
+  obProvidentBalance?: number | null;
+  /** @nullable */
+  obChristmasBalance?: number | null;
+  /** @nullable */
+  obRealLoanBalance?: number | null;
+  /** @nullable */
+  obEmergencyLoanBalance?: number | null;
+  /** @nullable */
+  obTotalLoanBalance?: number | null;
+  /** @nullable */
+  obElectronicsDebt?: number | null;
+  /** @nullable */
+  obSElectronicsDebt?: number | null;
+  /** @nullable */
+  obFurnitureDebt?: number | null;
+  /** @nullable */
+  obCommodityDebt?: number | null;
+  /** @nullable */
+  obGhlFormDebt?: number | null;
+  /** @nullable */
+  obFireFundBalance?: number | null;
+  /** @nullable */
+  obFuelVentureBalance?: number | null;
+  /** @nullable */
+  obLandLoanBalance?: number | null;
+  /** @nullable */
+  obTotalStoreDebt?: number | null;
   organization?: string;
   createdAt: string;
 }
@@ -422,6 +482,8 @@ export interface ExcelSheetInfo {
   name: string;
   rowCount: number;
   looksValid: boolean;
+  detectedMonth?: string;
+  detectedYear?: number;
 }
 
 export interface ExcelSheetsResult {
@@ -536,6 +598,66 @@ export interface UploadRecord {
   rowsSkipped: number;
   status: UploadRecordStatus;
   createdAt: string;
+}
+
+export interface ObImportSkippedRow {
+  row: number;
+  name: string;
+  reason: string;
+}
+
+export interface OpeningBalanceImport {
+  id: number;
+  uploadedBy: number;
+  uploaderName: string;
+  /** @nullable */
+  organization: string | null;
+  sheetName: string;
+  totalRows: number;
+  inserted: number;
+  skipped: number;
+  membersSynced: number;
+  skippedDetails: ObImportSkippedRow[];
+  createdAt: string;
+}
+
+export interface BalanceTimelineSnapshot {
+  savings: number;
+  loan: number;
+  store: number;
+}
+
+export type BalanceTimelinePeriodItemDirection =
+  (typeof BalanceTimelinePeriodItemDirection)[keyof typeof BalanceTimelinePeriodItemDirection];
+
+export const BalanceTimelinePeriodItemDirection = {
+  credit: "credit",
+  debit: "debit",
+} as const;
+
+export interface BalanceTimelinePeriodItem {
+  label: string;
+  amount: number;
+  direction: BalanceTimelinePeriodItemDirection;
+}
+
+export interface BalanceTimelinePeriod {
+  year: number;
+  month: string;
+  label: string;
+  savingsAdded: number;
+  loanRepaid: number;
+  storeRepaid: number;
+  running: BalanceTimelineSnapshot;
+  items: BalanceTimelinePeriodItem[];
+}
+
+export interface MemberBalanceTimeline {
+  memberId: number;
+  fullName: string;
+  opening: BalanceTimelineSnapshot;
+  periods: BalanceTimelinePeriod[];
+  current: BalanceTimelineSnapshot;
 }
 
 export type LoanStatus = (typeof LoanStatus)[keyof typeof LoanStatus];

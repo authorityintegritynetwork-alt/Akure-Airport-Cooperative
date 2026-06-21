@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, CalendarRange } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -105,6 +105,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {navItem("/opening-balances", <Wallet className="w-4 h-4" />, "Opening Balances")}
                     {navItem("/loans", <CreditCard className="w-4 h-4" />, "All Loans")}
                     {navItem("/upload", <FileSpreadsheet className="w-4 h-4" />, "Upload Deductions")}
+                    {navItem("/uploaded-months", <CalendarRange className="w-4 h-4" />, "Uploaded Months")}
                     {navItem("/store-admin", <ShoppingCart className="w-4 h-4" />, "Store Admin")}
                     {navItem("/organizations", <Building2 className="w-4 h-4" />, "Organizations")}
                     {navItem("/cooperative-records", <FileSpreadsheet className="w-4 h-4" />, "Cooperative Records")}

@@ -6,10 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ExcelSheetInfo {
+export interface ObImportSkippedRow {
+  row: number;
   name: string;
-  rowCount: number;
-  looksValid: boolean;
-  detectedMonth?: string;
-  detectedYear?: number;
+  reason: string;
 }

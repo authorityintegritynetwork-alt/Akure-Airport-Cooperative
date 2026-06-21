@@ -3,8 +3,10 @@ import {
   db,
   membersTable,
   openingBalancesTable,
+  openingBalanceImportsTable,
   transactionsTable,
   type OpeningBalance,
+  type ObImportSkippedRow,
 } from "@workspace/db";
 import { eq, ilike, and, desc, sql } from "drizzle-orm";
 import {
@@ -427,8 +429,16 @@ router.post(
       const matcher = new NameMatcher(allMembers);
 
       let inserted = 0;
-      let skipped = 0;
       let membersSynced = 0;
+      // Rows the parser rejected before they reached the insert loop
+      // (unnamed rows carrying balances, named rows with all-zero amounts).
+      const skippedDetails: ObImportSkippedRow[] = sheet.skipped.map((s) => ({
+        row: s.row,
+        name: s.name,
+        reason: s.reason,
+      }));
+      // Total meaningful data rows = those we attempt to insert + those skipped.
+      const totalRows = sheet.rows.length + skippedDetails.length;
       const uploadedAt = new Date();
 
       await db.transaction(async (tx) => {
@@ -443,11 +453,12 @@ router.post(
           await tx.delete(openingBalancesTable);
         }
 
-        // Step 2: Insert new rows and sync ob_* on matched members
+        // Step 2: Insert new rows and sync ob_* on matched members.
+        // The parser guarantees every kept row has a non-blank name and at
+        // least one non-zero balance; rejected rows are already in
+        // skippedDetails above.
         for (const row of sheet.rows) {
           const name = row.rawName.trim();
-          if (!name) { skipped++; continue; }
-
           const vals = computeObValues(row);
 
           await tx.insert(openingBalancesTable).values({
@@ -499,6 +510,20 @@ router.post(
             membersSynced++;
           }
         }
+
+        // Persist a revisitable summary of this import run so the admin can
+        // later confirm everyone came in (totalRows vs inserted) and inspect
+        // exactly which rows were skipped and why.
+        await tx.insert(openingBalanceImportsTable).values({
+          uploadedBy: req.memberId!,
+          organization: org,
+          sheetName,
+          totalRows,
+          inserted,
+          skipped: skippedDetails.length,
+          membersSynced,
+          skippedDetails,
+        });
       });
 
       await logAudit({
@@ -506,13 +531,38 @@ router.post(
         action: "IMPORT_OPENING_BALANCES",
         entity: "opening_balance",
         entityId: 0,
-        details: `Superseded opening balances from "${sheetName}"${org ? ` (${org})` : ""}: ${inserted} inserted, ${skipped} skipped, ${membersSynced} member book balances updated.`,
+        details: `Superseded opening balances from "${sheetName}"${org ? ` (${org})` : ""}: ${inserted} inserted, ${skippedDetails.length} skipped, ${membersSynced} member book balances updated.`,
       });
 
-      res.json({ inserted, skipped, membersSynced });
+      res.json({ inserted, skipped: skippedDetails.length, membersSynced, totalRows, skippedDetails });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to process file: ${err.message}` });
     }
+  },
+);
+
+router.get(
+  "/opening-balances/imports",
+  requireAuth,
+  requireAdmin,
+  async (_req: AuthRequest, res): Promise<void> => {
+    const imports = await db
+      .select()
+      .from(openingBalanceImportsTable)
+      .orderBy(desc(openingBalanceImportsTable.createdAt))
+      .limit(50);
+
+    const members = await db
+      .select({ id: membersTable.id, fullName: membersTable.fullName })
+      .from(membersTable);
+    const memberMap = Object.fromEntries(members.map((m) => [m.id, m.fullName]));
+
+    res.json(
+      imports.map((r) => ({
+        ...r,
+        uploaderName: memberMap[r.uploadedBy] || "Unknown",
+      })),
+    );
   },
 );
 

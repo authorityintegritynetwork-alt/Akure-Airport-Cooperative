@@ -810,6 +810,42 @@ paths:
                 items:
                   $ref: "#/components/schemas/UploadRecord"
 
+  /opening-balances/imports:
+    get:
+      operationId: listOpeningBalanceImports
+      tags: [opening-balances]
+      summary: List opening-balance import runs with stats (Admin+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpeningBalanceImport"
+
+  /members/{id}/balance-timeline:
+    get:
+      operationId: getMemberBalanceTimeline
+      tags: [members]
+      summary: Member balance timeline from opening balance through monthly deductions (Admin+)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberBalanceTimeline"
+        "404":
+          description: Member not found
+
   # ── LOANS ────────────────────────────────────────────────────────────────────
   /loans:
     get:
@@ -1733,6 +1769,36 @@ components:
           type: number
         totalStoreDebt:
           type: number
+        obSavingsBalance:
+          type: ["number", "null"]
+        obProvidentBalance:
+          type: ["number", "null"]
+        obChristmasBalance:
+          type: ["number", "null"]
+        obRealLoanBalance:
+          type: ["number", "null"]
+        obEmergencyLoanBalance:
+          type: ["number", "null"]
+        obTotalLoanBalance:
+          type: ["number", "null"]
+        obElectronicsDebt:
+          type: ["number", "null"]
+        obSElectronicsDebt:
+          type: ["number", "null"]
+        obFurnitureDebt:
+          type: ["number", "null"]
+        obCommodityDebt:
+          type: ["number", "null"]
+        obGhlFormDebt:
+          type: ["number", "null"]
+        obFireFundBalance:
+          type: ["number", "null"]
+        obFuelVentureBalance:
+          type: ["number", "null"]
+        obLandLoanBalance:
+          type: ["number", "null"]
+        obTotalStoreDebt:
+          type: ["number", "null"]
         createdAt:
           type: string
           format: date-time
@@ -1928,6 +1994,36 @@ components:
           type: number
         landLoanBalance:
           type: number
+        obSavingsBalance:
+          type: ["number", "null"]
+        obProvidentBalance:
+          type: ["number", "null"]
+        obChristmasBalance:
+          type: ["number", "null"]
+        obRealLoanBalance:
+          type: ["number", "null"]
+        obEmergencyLoanBalance:
+          type: ["number", "null"]
+        obTotalLoanBalance:
+          type: ["number", "null"]
+        obElectronicsDebt:
+          type: ["number", "null"]
+        obSElectronicsDebt:
+          type: ["number", "null"]
+        obFurnitureDebt:
+          type: ["number", "null"]
+        obCommodityDebt:
+          type: ["number", "null"]
+        obGhlFormDebt:
+          type: ["number", "null"]
+        obFireFundBalance:
+          type: ["number", "null"]
+        obFuelVentureBalance:
+          type: ["number", "null"]
+        obLandLoanBalance:
+          type: ["number", "null"]
+        obTotalStoreDebt:
+          type: ["number", "null"]
         organization:
           type: string
         createdAt:
@@ -2283,6 +2379,10 @@ components:
           type: integer
         looksValid:
           type: boolean
+        detectedMonth:
+          type: string
+        detectedYear:
+          type: integer
       required: [name, rowCount, looksValid]
 
     ExcelSheetsResult:
@@ -2509,6 +2609,143 @@ components:
         - rowsSkipped
         - status
         - createdAt
+
+    ObImportSkippedRow:
+      type: object
+      properties:
+        row:
+          type: integer
+        name:
+          type: string
+        reason:
+          type: string
+      required:
+        - row
+        - name
+        - reason
+
+    OpeningBalanceImport:
+      type: object
+      properties:
+        id:
+          type: integer
+        uploadedBy:
+          type: integer
+        uploaderName:
+          type: string
+        organization:
+          type: ["string", "null"]
+        sheetName:
+          type: string
+        totalRows:
+          type: integer
+        inserted:
+          type: integer
+        skipped:
+          type: integer
+        membersSynced:
+          type: integer
+        skippedDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObImportSkippedRow"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - uploadedBy
+        - uploaderName
+        - organization
+        - sheetName
+        - totalRows
+        - inserted
+        - skipped
+        - membersSynced
+        - skippedDetails
+        - createdAt
+
+    BalanceTimelineSnapshot:
+      type: object
+      properties:
+        savings:
+          type: number
+        loan:
+          type: number
+        store:
+          type: number
+      required:
+        - savings
+        - loan
+        - store
+
+    BalanceTimelinePeriodItem:
+      type: object
+      properties:
+        label:
+          type: string
+        amount:
+          type: number
+        direction:
+          type: string
+          enum: [credit, debit]
+      required:
+        - label
+        - amount
+        - direction
+
+    BalanceTimelinePeriod:
+      type: object
+      properties:
+        year:
+          type: integer
+        month:
+          type: string
+        label:
+          type: string
+        savingsAdded:
+          type: number
+        loanRepaid:
+          type: number
+        storeRepaid:
+          type: number
+        running:
+          $ref: "#/components/schemas/BalanceTimelineSnapshot"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceTimelinePeriodItem"
+      required:
+        - year
+        - month
+        - label
+        - savingsAdded
+        - loanRepaid
+        - storeRepaid
+        - running
+        - items
+
+    MemberBalanceTimeline:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        fullName:
+          type: string
+        opening:
+          $ref: "#/components/schemas/BalanceTimelineSnapshot"
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceTimelinePeriod"
+        current:
+          $ref: "#/components/schemas/BalanceTimelineSnapshot"
+      required:
+        - memberId
+        - fullName
+        - opening
+        - periods
+        - current
 
     # ── LOANS ─────────────────────────────────────────────────────────────────
     Loan:

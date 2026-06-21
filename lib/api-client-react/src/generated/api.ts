@@ -66,12 +66,14 @@ import type {
   LoanProduct,
   MatchSuggestionList,
   Member,
+  MemberBalanceTimeline,
   MemberDashboardSummary,
   MemberProfile,
   MemberSummary,
   Notification,
   OpeningBalance,
   OpeningBalanceClaimInput,
+  OpeningBalanceImport,
   OpeningBalanceSuggestion,
   Organization,
   PendingSignup,
@@ -3297,6 +3299,177 @@ export function useListUploadHistory<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListUploadHistoryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List opening-balance import runs with stats (Admin+)
+ */
+export const getListOpeningBalanceImportsUrl = () => {
+  return `/api/opening-balances/imports`;
+};
+
+export const listOpeningBalanceImports = async (
+  options?: RequestInit,
+): Promise<OpeningBalanceImport[]> => {
+  return customFetch<OpeningBalanceImport[]>(
+    getListOpeningBalanceImportsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListOpeningBalanceImportsQueryKey = () => {
+  return [`/api/opening-balances/imports`] as const;
+};
+
+export const getListOpeningBalanceImportsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOpeningBalanceImports>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOpeningBalanceImports>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListOpeningBalanceImportsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOpeningBalanceImports>>
+  > = ({ signal }) => listOpeningBalanceImports({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOpeningBalanceImports>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOpeningBalanceImportsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOpeningBalanceImports>>
+>;
+export type ListOpeningBalanceImportsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List opening-balance import runs with stats (Admin+)
+ */
+
+export function useListOpeningBalanceImports<
+  TData = Awaited<ReturnType<typeof listOpeningBalanceImports>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOpeningBalanceImports>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOpeningBalanceImportsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Member balance timeline from opening balance through monthly deductions (Admin+)
+ */
+export const getGetMemberBalanceTimelineUrl = (id: number) => {
+  return `/api/members/${id}/balance-timeline`;
+};
+
+export const getMemberBalanceTimeline = async (
+  id: number,
+  options?: RequestInit,
+): Promise<MemberBalanceTimeline> => {
+  return customFetch<MemberBalanceTimeline>(
+    getGetMemberBalanceTimelineUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetMemberBalanceTimelineQueryKey = (id: number) => {
+  return [`/api/members/${id}/balance-timeline`] as const;
+};
+
+export const getGetMemberBalanceTimelineQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMemberBalanceTimeline>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMemberBalanceTimeline>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMemberBalanceTimelineQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMemberBalanceTimeline>>
+  > = ({ signal }) =>
+    getMemberBalanceTimeline(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMemberBalanceTimeline>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMemberBalanceTimelineQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMemberBalanceTimeline>>
+>;
+export type GetMemberBalanceTimelineQueryError = ErrorType<void>;
+
+/**
+ * @summary Member balance timeline from opening balance through monthly deductions (Admin+)
+ */
+
+export function useGetMemberBalanceTimeline<
+  TData = Awaited<ReturnType<typeof getMemberBalanceTimeline>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMemberBalanceTimeline>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMemberBalanceTimelineQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -1,3 +1,4 @@
 - [Auth role guards](auth-role-guards.md) — `requireAdmin` includes auditor+treasurer; use `requireAdminOnly` for balance/membership mutations.
 - [Testing step-up flows](testing-step-up-flows.md) — pass OTP gate in tests by DB-overriding `otp_codes.code_hash`; 10-min grant means 2nd action won't re-prompt (not a bug).
+- [Excel parser skip diagnostics](excel-parser-skip-diagnostics.md) — parseSheet drops rows pre-consumer; collect skip reasons in the parser, not the insert loop.
 - [Dev workflow port conflict](dev-workflow-port-conflict.md) — new routes 404→Vite HTML despite being in dist? Stale api-server holds the port; restart `artifacts/api-server: API Server`.

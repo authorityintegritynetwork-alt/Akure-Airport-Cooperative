@@ -7,6 +7,7 @@ import {
   integer,
   index,
   check,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -119,3 +120,42 @@ export const insertOpeningBalanceSchema = createInsertSchema(openingBalancesTabl
 });
 export type InsertOpeningBalance = z.infer<typeof insertOpeningBalanceSchema>;
 export type OpeningBalance = typeof openingBalancesTable.$inferSelect;
+
+/** A single skipped/failed row from an opening-balance import. */
+export type ObImportSkippedRow = {
+  row: number;
+  name: string;
+  reason: string;
+};
+
+/**
+ * Persistent summary of each opening-balance import run, so an admin can later
+ * confirm every member from the sheet was loaded (total rows vs inserted) and
+ * inspect exactly which rows were skipped and why.
+ */
+export const openingBalanceImportsTable = pgTable(
+  "opening_balance_imports",
+  {
+    id: serial("id").primaryKey(),
+    uploadedBy: integer("uploaded_by")
+      .notNull()
+      .references(() => membersTable.id, { onDelete: "restrict" }),
+    organization: text("organization"),
+    sheetName: text("sheet_name").notNull(),
+    totalRows: integer("total_rows").notNull().default(0),
+    inserted: integer("inserted").notNull().default(0),
+    skipped: integer("skipped").notNull().default(0),
+    membersSynced: integer("members_synced").notNull().default(0),
+    skippedDetails: jsonb("skipped_details")
+      .$type<ObImportSkippedRow[]>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    createdIdx: index("opening_balance_imports_created_idx").on(t.createdAt),
+    orgIdx: index("opening_balance_imports_org_idx").on(t.organization),
+  }),
+);
+
+export type OpeningBalanceImport = typeof openingBalanceImportsTable.$inferSelect;

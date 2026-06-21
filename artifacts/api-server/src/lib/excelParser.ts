@@ -203,11 +203,18 @@ export interface ParsedRow {
   errors: string[];
 }
 
+export interface ParsedSkip {
+  row: number;
+  name: string;
+  reason: string;
+}
+
 export interface ParsedSheet {
   sheetName: string;
   rows: ParsedRow[];
   detectedColumns: DeductionCategory[];
   headerRowIndex: number;
+  skipped: ParsedSkip[];
 }
 
 function emptyAmounts(): Record<DeductionCategory, number> {
@@ -240,20 +247,38 @@ export function parseSheet(
       rows: [],
       detectedColumns: [],
       headerRowIndex: -1,
+      skipped: [],
     };
   }
 
   const detectedColumns = Object.keys(header.categoryCols) as DeductionCategory[];
   const out: ParsedRow[] = [];
+  const skipped: ParsedSkip[] = [];
 
   for (let r = header.headerRowIndex + 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
 
     const rawName = row[header.nameCol];
-    if (rawName == null) continue;
-    const nameStr = String(rawName).trim();
-    if (!nameStr) continue;
+    const nameStr = rawName == null ? "" : String(rawName).trim();
+
+    const amounts = emptyAmounts();
+    for (const cat of detectedColumns) {
+      const col = header.categoryCols[cat]!;
+      amounts[cat] = toNumber(row[col]);
+    }
+    const computedTotal = ALL_CATEGORIES.reduce((a, c) => a + amounts[c], 0);
+    const total = header.totalCol != null ? toNumber(row[header.totalCol]) : computedTotal;
+    const hasAmounts = computedTotal !== 0 || total !== 0;
+
+    if (!nameStr) {
+      // Unnamed row carrying balances is a data error worth reporting;
+      // a fully empty spacer row is silently ignored.
+      if (hasAmounts) {
+        skipped.push({ row: r + 1, name: "(blank)", reason: "Missing member name" });
+      }
+      continue;
+    }
 
     const lower = nameStr.toLowerCase();
     if (
@@ -266,16 +291,10 @@ export function parseSheet(
       continue;
     }
 
-    const amounts = emptyAmounts();
-    for (const cat of detectedColumns) {
-      const col = header.categoryCols[cat]!;
-      amounts[cat] = toNumber(row[col]);
+    if (!hasAmounts) {
+      skipped.push({ row: r + 1, name: nameStr, reason: "No balance amounts (all zero)" });
+      continue;
     }
-
-    const computedTotal = ALL_CATEGORIES.reduce((a, c) => a + amounts[c], 0);
-    const total = header.totalCol != null ? toNumber(row[header.totalCol]) : computedTotal;
-
-    if (computedTotal === 0 && total === 0) continue;
 
     const totalMismatch = header.totalCol != null && Math.abs(total - computedTotal) > 0.5;
     const warnings: string[] = [];
@@ -302,6 +321,7 @@ export function parseSheet(
     rows: out,
     detectedColumns,
     headerRowIndex: header.headerRowIndex,
+    skipped,
   };
 }
 
