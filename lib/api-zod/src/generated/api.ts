@@ -89,6 +89,29 @@ export const RegisterMemberBody = zod.object({
 });
 
 /**
+ * @summary Suggest cooperative records matching a name + organization (for signup preview)
+ */
+export const GetMatchSuggestionsQueryParams = zod.object({
+  fullName: zod.coerce.string(),
+  organization: zod.coerce.string(),
+});
+
+export const GetMatchSuggestionsResponse = zod.object({
+  suggestions: zod.array(
+    zod.object({
+      recordId: zod.number(),
+      fullName: zod.string(),
+      organization: zod.string().nullish(),
+      staffId: zod.string().nullish(),
+      confidence: zod.enum(["exact", "fuzzy", "none"]),
+      savingsBalance: zod.number(),
+      totalLoanBalance: zod.number(),
+      totalStoreDebt: zod.number(),
+    }),
+  ),
+});
+
+/**
  * @summary List all members (Admin+)
  */
 export const ListMembersQueryParams = zod.object({
@@ -101,7 +124,7 @@ export const ListMembersResponseItem = zod.object({
   id: zod.number(),
   clerkUserId: zod.string().nullish(),
   fullName: zod.string(),
-  email: zod.string(),
+  email: zod.string().nullable(),
   phone: zod.string().nullish(),
   staffId: zod.string().nullish(),
   role: zod.enum([
@@ -159,7 +182,7 @@ export const GetMemberResponse = zod.object({
   id: zod.number(),
   clerkUserId: zod.string().nullish(),
   fullName: zod.string(),
-  email: zod.string(),
+  email: zod.string().nullable(),
   phone: zod.string().nullish(),
   staffId: zod.string().nullish(),
   role: zod.enum([
@@ -212,7 +235,7 @@ export const UpdateMemberResponse = zod.object({
   id: zod.number(),
   clerkUserId: zod.string().nullish(),
   fullName: zod.string(),
-  email: zod.string(),
+  email: zod.string().nullable(),
   phone: zod.string().nullish(),
   staffId: zod.string().nullish(),
   role: zod.enum([
@@ -266,6 +289,7 @@ export const ListOrganizationsResponseItem = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
+  excelFormat: zod.string(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -287,8 +311,8 @@ export const CreateOrganizationBody = zod.object({
     .optional()
     .describe("Optional one-line description shown on the sign-up screen."),
   excelFormat: zod
-    .enum(["faan", "nama"])
-    .describe("Excel deduction format: 'faan' or 'nama'."),
+    .string()
+    .describe("Deduction spreadsheet column layout key for this organization."),
 });
 
 /**
@@ -301,7 +325,7 @@ export const UpdateOrganizationParams = zod.object({
 export const UpdateOrganizationBody = zod.object({
   name: zod.string().optional(),
   description: zod.string().nullish(),
-  excelFormat: zod.enum(["faan", "nama"]).optional(),
+  excelFormat: zod.string().optional(),
 });
 
 export const UpdateOrganizationResponse = zod.object({
@@ -327,6 +351,7 @@ export const ActivateOrganizationResponse = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
+  excelFormat: zod.string(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -344,6 +369,7 @@ export const DeactivateOrganizationResponse = zod.object({
   code: zod.string(),
   name: zod.string(),
   description: zod.string().nullish(),
+  excelFormat: zod.string(),
   isActive: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -373,7 +399,7 @@ export const ActivateMemberResponse = zod.object({
   id: zod.number(),
   clerkUserId: zod.string().nullish(),
   fullName: zod.string(),
-  email: zod.string(),
+  email: zod.string().nullable(),
   phone: zod.string().nullish(),
   staffId: zod.string().nullish(),
   role: zod.enum([
@@ -415,7 +441,7 @@ export const DeactivateMemberResponse = zod.object({
   id: zod.number(),
   clerkUserId: zod.string().nullish(),
   fullName: zod.string(),
-  email: zod.string(),
+  email: zod.string().nullable(),
   phone: zod.string().nullish(),
   staffId: zod.string().nullish(),
   role: zod.enum([
@@ -444,6 +470,138 @@ export const DeactivateMemberResponse = zod.object({
   totalStoreDebt: zod.number(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List app sign-ups awaiting admin approval/match (Admin+)
+ */
+export const ListPendingSignupsResponseItem = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  pendingName: zod.string().nullish(),
+  pendingEmail: zod.string().nullish(),
+  organization: zod.string(),
+  staffId: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  suggestions: zod.array(
+    zod.object({
+      recordId: zod.number(),
+      fullName: zod.string(),
+      organization: zod.string().nullish(),
+      staffId: zod.string().nullish(),
+      confidence: zod.enum(["exact", "fuzzy", "none"]),
+      savingsBalance: zod.number(),
+      totalLoanBalance: zod.number(),
+      totalStoreDebt: zod.number(),
+    }),
+  ),
+});
+export const ListPendingSignupsResponse = zod.array(
+  ListPendingSignupsResponseItem,
+);
+
+/**
+ * @summary List cooperative records not yet linked to an app account (Admin+)
+ */
+export const ListCooperativeRecordsQueryParams = zod.object({
+  search: zod.coerce.string().optional(),
+  organization: zod.coerce.string().optional(),
+});
+
+export const ListCooperativeRecordsResponseItem = zod.object({
+  id: zod.number(),
+  clerkUserId: zod.string().nullish(),
+  fullName: zod.string(),
+  email: zod.string().nullable(),
+  phone: zod.string().nullish(),
+  staffId: zod.string().nullish(),
+  role: zod.enum([
+    "member",
+    "admin",
+    "financial_auditor",
+    "treasurer",
+    "super_admin",
+  ]),
+  status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.string(),
+  savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
+  totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
+  fireFundBalance: zod.number(),
+  totalStoreDebt: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListCooperativeRecordsResponse = zod.array(
+  ListCooperativeRecordsResponseItem,
+);
+
+/**
+ * @summary Approve a pending sign-up, optionally linking it to a cooperative record (Admin+, step-up)
+ */
+export const ApproveMatchParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApproveMatchBody = zod.object({
+  cooperativeRecordId: zod.number().nullish(),
+});
+
+export const ApproveMatchResponse = zod.object({
+  id: zod.number(),
+  clerkUserId: zod.string().nullish(),
+  fullName: zod.string(),
+  email: zod.string().nullable(),
+  phone: zod.string().nullish(),
+  staffId: zod.string().nullish(),
+  role: zod.enum([
+    "member",
+    "admin",
+    "financial_auditor",
+    "treasurer",
+    "super_admin",
+  ]),
+  status: zod.enum(["pending", "active", "inactive"]),
+  organization: zod.string(),
+  savingsBalance: zod.number(),
+  providentBalance: zod.number(),
+  christmasBalance: zod.number(),
+  realLoanBalance: zod.number(),
+  emergencyLoanBalance: zod.number(),
+  fuelVentureBalance: zod.number(),
+  landLoanBalance: zod.number(),
+  totalLoanBalance: zod.number(),
+  electronicsDebt: zod.number(),
+  sElectronicsDebt: zod.number(),
+  furnitureDebt: zod.number(),
+  commodityDebt: zod.number(),
+  ghlFormDebt: zod.number(),
+  fireFundBalance: zod.number(),
+  totalStoreDebt: zod.number(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Reject a pending sign-up (Admin+, step-up)
+ */
+export const RejectMatchParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RejectMatchResponse = zod.object({
+  rejected: zod.boolean(),
 });
 
 /**
@@ -564,7 +722,7 @@ export const ClaimOpeningBalanceResponse = zod.object({
   id: zod.number(),
   clerkUserId: zod.string().nullish(),
   fullName: zod.string(),
-  email: zod.string(),
+  email: zod.string().nullable(),
   phone: zod.string().nullish(),
   staffId: zod.string().nullish(),
   role: zod.enum([
@@ -713,8 +871,6 @@ export const ListExcelSheetsResponse = zod.object({
       name: zod.string(),
       rowCount: zod.number(),
       looksValid: zod.boolean(),
-      detectedMonth: zod.string().optional(),
-      detectedYear: zod.number().optional(),
     }),
   ),
 });
@@ -743,8 +899,6 @@ export const PreviewExcelUploadResponse = zod.object({
   month: zod.string(),
   year: zod.number(),
   totalRows: zod.number(),
-  hasMismatchedTotals: zod.boolean().optional(),
-  hasDuplicateNames: zod.boolean().optional(),
   matchedRows: zod.number(),
   unmatchedRows: zod.number(),
   errorRows: zod.number(),
@@ -776,7 +930,6 @@ export const PreviewExcelUploadResponse = zod.object({
       totalMismatch: zod.boolean(),
       errors: zod.array(zod.string()),
       warnings: zod.array(zod.string()),
-      hasOpeningBalance: zod.boolean().nullish(),
     }),
   ),
 });
@@ -792,7 +945,12 @@ export const ProcessExcelUploadBody = zod.object({
   organization: zod.string(),
   skipErrors: zod.boolean().optional(),
   autoTagOrganization: zod.boolean().optional(),
-  acknowledgeMismatch: zod.boolean().optional(),
+  acknowledgeMismatch: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Confirm processing despite rows where the sheet Total disagrees with the sum of columns.",
+    ),
   manualMatches: zod
     .array(
       zod.object({
@@ -807,9 +965,7 @@ export const ProcessExcelUploadResponse = zod.object({
   uploadRecordId: zod.number(),
   processed: zod.number(),
   skipped: zod.number(),
-  autoCreated: zod.number(),
   errors: zod.array(zod.string()),
-  openingBalancesFlagged: zod.number().optional(),
 });
 
 /**

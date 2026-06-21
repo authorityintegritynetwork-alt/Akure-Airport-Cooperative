@@ -17,9 +17,12 @@ export const membersTable = pgTable(
     id: serial("id").primaryKey(),
     clerkUserId: text("clerk_user_id").unique(),
     fullName: text("full_name").notNull(),
-    email: text("email").notNull().unique(),
+    email: text("email").unique(),
     phone: text("phone"),
     staffId: text("staff_id"),
+    pendingClerkUserId: text("pending_clerk_user_id").unique(),
+    pendingEmail: text("pending_email"),
+    pendingName: text("pending_name"),
     role: text("role", {
       enum: ["member", "admin", "financial_auditor", "treasurer", "super_admin"],
     })

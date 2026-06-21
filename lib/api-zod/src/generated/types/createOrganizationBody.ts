@@ -13,6 +13,6 @@ export interface CreateOrganizationBody {
   name: string;
   /** Optional one-line description shown on the sign-up screen. */
   description?: string;
-  /** Excel deduction format: 'faan' or 'nama'. */
-  excelFormat: "faan" | "nama";
+  /** Deduction spreadsheet column layout key for this organization. */
+  excelFormat: string;
 }

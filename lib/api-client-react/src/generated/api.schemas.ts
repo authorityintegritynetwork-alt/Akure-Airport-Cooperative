@@ -32,7 +32,8 @@ export interface Member {
   /** @nullable */
   clerkUserId?: string | null;
   fullName: string;
-  email: string;
+  /** @nullable */
+  email: string | null;
   /** @nullable */
   phone?: string | null;
   /** @nullable */
@@ -55,38 +56,6 @@ export interface Member {
   ghlFormDebt: number;
   fireFundBalance: number;
   totalStoreDebt: number;
-  /** @nullable */
-  obSavingsBalance?: number | null;
-  /** @nullable */
-  obProvidentBalance?: number | null;
-  /** @nullable */
-  obChristmasBalance?: number | null;
-  /** @nullable */
-  obRealLoanBalance?: number | null;
-  /** @nullable */
-  obEmergencyLoanBalance?: number | null;
-  /** @nullable */
-  obTotalLoanBalance?: number | null;
-  /** @nullable */
-  obElectronicsDebt?: number | null;
-  /** @nullable */
-  obSElectronicsDebt?: number | null;
-  /** @nullable */
-  obFurnitureDebt?: number | null;
-  /** @nullable */
-  obCommodityDebt?: number | null;
-  /** @nullable */
-  obGhlFormDebt?: number | null;
-  /** @nullable */
-  obFireFundBalance?: number | null;
-  /** @nullable */
-  obFuelVentureBalance?: number | null;
-  /** @nullable */
-  obLandLoanBalance?: number | null;
-  /** @nullable */
-  obTotalStoreDebt?: number | null;
-  /** @nullable */
-  obUploadedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -204,38 +173,6 @@ export interface MemberProfile {
   landLoanBalance?: number;
   organization?: string;
   createdAt: string;
-  /** @nullable */
-  obSavingsBalance?: number | null;
-  /** @nullable */
-  obProvidentBalance?: number | null;
-  /** @nullable */
-  obChristmasBalance?: number | null;
-  /** @nullable */
-  obRealLoanBalance?: number | null;
-  /** @nullable */
-  obEmergencyLoanBalance?: number | null;
-  /** @nullable */
-  obTotalLoanBalance?: number | null;
-  /** @nullable */
-  obElectronicsDebt?: number | null;
-  /** @nullable */
-  obSElectronicsDebt?: number | null;
-  /** @nullable */
-  obFurnitureDebt?: number | null;
-  /** @nullable */
-  obCommodityDebt?: number | null;
-  /** @nullable */
-  obGhlFormDebt?: number | null;
-  /** @nullable */
-  obFireFundBalance?: number | null;
-  /** @nullable */
-  obFuelVentureBalance?: number | null;
-  /** @nullable */
-  obLandLoanBalance?: number | null;
-  /** @nullable */
-  obTotalStoreDebt?: number | null;
-  /** @nullable */
-  obUploadedAt?: string | null;
 }
 
 export interface RegisterMemberBody {
@@ -243,6 +180,53 @@ export interface RegisterMemberBody {
   phone?: string;
   staffId?: string;
   organization: string;
+}
+
+export type MatchSuggestionConfidence =
+  (typeof MatchSuggestionConfidence)[keyof typeof MatchSuggestionConfidence];
+
+export const MatchSuggestionConfidence = {
+  exact: "exact",
+  fuzzy: "fuzzy",
+  none: "none",
+} as const;
+
+export interface MatchSuggestion {
+  recordId: number;
+  fullName: string;
+  /** @nullable */
+  organization?: string | null;
+  /** @nullable */
+  staffId?: string | null;
+  confidence: MatchSuggestionConfidence;
+  savingsBalance: number;
+  totalLoanBalance: number;
+  totalStoreDebt: number;
+}
+
+export interface MatchSuggestionList {
+  suggestions: MatchSuggestion[];
+}
+
+export interface PendingSignup {
+  id: number;
+  fullName: string;
+  /** @nullable */
+  pendingName?: string | null;
+  /** @nullable */
+  pendingEmail?: string | null;
+  organization: string;
+  /** @nullable */
+  staffId?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  createdAt: string;
+  suggestions: MatchSuggestion[];
+}
+
+export interface ApproveMatchBody {
+  /** @nullable */
+  cooperativeRecordId?: number | null;
 }
 
 export type CreateMemberBodyRole =
@@ -329,15 +313,15 @@ export interface CreateOrganizationBody {
   name: string;
   /** Optional one-line description shown on the sign-up screen. */
   description?: string;
-  /** Excel deduction format: 'faan' or 'nama'. */
-  excelFormat: "faan" | "nama";
+  /** Deduction spreadsheet column layout key for this organization. */
+  excelFormat: string;
 }
 
 export interface UpdateOrganizationBody {
   name?: string;
   /** @nullable */
   description?: string | null;
-  excelFormat?: "faan" | "nama";
+  excelFormat?: string;
 }
 
 export interface LoanProduct {
@@ -438,8 +422,6 @@ export interface ExcelSheetInfo {
   name: string;
   rowCount: number;
   looksValid: boolean;
-  detectedMonth?: string;
-  detectedYear?: number;
 }
 
 export interface ExcelSheetsResult {
@@ -499,8 +481,6 @@ export interface ExcelRowPreview {
   totalMismatch: boolean;
   errors: string[];
   warnings: string[];
-  /** null for matched rows; true/false for unmatched rows */
-  hasOpeningBalance?: boolean | null;
 }
 
 export interface ExcelUploadPreview {
@@ -523,6 +503,8 @@ export interface ExcelUploadProcessBody {
   organization: string;
   skipErrors?: boolean;
   autoTagOrganization?: boolean;
+  /** Confirm processing despite rows where the sheet Total disagrees with the sum of columns. */
+  acknowledgeMismatch?: boolean;
   manualMatches?: ManualMatch[];
 }
 
@@ -530,9 +512,7 @@ export interface ExcelUploadResult {
   uploadRecordId: number;
   processed: number;
   skipped: number;
-  autoCreated: number;
   errors: string[];
-  openingBalancesFlagged?: number;
 }
 
 export type UploadRecordStatus =
@@ -1056,6 +1036,11 @@ export type GetStepUpStatus200 = {
   active: boolean;
 };
 
+export type GetMatchSuggestionsParams = {
+  fullName: string;
+  organization: string;
+};
+
 export type ListMembersParams = {
   status?: ListMembersStatus;
   organization?: string;
@@ -1081,6 +1066,15 @@ export type ListOrganizationsParams = {
 
 export type BulkAssignOrganization200 = {
   updated: number;
+};
+
+export type ListCooperativeRecordsParams = {
+  search?: string;
+  organization?: string;
+};
+
+export type RejectMatch200 = {
+  rejected: boolean;
 };
 
 export type ListOpeningBalancesParams = {

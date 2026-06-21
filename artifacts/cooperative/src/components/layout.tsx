@@ -107,6 +107,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {navItem("/upload", <FileSpreadsheet className="w-4 h-4" />, "Upload Deductions")}
                     {navItem("/store-admin", <ShoppingCart className="w-4 h-4" />, "Store Admin")}
                     {navItem("/organizations", <Building2 className="w-4 h-4" />, "Organizations")}
+                    {navItem("/cooperative-records", <FileSpreadsheet className="w-4 h-4" />, "Cooperative Records")}
                     {navItem("/announcements", <Megaphone className="w-4 h-4" />, "Announcements")}
                     {navItem("/support-admin", <Headphones className="w-4 h-4" />, "Support Queue")}
                   </SidebarMenu>

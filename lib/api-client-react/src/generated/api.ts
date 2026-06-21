@@ -20,6 +20,7 @@ import type {
   ActivityItem,
   AddSupportMessageBody,
   AdminDashboardSummary,
+  ApproveMatchBody,
   AuditLog,
   BroadcastDetail,
   BroadcastSummary,
@@ -40,10 +41,12 @@ import type {
   ExcelUploadPreviewBody,
   ExcelUploadProcessBody,
   ExcelUploadResult,
+  GetMatchSuggestionsParams,
   GetRecentActivityParams,
   GetStepUpStatus200,
   HealthStatus,
   ListAuditLogsParams,
+  ListCooperativeRecordsParams,
   ListLoanProductsParams,
   ListLoansParams,
   ListMembersParams,
@@ -61,6 +64,7 @@ import type {
   LoanCalculation,
   LoanPipelineItem,
   LoanProduct,
+  MatchSuggestionList,
   Member,
   MemberDashboardSummary,
   MemberProfile,
@@ -70,7 +74,9 @@ import type {
   OpeningBalanceClaimInput,
   OpeningBalanceSuggestion,
   Organization,
+  PendingSignup,
   RegisterMemberBody,
+  RejectMatch200,
   RequestStepUpCode200,
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -580,6 +586,106 @@ export const useRegisterMember = <
 > => {
   return useMutation(getRegisterMemberMutationOptions(options));
 };
+
+/**
+ * @summary Suggest cooperative records matching a name + organization (for signup preview)
+ */
+export const getGetMatchSuggestionsUrl = (
+  params: GetMatchSuggestionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/auth/match-suggestions?${stringifiedParams}`
+    : `/api/auth/match-suggestions`;
+};
+
+export const getMatchSuggestions = async (
+  params: GetMatchSuggestionsParams,
+  options?: RequestInit,
+): Promise<MatchSuggestionList> => {
+  return customFetch<MatchSuggestionList>(getGetMatchSuggestionsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMatchSuggestionsQueryKey = (
+  params?: GetMatchSuggestionsParams,
+) => {
+  return [`/api/auth/match-suggestions`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetMatchSuggestionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMatchSuggestions>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMatchSuggestionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMatchSuggestions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetMatchSuggestionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMatchSuggestions>>
+  > = ({ signal }) =>
+    getMatchSuggestions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMatchSuggestions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMatchSuggestionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMatchSuggestions>>
+>;
+export type GetMatchSuggestionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Suggest cooperative records matching a name + organization (for signup preview)
+ */
+
+export function useGetMatchSuggestions<
+  TData = Awaited<ReturnType<typeof getMatchSuggestions>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetMatchSuggestionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMatchSuggestions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMatchSuggestionsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List all members (Admin+)
@@ -1710,6 +1816,352 @@ export const useDeactivateMember = <
   TContext
 > => {
   return useMutation(getDeactivateMemberMutationOptions(options));
+};
+
+/**
+ * @summary List app sign-ups awaiting admin approval/match (Admin+)
+ */
+export const getListPendingSignupsUrl = () => {
+  return `/api/members/pending-signups`;
+};
+
+export const listPendingSignups = async (
+  options?: RequestInit,
+): Promise<PendingSignup[]> => {
+  return customFetch<PendingSignup[]>(getListPendingSignupsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPendingSignupsQueryKey = () => {
+  return [`/api/members/pending-signups`] as const;
+};
+
+export const getListPendingSignupsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPendingSignups>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPendingSignups>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPendingSignupsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPendingSignups>>
+  > = ({ signal }) => listPendingSignups({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPendingSignups>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPendingSignupsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPendingSignups>>
+>;
+export type ListPendingSignupsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List app sign-ups awaiting admin approval/match (Admin+)
+ */
+
+export function useListPendingSignups<
+  TData = Awaited<ReturnType<typeof listPendingSignups>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPendingSignups>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPendingSignupsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List cooperative records not yet linked to an app account (Admin+)
+ */
+export const getListCooperativeRecordsUrl = (
+  params?: ListCooperativeRecordsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/cooperative-records?${stringifiedParams}`
+    : `/api/cooperative-records`;
+};
+
+export const listCooperativeRecords = async (
+  params?: ListCooperativeRecordsParams,
+  options?: RequestInit,
+): Promise<Member[]> => {
+  return customFetch<Member[]>(getListCooperativeRecordsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCooperativeRecordsQueryKey = (
+  params?: ListCooperativeRecordsParams,
+) => {
+  return [`/api/cooperative-records`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCooperativeRecordsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCooperativeRecords>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListCooperativeRecordsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCooperativeRecords>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCooperativeRecordsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCooperativeRecords>>
+  > = ({ signal }) =>
+    listCooperativeRecords(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCooperativeRecords>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCooperativeRecordsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCooperativeRecords>>
+>;
+export type ListCooperativeRecordsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List cooperative records not yet linked to an app account (Admin+)
+ */
+
+export function useListCooperativeRecords<
+  TData = Awaited<ReturnType<typeof listCooperativeRecords>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListCooperativeRecordsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCooperativeRecords>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCooperativeRecordsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Approve a pending sign-up, optionally linking it to a cooperative record (Admin+, step-up)
+ */
+export const getApproveMatchUrl = (id: number) => {
+  return `/api/members/${id}/approve-match`;
+};
+
+export const approveMatch = async (
+  id: number,
+  approveMatchBody?: ApproveMatchBody,
+  options?: RequestInit,
+): Promise<Member> => {
+  return customFetch<Member>(getApproveMatchUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(approveMatchBody),
+  });
+};
+
+export const getApproveMatchMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveMatch>>,
+    TError,
+    { id: number; data: BodyType<ApproveMatchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveMatch>>,
+  TError,
+  { id: number; data: BodyType<ApproveMatchBody> },
+  TContext
+> => {
+  const mutationKey = ["approveMatch"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveMatch>>,
+    { id: number; data: BodyType<ApproveMatchBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return approveMatch(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveMatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveMatch>>
+>;
+export type ApproveMatchMutationBody = BodyType<ApproveMatchBody>;
+export type ApproveMatchMutationError = ErrorType<void>;
+
+/**
+ * @summary Approve a pending sign-up, optionally linking it to a cooperative record (Admin+, step-up)
+ */
+export const useApproveMatch = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveMatch>>,
+    TError,
+    { id: number; data: BodyType<ApproveMatchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof approveMatch>>,
+  TError,
+  { id: number; data: BodyType<ApproveMatchBody> },
+  TContext
+> => {
+  return useMutation(getApproveMatchMutationOptions(options));
+};
+
+/**
+ * @summary Reject a pending sign-up (Admin+, step-up)
+ */
+export const getRejectMatchUrl = (id: number) => {
+  return `/api/members/${id}/reject-match`;
+};
+
+export const rejectMatch = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RejectMatch200> => {
+  return customFetch<RejectMatch200>(getRejectMatchUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRejectMatchMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectMatch>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof rejectMatch>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["rejectMatch"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof rejectMatch>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return rejectMatch(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RejectMatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof rejectMatch>>
+>;
+
+export type RejectMatchMutationError = ErrorType<void>;
+
+/**
+ * @summary Reject a pending sign-up (Admin+, step-up)
+ */
+export const useRejectMatch = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof rejectMatch>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof rejectMatch>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRejectMatchMutationOptions(options));
 };
 
 /**

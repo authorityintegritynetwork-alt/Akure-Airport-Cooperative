@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface UpdateOrganizationBody {
-  name?: string;
-  /** @nullable */
-  description?: string | null;
-  excelFormat?: string;
-}
+export type RejectMatch200 = {
+  rejected: boolean;
+};

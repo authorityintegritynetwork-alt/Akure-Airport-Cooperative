@@ -15,5 +15,7 @@ export interface ExcelUploadProcessBody {
   organization: string;
   skipErrors?: boolean;
   autoTagOrganization?: boolean;
+  /** Confirm processing despite rows where the sheet Total disagrees with the sum of columns. */
+  acknowledgeMismatch?: boolean;
   manualMatches?: ManualMatch[];
 }

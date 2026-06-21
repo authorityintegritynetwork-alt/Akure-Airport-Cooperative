@@ -9,7 +9,12 @@ import {
   useBulkAssignOrganization,
   useGetProfile,
   useListOrganizations,
+  useListPendingSignups,
+  useApproveMatch,
+  useRejectMatch,
   getListMembersQueryKey,
+  type PendingSignup,
+  type MatchSuggestion,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -112,6 +117,8 @@ export function MembersPage() {
   const [deletingMember, setDeletingMember] = useState<any | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [approvingMember, setApprovingMember] = useState<{ id: number; fullName: string } | null>(null);
+  const [tab, setTab] = useState<"members" | "pending">("members");
+  const [reviewSignup, setReviewSignup] = useState<PendingSignup | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -131,11 +138,62 @@ export function MembersPage() {
     query: { queryKey: getListMembersQueryKey(params) },
   });
 
+  const { data: pendingSignups, isLoading: pendingLoading } = useListPendingSignups({
+    query: { enabled: canManage, queryKey: ["listPendingSignups"] },
+  });
+  const pendingCount = pendingSignups?.length ?? 0;
+
   const deactivateMember = useDeactivateMember();
   const createMember = useCreateMember();
   const updateMember = useUpdateMember();
   const deleteMember = useDeleteMember();
   const bulkAssign = useBulkAssignOrganization();
+  const approveMatch = useApproveMatch();
+  const rejectMatch = useRejectMatch();
+
+  const approveMatchWithStepUp = useStepUpAction(
+    (id: number, cooperativeRecordId: number | null) =>
+      approveMatch.mutateAsync({ id, data: { cooperativeRecordId } }),
+  );
+  const rejectMatchWithStepUp = useStepUpAction(
+    (id: number) => rejectMatch.mutateAsync({ id }),
+  );
+
+  function refetchSignupsAndMembers() {
+    queryClient.invalidateQueries({ queryKey: ["listPendingSignups"] });
+    queryClient.invalidateQueries({
+      predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/members",
+    });
+  }
+
+  async function handleApproveSignup(signup: PendingSignup, cooperativeRecordId: number | null) {
+    try {
+      await approveMatchWithStepUp(signup.id, cooperativeRecordId);
+      toast({
+        title: "Sign-up approved",
+        description: cooperativeRecordId
+          ? `${signup.fullName} linked to their cooperative record.`
+          : `${signup.fullName} approved as a new member.`,
+      });
+      setReviewSignup(null);
+      refetchSignupsAndMembers();
+    } catch (err: any) {
+      if (err?.cancelled) return;
+      toast({ title: "Approval failed", description: err.message, variant: "destructive" });
+    }
+  }
+
+  async function handleRejectSignup(signup: PendingSignup) {
+    try {
+      await rejectMatchWithStepUp(signup.id);
+      toast({ title: "Sign-up rejected", description: `${signup.fullName}'s request was removed.` });
+      setReviewSignup(null);
+      refetchSignupsAndMembers();
+    } catch (err: any) {
+      if (err?.cancelled) return;
+      toast({ title: "Reject failed", description: err.message, variant: "destructive" });
+    }
+  }
 
   const updateMemberWithStepUp = useStepUpAction(
     (id: number, data: any) => updateMember.mutateAsync({ id, data }),
@@ -377,6 +435,45 @@ export function MembersPage() {
         </div>
       </div>
 
+      {/* Tabs — Members vs pending sign-ups (admins only) */}
+      {canManage && (
+        <div className="flex gap-1 rounded-xl bg-muted p-1" data-testid="members-tabs">
+          <button
+            type="button"
+            onClick={() => setTab("members")}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              tab === "members" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+            }`}
+            data-testid="tab-members"
+          >
+            Members
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("pending")}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition flex items-center justify-center gap-1.5 ${
+              tab === "pending" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+            }`}
+            data-testid="tab-pending-signups"
+          >
+            Pending sign-ups
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {tab === "pending" && canManage ? (
+        <PendingSignupsList
+          signups={pendingSignups}
+          isLoading={pendingLoading}
+          onReview={setReviewSignup}
+        />
+      ) : (
+        <>
       {/* Toolbar — search always visible, filters on desktop / sheet on mobile */}
       <div className="flex gap-2 items-center">
         <div className="relative flex-1">
@@ -739,6 +836,20 @@ export function MembersPage() {
           })}
         </div>
       )}
+        </>
+      )}
+
+      {reviewSignup && (
+        <ReviewSignupDialog
+          signup={reviewSignup}
+          open={!!reviewSignup}
+          onOpenChange={(o) => !o && setReviewSignup(null)}
+          onApprove={handleApproveSignup}
+          onReject={handleRejectSignup}
+          isApproving={approveMatch.isPending}
+          isRejecting={rejectMatch.isPending}
+        />
+      )}
 
       <Dialog open={!!editingMember} onOpenChange={(o) => !o && setEditingMember(null)}>
         <DialogContent>
@@ -877,5 +988,232 @@ export function MembersPage() {
         }}
       />
     </div>
+  );
+}
+
+function confidenceBadge(confidence: MatchSuggestion["confidence"]) {
+  const map: Record<string, { variant: "default" | "secondary" | "outline"; label: string }> = {
+    exact: { variant: "default", label: "Strong match" },
+    fuzzy: { variant: "secondary", label: "Possible match" },
+    none: { variant: "outline", label: "Weak match" },
+  };
+  const c = map[confidence] ?? map.none;
+  return <Badge variant={c.variant} className="text-[10px] rounded-full px-2">{c.label}</Badge>;
+}
+
+function PendingSignupsList({
+  signups,
+  isLoading,
+  onReview,
+}: {
+  signups: PendingSignup[] | undefined;
+  isLoading: boolean;
+  onReview: (s: PendingSignup) => void;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
+      </div>
+    );
+  }
+  if (!signups || signups.length === 0) {
+    return (
+      <Card className="rounded-2xl shadow-sm">
+        <CardContent className="text-center py-16 text-muted-foreground">
+          <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="font-medium">No pending sign-ups</p>
+          <p className="text-sm mt-1">
+            New members who sign up will appear here for your review and approval.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <div className="space-y-2.5">
+      {signups.map((s) => {
+        const top = s.suggestions[0];
+        return (
+          <div
+            key={s.id}
+            className="rounded-2xl border border-border/70 bg-card p-3 sm:p-4 shadow-sm"
+            data-testid={`pending-signup-${s.id}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+                {s.fullName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm truncate">{s.fullName}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {s.pendingEmail || "—"}
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <Badge variant="outline" className="text-[10px] uppercase rounded-full px-2">
+                    {s.organization || "—"}
+                  </Badge>
+                  {s.staffId && (
+                    <Badge variant="outline" className="text-[10px] rounded-full px-2">
+                      ID {s.staffId}
+                    </Badge>
+                  )}
+                  {top ? confidenceBadge(top.confidence) : (
+                    <Badge variant="outline" className="text-[10px] rounded-full px-2">
+                      No match found
+                    </Badge>
+                  )}
+                </div>
+                {top && (
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Likely record: <span className="font-medium text-foreground">{top.fullName}</span>
+                    {" · "}{formatCurrency(top.savingsBalance)} savings
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border/50">
+              <Button
+                size="sm"
+                className="flex-1 rounded-lg gap-1.5 text-xs h-8"
+                onClick={() => onReview(s)}
+                data-testid={`button-review-signup-${s.id}`}
+              >
+                <UserCheck className="w-3.5 h-3.5" /> Review
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReviewSignupDialog({
+  signup,
+  open,
+  onOpenChange,
+  onApprove,
+  onReject,
+  isApproving,
+  isRejecting,
+}: {
+  signup: PendingSignup;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onApprove: (s: PendingSignup, cooperativeRecordId: number | null) => void;
+  onReject: (s: PendingSignup) => void;
+  isApproving: boolean;
+  isRejecting: boolean;
+}) {
+  const [selectedRecordId, setSelectedRecordId] = useState<number | null>(
+    signup.suggestions[0]?.recordId ?? null,
+  );
+  const busy = isApproving || isRejecting;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Review sign-up</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-xl bg-muted/50 p-3 text-sm space-y-1">
+            <p className="font-semibold">{signup.fullName}</p>
+            <p className="text-muted-foreground text-xs">{signup.pendingEmail || "—"}</p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <Badge variant="outline" className="text-[10px] uppercase rounded-full px-2">
+                {signup.organization || "—"}
+              </Badge>
+              {signup.staffId && (
+                <Badge variant="outline" className="text-[10px] rounded-full px-2">
+                  ID {signup.staffId}
+                </Badge>
+              )}
+              {signup.phone && (
+                <Badge variant="outline" className="text-[10px] rounded-full px-2">
+                  {signup.phone}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2">Link to cooperative record</p>
+            {signup.suggestions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No matching cooperative records were found. You can still approve this person as a
+                new member with a zero opening balance.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {signup.suggestions.map((sug) => (
+                  <button
+                    key={sug.recordId}
+                    type="button"
+                    onClick={() => setSelectedRecordId(sug.recordId)}
+                    className={`w-full text-left border rounded-xl p-3 transition ${
+                      selectedRecordId === sug.recordId
+                        ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    data-testid={`match-option-${sug.recordId}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm">{sug.fullName}</span>
+                      {confidenceBadge(sug.confidence)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {sug.organization || "—"}
+                      {sug.staffId ? ` · ID ${sug.staffId}` : ""}
+                      {" · "}{formatCurrency(sug.savingsBalance)} savings
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <label
+            className={`flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 transition ${
+              selectedRecordId === null
+                ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                : "border-border hover:border-primary/50"
+            }`}
+            data-testid="match-option-new"
+          >
+            <input
+              type="radio"
+              className="accent-primary"
+              checked={selectedRecordId === null}
+              onChange={() => setSelectedRecordId(null)}
+            />
+            Approve as a new member (zero opening balance)
+          </label>
+
+          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
+            <Button
+              variant="outline"
+              className="flex-1 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => onReject(signup)}
+              disabled={busy}
+              data-testid="button-reject-signup"
+            >
+              <UserX className="w-4 h-4 mr-1.5" />
+              {isRejecting ? "Rejecting..." : "Reject"}
+            </Button>
+            <Button
+              className="flex-1 rounded-xl"
+              onClick={() => onApprove(signup, selectedRecordId)}
+              disabled={busy}
+              data-testid="button-approve-signup"
+            >
+              <UserCheck className="w-4 h-4 mr-1.5" />
+              {isApproving ? "Approving..." : "Approve"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

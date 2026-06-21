@@ -9,7 +9,7 @@ import {
   uploadRecordsTable,
   organizationsTable,
 } from "@workspace/db";
-import { eq, ilike, or, and, sql } from "drizzle-orm";
+import { eq, ilike, or, and, sql, isNull, isNotNull } from "drizzle-orm";
 import {
   requireAuth,
   requireAdmin,
@@ -36,6 +36,9 @@ import { inArray } from "drizzle-orm";
 const router: IRouter = Router();
 
 import { formatMember } from "../lib/formatMember";
+import { computeMatchSuggestions } from "../lib/matchSuggestions";
+import { requireAdminOnly } from "../middlewares/auth";
+import { ApproveMatchBody } from "@workspace/api-zod";
 
 router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = ListMembersQueryParams.safeParse(req.query);
@@ -44,8 +47,16 @@ router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res):
     return;
   }
 
-  let query = db.select().from(membersTable);
-  const conditions = [];
+  // The Members section shows only app accounts: rows that are either linked
+  // to a Clerk identity (active members) or have a pending sign-up awaiting
+  // approval. Pure cooperative records (clerkUserId AND pendingClerkUserId both
+  // NULL) live in the separate Cooperative Records view.
+  const conditions: any[] = [
+    or(
+      isNotNull(membersTable.clerkUserId),
+      isNotNull(membersTable.pendingClerkUserId),
+    )!,
+  ];
 
   if (params.data.status) {
     conditions.push(eq(membersTable.status, params.data.status as any));
@@ -62,15 +73,89 @@ router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res):
     );
   }
 
-  const members = conditions.length
-    ? await db
-        .select()
-        .from(membersTable)
-        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
-    : await db.select().from(membersTable);
+  const members = await db
+    .select()
+    .from(membersTable)
+    .where(conditions.length === 1 ? conditions[0] : and(...conditions));
 
   res.json(members.map(formatMember));
 });
+
+// ── Pending sign-ups awaiting approval/match ────────────────────────────────
+// Registered BEFORE "/members/:id" so the literal path isn't parsed as an id.
+router.get(
+  "/members/pending-signups",
+  requireAuth,
+  requireAdmin,
+  async (_req: AuthRequest, res): Promise<void> => {
+    const signups = await db
+      .select()
+      .from(membersTable)
+      .where(
+        and(
+          isNotNull(membersTable.pendingClerkUserId),
+          isNull(membersTable.clerkUserId),
+        ),
+      );
+
+    const result = [];
+    for (const s of signups) {
+      const suggestions = await computeMatchSuggestions(
+        s.pendingName ?? s.fullName,
+        s.organization,
+      );
+      result.push({
+        id: s.id,
+        fullName: s.fullName,
+        pendingName: s.pendingName,
+        pendingEmail: s.pendingEmail,
+        organization: s.organization,
+        staffId: s.staffId,
+        phone: s.phone,
+        createdAt: s.createdAt,
+        suggestions,
+      });
+    }
+
+    res.json(result);
+  },
+);
+
+// ── Cooperative records (not yet linked to an app account) ───────────────────
+router.get(
+  "/cooperative-records",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const conditions: any[] = [
+      isNull(membersTable.clerkUserId),
+      isNull(membersTable.pendingClerkUserId),
+    ];
+
+    const organization = req.query.organization
+      ? String(req.query.organization)
+      : "";
+    if (organization) {
+      conditions.push(eq(membersTable.organization, organization));
+    }
+    const search = req.query.search ? String(req.query.search) : "";
+    if (search) {
+      conditions.push(
+        or(
+          ilike(membersTable.fullName, `%${search}%`),
+          ilike(membersTable.staffId, `%${search}%`),
+        )!,
+      );
+    }
+
+    const records = await db
+      .select()
+      .from(membersTable)
+      .where(and(...conditions));
+
+    res.json(records.map(formatMember));
+  },
+);
 
 router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CreateMemberBody.safeParse(req.body);
@@ -138,11 +223,13 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
   });
 
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
-  const invite = await createClerkInvitation({
-    emailAddress: member.email,
-    redirectUrl: `${appUrl}/sign-up`,
-    publicMetadata: { memberId: member.id, fullName: member.fullName },
-  });
+  const invite = member.email
+    ? await createClerkInvitation({
+        emailAddress: member.email,
+        redirectUrl: `${appUrl}/sign-up`,
+        publicMetadata: { memberId: member.id, fullName: member.fullName },
+      })
+    : { ok: false };
 
   res.status(201).json({ ...formatMember(member), invitationSent: invite.ok });
 });
@@ -368,6 +455,181 @@ router.post("/members/:id/deactivate", requireAuth, requireAdmin, requireReverif
 
   res.json(formatMember(member));
 });
+
+router.post(
+  "/members/:id/approve-match",
+  requireAuth,
+  requireAdminOnly,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+
+    const parsed = ApproveMatchBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const cooperativeRecordId =
+      (parsed.data as any).cooperativeRecordId ?? null;
+
+    const [signup] = await db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, id));
+    if (!signup || !signup.pendingClerkUserId || signup.clerkUserId) {
+      res.status(404).json({ error: "Pending sign-up not found" });
+      return;
+    }
+
+    // Approve WITHOUT a cooperative record: promote the sign-up row itself into
+    // an active app account with zero balances.
+    if (cooperativeRecordId == null) {
+      const [member] = await db
+        .update(membersTable)
+        .set({
+          clerkUserId: signup.pendingClerkUserId,
+          email: signup.pendingEmail,
+          status: "active",
+          pendingClerkUserId: null,
+          pendingEmail: null,
+          pendingName: null,
+        })
+        .where(eq(membersTable.id, id))
+        .returning();
+
+      await logAudit({
+        actorId: req.memberId,
+        action: "APPROVE_SIGNUP_NEW",
+        entity: "member",
+        entityId: id,
+        details: `Approved sign-up as new member (zero balance): ${member.fullName}`,
+      });
+
+      res.json(formatMember(member));
+      return;
+    }
+
+    // Approve WITH a cooperative record: link the Clerk identity to that record
+    // (which already holds the balances + transaction history), then discard the
+    // temporary sign-up row. Strict 1-to-1: the record must be unclaimed.
+    const [record] = await db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, cooperativeRecordId));
+    if (!record) {
+      res.status(404).json({ error: "Cooperative record not found" });
+      return;
+    }
+    if (record.clerkUserId || record.pendingClerkUserId) {
+      res.status(409).json({
+        error: "That cooperative record is already linked to an app account.",
+      });
+      return;
+    }
+
+    // Link + delete must be atomic: a partial success would either leave a
+    // stale pending row or orphan the Clerk identity. Re-check the record is
+    // still unclaimed inside the transaction to close the approve/approve race.
+    type LinkResult =
+      | { ok: true; member: typeof signup }
+      | { ok: false; status: number; error: string };
+    let result: LinkResult;
+    try {
+      result = await db.transaction(async (tx): Promise<LinkResult> => {
+        const [current] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, cooperativeRecordId));
+        if (!current) {
+          return { ok: false, status: 404, error: "Cooperative record not found" };
+        }
+        if (current.clerkUserId || current.pendingClerkUserId) {
+          return {
+            ok: false,
+            status: 409,
+            error: "That cooperative record is already linked to an app account.",
+          };
+        }
+
+        const [updated] = await tx
+          .update(membersTable)
+          .set({
+            clerkUserId: signup.pendingClerkUserId,
+            email: signup.pendingEmail,
+            phone: current.phone ?? signup.phone ?? undefined,
+            staffId: current.staffId ?? signup.staffId ?? undefined,
+            status: "active",
+          })
+          .where(eq(membersTable.id, cooperativeRecordId))
+          .returning();
+
+        // Remove the now-redundant sign-up row (no transactions/balances).
+        await tx.delete(membersTable).where(eq(membersTable.id, id));
+        return { ok: true, member: updated };
+      });
+    } catch (err: any) {
+      const code = err?.code ?? err?.cause?.code;
+      if (code === "23505") {
+        res.status(409).json({
+          error: "This account or email is already linked to a member.",
+        });
+        return;
+      }
+      throw err;
+    }
+
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    const linked = result.member;
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "APPROVE_SIGNUP_MATCH",
+      entity: "member",
+      entityId: linked.id,
+      details: `Linked sign-up "${signup.pendingName ?? signup.fullName}" to cooperative record: ${linked.fullName}`,
+    });
+
+    res.json(formatMember(linked));
+  },
+);
+
+router.post(
+  "/members/:id/reject-match",
+  requireAuth,
+  requireAdminOnly,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+
+    const [signup] = await db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, id));
+    if (!signup || !signup.pendingClerkUserId || signup.clerkUserId) {
+      res.status(404).json({ error: "Pending sign-up not found" });
+      return;
+    }
+
+    // A pending sign-up row carries no financial history, so it is safe to
+    // delete. The person can re-register if the rejection was a mistake.
+    await db.delete(membersTable).where(eq(membersTable.id, id));
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "REJECT_SIGNUP",
+      entity: "member",
+      entityId: id,
+      details: `Rejected sign-up: ${signup.pendingName ?? signup.fullName}`,
+    });
+
+    res.json({ rejected: true });
+  },
+);
 
 router.delete(
   "/members/:id",

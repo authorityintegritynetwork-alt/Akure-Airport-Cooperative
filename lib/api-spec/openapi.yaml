@@ -141,6 +141,30 @@ paths:
         "400":
           description: Bad request
 
+  /auth/match-suggestions:
+    get:
+      operationId: getMatchSuggestions
+      tags: [auth]
+      summary: Suggest cooperative records matching a name + organization (for signup preview)
+      parameters:
+        - in: query
+          name: fullName
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: organization
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchSuggestionList"
+
   # ── MEMBERS ──────────────────────────────────────────────────────────────────
   /members:
     get:
@@ -413,6 +437,99 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Member"
+
+  /members/pending-signups:
+    get:
+      operationId: listPendingSignups
+      tags: [members]
+      summary: List app sign-ups awaiting admin approval/match (Admin+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PendingSignup"
+
+  /cooperative-records:
+    get:
+      operationId: listCooperativeRecords
+      tags: [members]
+      summary: List cooperative records not yet linked to an app account (Admin+)
+      parameters:
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: organization
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+
+  /members/{id}/approve-match:
+    post:
+      operationId: approveMatch
+      tags: [members]
+      summary: Approve a pending sign-up, optionally linking it to a cooperative record (Admin+, step-up)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveMatchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "403": { description: Step-up reverification required }
+        "404": { description: Pending sign-up or cooperative record not found }
+
+  /members/{id}/reject-match:
+    post:
+      operationId: rejectMatch
+      tags: [members]
+      summary: Reject a pending sign-up (Admin+, step-up)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rejected:
+                    type: boolean
+                required: [rejected]
+        "403": { description: Step-up reverification required }
+        "404": { description: Pending sign-up not found }
 
   /members/{id}/summary:
     get:
@@ -1573,7 +1690,7 @@ components:
         fullName:
           type: string
         email:
-          type: string
+          type: ["string", "null"]
         phone:
           type: ["string", "null"]
         staffId:
@@ -1851,6 +1968,80 @@ components:
           type: string
       required: [fullName, organization]
 
+    MatchSuggestion:
+      type: object
+      properties:
+        recordId:
+          type: integer
+        fullName:
+          type: string
+        organization:
+          type: ["string", "null"]
+        staffId:
+          type: ["string", "null"]
+        confidence:
+          type: string
+          enum: [exact, fuzzy, none]
+        savingsBalance:
+          type: number
+        totalLoanBalance:
+          type: number
+        totalStoreDebt:
+          type: number
+      required:
+        - recordId
+        - fullName
+        - confidence
+        - savingsBalance
+        - totalLoanBalance
+        - totalStoreDebt
+
+    MatchSuggestionList:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchSuggestion"
+      required: [suggestions]
+
+    PendingSignup:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        pendingName:
+          type: ["string", "null"]
+        pendingEmail:
+          type: ["string", "null"]
+        organization:
+          type: string
+        staffId:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchSuggestion"
+      required:
+        - id
+        - fullName
+        - organization
+        - createdAt
+        - suggestions
+
+    ApproveMatchBody:
+      type: object
+      properties:
+        cooperativeRecordId:
+          type: ["integer", "null"]
+
     CreateMemberBody:
       type: object
       properties:
@@ -1909,10 +2100,11 @@ components:
         code: { type: string }
         name: { type: string }
         description: { type: ["string", "null"] }
+        excelFormat: { type: string }
         isActive: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, code, name, isActive, createdAt, updatedAt]
+      required: [id, code, name, excelFormat, isActive, createdAt, updatedAt]
 
     CreateOrganizationBody:
       type: object
@@ -1926,13 +2118,17 @@ components:
         description:
           type: string
           description: "Optional one-line description shown on the sign-up screen."
-      required: [code, name]
+        excelFormat:
+          type: string
+          description: "Deduction spreadsheet column layout key for this organization."
+      required: [code, name, excelFormat]
 
     UpdateOrganizationBody:
       type: object
       properties:
         name: { type: string }
         description: { type: ["string", "null"] }
+        excelFormat: { type: string }
 
     LoanProduct:
       type: object
@@ -2250,6 +2446,9 @@ components:
           type: boolean
         autoTagOrganization:
           type: boolean
+        acknowledgeMismatch:
+          type: boolean
+          description: "Confirm processing despite rows where the sheet Total disagrees with the sum of columns."
         manualMatches:
           type: array
           items:

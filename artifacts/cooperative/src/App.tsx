@@ -30,6 +30,7 @@ import { SettingsPage } from "./pages/settings";
 import { RolesPage } from "./pages/roles";
 import { CompleteProfilePage } from "./pages/complete-profile";
 import { OrganizationsPage } from "./pages/organizations";
+import { CooperativeRecordsPage } from "./pages/cooperative-records";
 import { AnnouncementsPage } from "./pages/announcements";
 import { SupportPage } from "./pages/support";
 import { SupportAdminPage } from "./pages/support-admin";
@@ -299,6 +300,9 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/organizations">
             <ProtectedRoute component={OrganizationsPage} />
+          </Route>
+          <Route path="/cooperative-records">
+            <ProtectedRoute component={CooperativeRecordsPage} />
           </Route>
           <Route path="/audit-logs">
             <ProtectedRoute component={AuditLogsPage} />

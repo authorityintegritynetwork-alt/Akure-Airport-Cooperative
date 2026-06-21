@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { db, membersTable, organizationsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { AuthRequest } from "../middlewares/auth";
 import { RegisterMemberBody } from "@workspace/api-zod";
 import { getClerkUser } from "../lib/clerk";
 import { formatMember } from "../lib/formatMember";
+import { computeMatchSuggestions } from "../lib/matchSuggestions";
 
 const router: IRouter = Router();
 
@@ -17,18 +18,67 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
+  // An active app account has its clerkUserId set.
   const [member] = await db
     .select()
     .from(membersTable)
     .where(eq(membersTable.clerkUserId, userId));
 
-  if (!member) {
-    res.status(404).json({ error: "Member not found" });
+  if (member) {
+    res.json(formatMember(member));
     return;
   }
 
-  res.json(formatMember(member));
+  // A signed-up-but-not-yet-approved user only has pendingClerkUserId set.
+  // Surface them as a pending profile so the frontend shows the
+  // "awaiting approval" screen instead of sending them back to complete-profile.
+  const [pending] = await db
+    .select()
+    .from(membersTable)
+    .where(eq(membersTable.pendingClerkUserId, userId));
+
+  if (pending) {
+    res.json({
+      ...formatMember(pending),
+      clerkUserId: pending.clerkUserId ?? pending.pendingClerkUserId,
+      status: "pending",
+    });
+    return;
+  }
+
+  res.status(404).json({ error: "Member not found" });
 });
+
+router.get(
+  "/auth/match-suggestions",
+  async (req: AuthRequest, res): Promise<void> => {
+    const auth = getAuth(req);
+    const userId = auth?.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const fullName = String(req.query.fullName ?? "").trim();
+    const organization = String(req.query.organization ?? "")
+      .trim()
+      .toUpperCase();
+    if (!fullName || !organization) {
+      res.json({ suggestions: [] });
+      return;
+    }
+
+    // Pre-approval signup flow: never expose cooperative records' financial
+    // balances to a not-yet-approved user. Only identity/match metadata.
+    const suggestions = await computeMatchSuggestions(
+      fullName,
+      organization,
+      6,
+      false,
+    );
+    res.json({ suggestions });
+  },
+);
 
 router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
   const auth = getAuth(req);
@@ -38,12 +88,25 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
-  const existing = await db
+  // Already an active app account?
+  const existingActive = await db
     .select()
     .from(membersTable)
     .where(eq(membersTable.clerkUserId, userId));
-  if (existing.length > 0) {
+  if (existingActive.length > 0) {
     res.status(400).json({ error: "Member already registered" });
+    return;
+  }
+
+  // Already submitted a sign-up awaiting approval?
+  const existingPending = await db
+    .select()
+    .from(membersTable)
+    .where(eq(membersTable.pendingClerkUserId, userId));
+  if (existingPending.length > 0) {
+    res
+      .status(400)
+      .json({ error: "Your registration is already awaiting approval." });
     return;
   }
 
@@ -83,28 +146,15 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
-  const memberCount = await db.select().from(membersTable);
-  const isFirstUser = memberCount.length === 0;
-
-  const existingByEmail = await db
-    .select()
+  // The very first app account bootstraps the system as an active super admin.
+  const appAccounts = await db
+    .select({ id: membersTable.id })
     .from(membersTable)
-    .where(eq(membersTable.email, email));
+    .where(isNotNull(membersTable.clerkUserId));
+  const isFirstUser = appAccounts.length === 0;
 
-  let member;
-  if (existingByEmail.length > 0) {
-    [member] = await db
-      .update(membersTable)
-      .set({
-        clerkUserId: userId,
-        fullName: parsed.data.fullName,
-        phone: parsed.data.phone ?? existingByEmail[0].phone ?? undefined,
-        staffId: parsed.data.staffId ?? existingByEmail[0].staffId ?? undefined,
-      })
-      .where(eq(membersTable.email, email))
-      .returning();
-  } else {
-    [member] = await db
+  if (isFirstUser) {
+    const [member] = await db
       .insert(membersTable)
       .values({
         clerkUserId: userId,
@@ -113,13 +163,39 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
         phone: parsed.data.phone ?? undefined,
         staffId: parsed.data.staffId ?? undefined,
         organization: orgRow.code,
-        role: isFirstUser ? "super_admin" : "member",
-        status: isFirstUser ? "active" : "pending",
+        role: "super_admin",
+        status: "active",
       })
       .returning();
+    res.status(201).json(formatMember(member));
+    return;
   }
 
-  res.status(201).json(formatMember(member));
+  // Everyone else creates a dedicated pending sign-up row. It holds the Clerk
+  // identity in pending* fields (clerkUserId stays NULL so they don't get a
+  // live profile) with zero balances until an admin approves and optionally
+  // links it to an existing cooperative record.
+  const [signup] = await db
+    .insert(membersTable)
+    .values({
+      clerkUserId: null,
+      pendingClerkUserId: userId,
+      pendingEmail: email,
+      pendingName: parsed.data.fullName,
+      fullName: parsed.data.fullName,
+      phone: parsed.data.phone ?? undefined,
+      staffId: parsed.data.staffId ?? undefined,
+      organization: orgRow.code,
+      role: "member",
+      status: "pending",
+    })
+    .returning();
+
+  res.status(201).json({
+    ...formatMember(signup),
+    clerkUserId: signup.clerkUserId ?? signup.pendingClerkUserId,
+    status: "pending",
+  });
 });
 
 export default router;

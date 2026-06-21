@@ -36,7 +36,7 @@ const createBroadcastBody = z.object({
 });
 
 async function resolveAudience(audience: BroadcastAudience): Promise<
-  Array<{ id: number; fullName: string; email: string }>
+  Array<{ id: number; fullName: string; email: string | null }>
 > {
   if (audience.kind === "all") {
     return db
@@ -180,9 +180,14 @@ router.post(
     );
 
     if (sendEmail) {
-      // fire-and-forget per recipient; don't block the response on SMTP
+      // fire-and-forget per recipient; don't block the response on SMTP.
+      // Skip recipients without a real email (e.g. unmatched cooperative rows).
+      const emailable = recipients.filter(
+        (r): r is { id: number; fullName: string; email: string } =>
+          !!r.email && !r.email.endsWith("@placeholder.aacsms.internal"),
+      );
       void Promise.allSettled(
-        recipients.map((r) =>
+        emailable.map((r) =>
           sendMail({
             to: r.email,
             subject: `[${category.toUpperCase()}] ${title}`,

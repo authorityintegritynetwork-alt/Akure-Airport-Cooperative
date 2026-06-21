@@ -13,7 +13,8 @@ export interface Member {
   /** @nullable */
   clerkUserId?: string | null;
   fullName: string;
-  email: string;
+  /** @nullable */
+  email: string | null;
   /** @nullable */
   phone?: string | null;
   /** @nullable */
