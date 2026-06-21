@@ -367,6 +367,11 @@ router.post(
         // Track which sheet rows matched a registered member so the opening
         // balance pass below can detect (and flag) double matches.
         const memberMatchedRows = new Set<number>();
+        // Track rows for which we auto-created a brand-new pending member. Their
+        // matching opening balance (if any) is deliberately left UNCLAIMED so it
+        // is only linked/copied when an admin approves the member. These rows are
+        // therefore excluded from the needs_reconcile double-match pass below.
+        const autoCreatedRows = new Set<number>();
 
         // Pre-load unclaimed OB rows once for the entire transaction (FOR UPDATE
         // so concurrent processes see a stable snapshot).
@@ -384,27 +389,14 @@ router.post(
           let rowWasAutoCreated = false;
           if (finalMatch.memberId == null) {
             // Auto-create a pending member so deductions are never silently lost.
-            // If an unclaimed opening balance row matches by name, copy its
-            // balance columns onto the new member and mark that OB as claimed.
+            // We intentionally do NOT copy any matching opening balance onto the
+            // member or mark that OB as claimed here — claiming only happens when
+            // an admin approves the member. The OB stays unclaimed and is picked
+            // up at approval time. This avoids "claiming" balances for someone who
+            // was never approved.
             rowWasAutoCreated = true;
+            autoCreatedRows.add(row.rowNumber);
             const newMemberId = await (async () => {
-              const obMatch = obMatcher.match(row.rawName);
-              const obRow =
-                obMatch.memberId != null
-                  ? unclaimedOpenings.find((r) => r.id === obMatch.memberId)
-                  : null;
-
-              // Fetch full OB row data if we have a match
-              let obData: (typeof openingBalancesTable.$inferSelect) | null = null;
-              if (obRow != null) {
-                const rows = await tx
-                  .select()
-                  .from(openingBalancesTable)
-                  .where(eq(openingBalancesTable.id, obRow.id))
-                  .for("update");
-                obData = rows[0] ?? null;
-              }
-
               const placeholderEmail = `unmatched-${randomUUID()}@placeholder.aacsms.internal`;
               const [newMember] = await tx
                 .insert(membersTable)
@@ -413,60 +405,8 @@ router.post(
                   email: placeholderEmail,
                   organization: uploadOrg,
                   status: "pending",
-                  // Copy opening balance columns if we have an OB row
-                  ...(obData != null
-                    ? {
-                        obSavingsBalance: obData.savingsBalance,
-                        obProvidentBalance: obData.providentBalance,
-                        obChristmasBalance: obData.christmasBalance,
-                        obRealLoanBalance: obData.realLoanBalance,
-                        obEmergencyLoanBalance: obData.emergencyLoanBalance,
-                        obTotalLoanBalance: obData.totalLoanBalance,
-                        obElectronicsDebt: obData.electronicsDebt,
-                        obSElectronicsDebt: obData.sElectronicsDebt,
-                        obFurnitureDebt: obData.furnitureDebt,
-                        obCommodityDebt: obData.commodityDebt,
-                        obGhlFormDebt: obData.ghlFormDebt,
-                        obFireFundBalance: obData.fireFundBalance,
-                        obFuelVentureBalance: obData.fuelVentureBalance,
-                        obLandLoanBalance: obData.landLoanBalance,
-                        obTotalStoreDebt: obData.totalStoreDebt,
-                        obUploadedAt: obData.createdAt,
-                        // Seed live balances from OB so the member starts with correct totals
-                        savingsBalance: obData.savingsBalance,
-                        providentBalance: obData.providentBalance,
-                        christmasBalance: obData.christmasBalance,
-                        realLoanBalance: obData.realLoanBalance,
-                        emergencyLoanBalance: obData.emergencyLoanBalance,
-                        totalLoanBalance: obData.totalLoanBalance,
-                        electronicsDebt: obData.electronicsDebt,
-                        sElectronicsDebt: obData.sElectronicsDebt,
-                        furnitureDebt: obData.furnitureDebt,
-                        commodityDebt: obData.commodityDebt,
-                        ghlFormDebt: obData.ghlFormDebt,
-                        fireFundBalance: obData.fireFundBalance,
-                        fuelVentureBalance: obData.fuelVentureBalance,
-                        landLoanBalance: obData.landLoanBalance,
-                        totalStoreDebt: obData.totalStoreDebt,
-                      }
-                    : {}),
                 })
                 .returning({ id: membersTable.id });
-
-              if (obData != null) {
-                await tx
-                  .update(openingBalancesTable)
-                  .set({
-                    status: "claimed",
-                    linkedMemberId: newMember.id,
-                    claimedAt: new Date(),
-                  })
-                  .where(eq(openingBalancesTable.id, obData.id));
-                // Remove from unclaimedOpenings so the OB pass below won't
-                // try to flag it a second time.
-                const idx = unclaimedOpenings.findIndex((r) => r.id === obData!.id);
-                if (idx !== -1) unclaimedOpenings.splice(idx, 1);
-              }
 
               autoCreated++;
               return newMember.id;
@@ -604,6 +544,9 @@ router.post(
         if (stillUnclaimedIds.size > 0) {
           for (const row of sheet.rows) {
             if (!memberMatchedRows.has(row.rowNumber)) continue;
+            // Auto-created members leave their matching OB unclaimed for approval —
+            // do not flag it for reconcile.
+            if (autoCreatedRows.has(row.rowNumber)) continue;
             const obMatch = obMatcher.match(row.rawName);
             if (obMatch.memberId == null) continue;
             // Skip if this OB was already claimed by the auto-create step above.
