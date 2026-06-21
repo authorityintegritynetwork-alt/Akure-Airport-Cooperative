@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membersTable } from "./members";
+import { uploadRecordsTable } from "./uploads";
 
 export const transactionsTable = pgTable(
   "transactions",
@@ -43,7 +44,10 @@ export const transactionsTable = pgTable(
     category: text("category"),
     amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
     description: text("description"),
-    uploadRecordId: integer("upload_record_id"),
+    uploadRecordId: integer("upload_record_id").references(
+      () => uploadRecordsTable.id,
+      { onDelete: "cascade" },
+    ),
     month: text("month"),
     year: integer("year"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

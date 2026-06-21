@@ -206,6 +206,18 @@ router.post(
       return;
     }
 
+    // Refuse to deactivate while members are assigned to this org.
+    const [{ memberCount: deactMemberCount }] = await db
+      .select({ memberCount: sql<number>`count(*)::int` })
+      .from(membersTable)
+      .where(eq(membersTable.organization, current.code));
+    if (deactMemberCount > 0) {
+      res.status(409).json({
+        error: `Cannot deactivate "${current.code}" — ${deactMemberCount} member(s) are currently assigned to it. Reassign them first.`,
+      });
+      return;
+    }
+
     const [org] = await db
       .update(organizationsTable)
       .set({ isActive: false })

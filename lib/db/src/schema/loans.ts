@@ -42,6 +42,7 @@ export const loansTable = pgTable(
       .notNull()
       .default("pending"),
     outstandingBalance: numeric("outstanding_balance", { precision: 15, scale: 2 }).notNull(),
+    loanType: text("loan_type", { enum: ["real", "emergency"] }).notNull().default("real"),
     adminApprovedAt: timestamp("admin_approved_at", { withTimezone: true }),
     adminApprovedBy: integer("admin_approved_by"),
     auditorApprovedAt: timestamp("auditor_approved_at", { withTimezone: true }),

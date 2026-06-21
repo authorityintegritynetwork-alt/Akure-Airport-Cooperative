@@ -743,6 +743,8 @@ export const PreviewExcelUploadResponse = zod.object({
   month: zod.string(),
   year: zod.number(),
   totalRows: zod.number(),
+  hasMismatchedTotals: zod.boolean().optional(),
+  hasDuplicateNames: zod.boolean().optional(),
   matchedRows: zod.number(),
   unmatchedRows: zod.number(),
   errorRows: zod.number(),
@@ -790,6 +792,7 @@ export const ProcessExcelUploadBody = zod.object({
   organization: zod.string(),
   skipErrors: zod.boolean().optional(),
   autoTagOrganization: zod.boolean().optional(),
+  acknowledgeMismatch: zod.boolean().optional(),
   manualMatches: zod
     .array(
       zod.object({

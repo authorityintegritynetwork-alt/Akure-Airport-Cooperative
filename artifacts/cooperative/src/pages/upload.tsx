@@ -65,6 +65,7 @@ export function UploadPage() {
   const [chosenSheet, setChosenSheet] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [manualMatches, setManualMatches] = useState<Record<number, number>>({});
+  const [acknowledgeMismatch, setAcknowledgeMismatch] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showAllSheets, setShowAllSheets] = useState(false);
   const { toast } = useToast();
@@ -100,6 +101,7 @@ export function UploadPage() {
     setChosenSheet(null);
     setPreviewData(null);
     setManualMatches({});
+    setAcknowledgeMismatch(false);
   }
 
   async function handleUpload() {
@@ -201,6 +203,7 @@ export function UploadPage() {
         month,
         year,
         organization,
+        acknowledgeMismatch: acknowledgeMismatch || undefined,
         manualMatches: Object.entries(manualMatches).map(([rowNumber, memberId]) => ({
           rowNumber: Number(rowNumber),
           memberId,
@@ -524,6 +527,34 @@ export function UploadPage() {
                 </span>
               </div>
             )}
+            {previewData.hasDuplicateNames && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-red-800 dark:text-red-200 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-3">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Upload blocked:</strong> the sheet contains duplicate member names (highlighted in red below).
+                  Fix the spreadsheet and re-upload before you can process.
+                </span>
+              </div>
+            )}
+            {previewData.hasMismatchedTotals && !previewData.hasDuplicateNames && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium">Some rows have a mismatch between the sheet's Total column and the sum of individual columns.</p>
+                  <p className="mt-1 text-amber-700 dark:text-amber-300">We will use the calculated column sum. Review the highlighted rows below, then tick the box to proceed.</p>
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={acknowledgeMismatch}
+                      onChange={(e) => setAcknowledgeMismatch(e.target.checked)}
+                      className="rounded"
+                      data-testid="checkbox-acknowledge-mismatch"
+                    />
+                    <span className="font-medium">I have reviewed the mismatches and agree to use the calculated totals</span>
+                  </label>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="overflow-auto max-h-[28rem] rounded-xl border border-border/60">
@@ -544,7 +575,9 @@ export function UploadPage() {
                 <tbody>
                   {previewData.rows.map((row: any) => {
                     const isUnmatched = row.matchedMemberId == null;
-                    const rowClass = isUnmatched
+                    const rowClass = row.isDuplicateName
+                      ? "bg-red-50 dark:bg-red-500/10"
+                      : isUnmatched
                       ? "bg-amber-50 dark:bg-amber-500/5"
                       : row.orgMismatch
                       ? "bg-amber-100 dark:bg-amber-500/10"
@@ -647,12 +680,20 @@ export function UploadPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => handleProcess()}
-                disabled={process.isPending}
+                disabled={
+                  process.isPending ||
+                  previewData.hasDuplicateNames ||
+                  (previewData.hasMismatchedTotals && !acknowledgeMismatch)
+                }
                 className="rounded-xl flex-1 min-w-[200px] h-11"
                 data-testid="button-process-upload"
               >
                 {process.isPending
                   ? "Processing..."
+                  : previewData.hasDuplicateNames
+                  ? "Fix duplicate names to continue"
+                  : previewData.hasMismatchedTotals && !acknowledgeMismatch
+                  ? "Acknowledge mismatches to continue"
                   : previewData.unmatchedRows > 0
                   ? `Process ${previewData.matchedRows} matched + ${previewData.unmatchedRows} auto-create`
                   : `Process ${previewData.matchedRows} Members`}

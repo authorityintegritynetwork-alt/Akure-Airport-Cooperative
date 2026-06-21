@@ -22,7 +22,7 @@ const broadcastAudienceSchema = z.discriminatedUnion("kind", [
 ]);
 import { requireAuth, requireAdminOnly, AuthRequest } from "../middlewares/auth";
 import { sendNotifications } from "../lib/notifications";
-import { sendMail } from "../lib/mailer";
+import { sendMail, type MailOptions } from "../lib/mailer";
 import { logAudit } from "../lib/audit";
 
 const router: IRouter = Router();

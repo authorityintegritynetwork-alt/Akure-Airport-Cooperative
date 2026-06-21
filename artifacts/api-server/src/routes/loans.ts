@@ -142,6 +142,8 @@ router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res):
   const totalRepayable = principal + interestAmount;
   const monthlyRepayment = totalRepayable / parsed.data.tenureMonths;
 
+  const loanType = product.code === "emergency" ? "emergency" : "real";
+
   const [loan] = await db
     .insert(loansTable)
     .values({
@@ -155,6 +157,7 @@ router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res):
       tenureMonths: parsed.data.tenureMonths,
       purpose: parsed.data.purpose ?? undefined,
       outstandingBalance: totalRepayable.toString(),
+      loanType,
     })
     .returning();
 

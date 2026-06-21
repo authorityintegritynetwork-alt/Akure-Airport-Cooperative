@@ -158,6 +158,13 @@ router.post(
         .where(eq(openingBalancesTable.status, "unclaimed"));
       const obPreviewMatcher = new NameMatcher(unclaimedObPreview);
 
+      // Detect duplicate names within the sheet before building preview rows.
+      const rawNameCounts = new Map<string, number>();
+      for (const row of sheet.rows) {
+        const key = row.rawName.toUpperCase();
+        rawNameCounts.set(key, (rawNameCounts.get(key) ?? 0) + 1);
+      }
+
       const previewRows = sheet.rows.map((row) => {
         const baseMatch = matcher.match(row.rawName);
         const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
@@ -165,11 +172,16 @@ router.post(
           finalMatch.memberId != null ? membersById.get(finalMatch.memberId) : null;
         const memberOrg = member?.organization ?? null;
         const orgMismatch = memberOrg != null && memberOrg !== uploadOrg;
+        const isDuplicateName = (rawNameCounts.get(row.rawName.toUpperCase()) ?? 0) > 1;
         const warnings = [...row.warnings];
+        const errors = [...row.errors];
         if (orgMismatch) {
           warnings.push(
             `Member is tagged as ${memberOrg} but this upload is for ${uploadOrg}.`,
           );
+        }
+        if (isDuplicateName) {
+          errors.push(`Duplicate name in sheet: "${row.rawName}" appears more than once. Fix the spreadsheet before processing.`);
         }
         // null for matched rows; true/false for unmatched rows
         const hasOpeningBalance =
@@ -197,10 +209,11 @@ router.post(
           landLoan: row.amounts.landLoan,
           memberOrganization: memberOrg,
           orgMismatch,
+          isDuplicateName,
           total: row.total,
           computedTotal: row.computedTotal,
           totalMismatch: row.totalMismatch,
-          errors: row.errors,
+          errors,
           warnings,
           hasOpeningBalance,
         };
@@ -209,6 +222,8 @@ router.post(
       const matched = previewRows.filter((r) => r.matchedMemberId != null).length;
       const unmatched = previewRows.length - matched;
       const errorRows = previewRows.filter((r) => r.errors.length > 0).length;
+      const hasMismatchedTotals = previewRows.some((r) => r.totalMismatch);
+      const hasDuplicateNames = previewRows.some((r) => r.isDuplicateName);
 
       res.json({
         sheetName,
@@ -219,6 +234,8 @@ router.post(
         unmatchedRows: unmatched,
         errorRows,
         duplicateMonth: dup.length > 0,
+        hasMismatchedTotals,
+        hasDuplicateNames,
         rows: previewRows,
       });
     } catch (err: any) {
@@ -269,6 +286,34 @@ router.post(
 
       const uploadOrg = orgRecord.code;
       const autoTag = parsed.data.autoTagOrganization !== false;
+
+      // ── Pre-flight: reject if the sheet contains duplicate names ──────────
+      const processNameCounts = new Map<string, number[]>();
+      for (const row of sheet.rows) {
+        const key = row.rawName.toUpperCase();
+        if (!processNameCounts.has(key)) processNameCounts.set(key, []);
+        processNameCounts.get(key)!.push(row.rowNumber);
+      }
+      const duplicatedNames = [...processNameCounts.entries()]
+        .filter(([, rows]) => rows.length > 1)
+        .map(([name, rows]) => `"${name}" (rows ${rows.join(", ")})`);
+      if (duplicatedNames.length > 0) {
+        res.status(422).json({
+          error: `Upload rejected: the sheet contains duplicate member names. Fix the spreadsheet and re-upload.`,
+          duplicates: duplicatedNames,
+        });
+        return;
+      }
+
+      // ── Pre-flight: require acknowledgement for total mismatches ──────────
+      const hasMismatches = sheet.rows.some((r) => r.totalMismatch);
+      if (hasMismatches && !parsed.data.acknowledgeMismatch) {
+        res.status(422).json({
+          error: "Some rows have a mismatch between the sheet Total column and the sum of individual columns. Run preview to review them, then re-submit with acknowledgeMismatch: true.",
+          code: "TOTAL_MISMATCH",
+        });
+        return;
+      }
 
       // Run the entire processing in a single DB transaction so that any
       // failure rolls back all transaction inserts and balance/loan mutations.
@@ -478,9 +523,10 @@ router.post(
               (balanceDeltas[cfg.balanceField as string] || 0) + signed;
             rowTouched = true;
 
-            // Apply loan repayment FIFO: oldest disbursed loan with outstanding > 0.
-            // NOTE: schema does not yet distinguish real vs emergency loans;
-            // when added, filter by loan type here.
+            // Apply loan repayment FIFO — scoped strictly by loan type.
+            // realLoan column → only reduces Real loans (loanStatus='real').
+            // emergencyLoan column → only reduces Emergency loans (loanStatus='emergency').
+            // This prevents cross-type repayment (e.g. real-loan money paying off an emergency loan).
             if (cfg.loanStatus) {
               const loans = await tx
                 .select()
@@ -489,6 +535,7 @@ router.post(
                   and(
                     eq(loansTable.memberId, memberId),
                     eq(loansTable.status, "disbursed"),
+                    eq(loansTable.loanType, cfg.loanStatus),
                   ),
                 )
                 .orderBy(asc(loansTable.disbursedAt), asc(loansTable.id));

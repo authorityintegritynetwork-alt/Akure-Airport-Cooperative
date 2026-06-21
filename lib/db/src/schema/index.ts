@@ -12,3 +12,4 @@ export * from "./openingBalances";
 export * from "./stepUp";
 export * from "./broadcasts";
 export * from "./support";
+export * from "./emailFailures";
