@@ -20,6 +20,8 @@ export const membersTable = pgTable(
     email: text("email").unique(),
     phone: text("phone"),
     staffId: text("staff_id"),
+    /** Payroll Employee No. / Pensioner No. — permanent ID for monthly deduction matching. */
+    employeeNo: text("employee_no"),
     pendingClerkUserId: text("pending_clerk_user_id").unique(),
     pendingEmail: text("pending_email"),
     pendingName: text("pending_name"),
@@ -32,6 +34,9 @@ export const membersTable = pgTable(
       .notNull()
       .default("pending"),
     organization: text("organization").notNull().default("FAAN"),
+    sharesBalance: numeric("shares_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
     savingsBalance: numeric("savings_balance", { precision: 15, scale: 2 })
       .notNull()
       .default("0"),
@@ -79,6 +84,7 @@ export const membersTable = pgTable(
       .default("0"),
     failedStepUpAttempts: integer("failed_step_up_attempts").notNull().default(0),
     stepUpLockedUntil: timestamp("step_up_locked_until", { withTimezone: true }),
+    obSharesBalance: numeric("ob_shares_balance", { precision: 15, scale: 2 }),
     obSavingsBalance: numeric("ob_savings_balance", { precision: 15, scale: 2 }),
     obProvidentBalance: numeric("ob_provident_balance", { precision: 15, scale: 2 }),
     obChristmasBalance: numeric("ob_christmas_balance", { precision: 15, scale: 2 }),
@@ -102,6 +108,7 @@ export const membersTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => ({
+    sharesNonNeg: check("members_shares_non_neg", sql`${t.sharesBalance} >= 0`),
     savingsNonNeg: check("members_savings_non_neg", sql`${t.savingsBalance} >= 0`),
     providentNonNeg: check("members_provident_non_neg", sql`${t.providentBalance} >= 0`),
     christmasNonNeg: check("members_christmas_non_neg", sql`${t.christmasBalance} >= 0`),

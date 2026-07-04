@@ -26,6 +26,18 @@ const SEED = [
     description: "Nigerian Civil Aviation Authority staff.",
     excelFormat: "faan",
   },
+  {
+    code: "PENSIONERS",
+    name: "Pensioners",
+    description: "Retired members on the pension payroll (code 005511 CTAKR).",
+    excelFormat: "faan",
+  },
+  {
+    code: "NON_STAFF",
+    name: "Non-Staff",
+    description: "Members outside payroll; payments recorded manually by the admin.",
+    excelFormat: "faan",
+  },
 ];
 
 export async function seedOrganizations(): Promise<void> {

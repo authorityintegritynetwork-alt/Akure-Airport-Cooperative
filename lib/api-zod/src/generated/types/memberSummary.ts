@@ -9,6 +9,7 @@
 export interface MemberSummary {
   memberId: number;
   fullName: string;
+  sharesBalance?: number;
   savingsBalance: number;
   totalLoanBalance: number;
   totalStoreDebt: number;

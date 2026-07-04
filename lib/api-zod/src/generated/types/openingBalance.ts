@@ -17,6 +17,9 @@ export interface OpeningBalance {
   linkedMemberId?: number | null;
   /** @nullable */
   reconcileNote?: string | null;
+  /** @nullable */
+  employeeNo?: string | null;
+  sharesBalance?: number;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;

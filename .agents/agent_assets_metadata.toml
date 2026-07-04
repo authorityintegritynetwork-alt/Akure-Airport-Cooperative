@@ -12,3 +12,9 @@ id = "Bme9G4f81dB4r2k_ENGCw"
 uri = "file://docs/app-overview.md"
 type = "text"
 title = "Akure Airport Co-operative — Application Overview"
+
+[[outputs]]
+id = "6j0tAwS-qVANBT1xeTu-k"
+uri = "file://.local/migration_report.md"
+type = "text"
+title = "Migration Dry-Run Report (Dec 2025)"

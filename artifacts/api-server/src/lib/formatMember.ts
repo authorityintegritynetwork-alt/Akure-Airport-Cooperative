@@ -1,4 +1,5 @@
 type MemberRow = {
+  sharesBalance: string;
   savingsBalance: string;
   providentBalance: string;
   christmasBalance: string;
@@ -14,6 +15,7 @@ type MemberRow = {
   totalStoreDebt: string;
   fuelVentureBalance: string;
   landLoanBalance: string;
+  obSharesBalance?: string | null;
   obSavingsBalance?: string | null;
   obProvidentBalance?: string | null;
   obChristmasBalance?: string | null;
@@ -41,6 +43,7 @@ function parseOb(v: string | null | undefined): number | null {
 export function formatMember<T extends MemberRow>(m: T) {
   return {
     ...m,
+    sharesBalance: parseFloat(m.sharesBalance),
     savingsBalance: parseFloat(m.savingsBalance),
     providentBalance: parseFloat(m.providentBalance),
     christmasBalance: parseFloat(m.christmasBalance),
@@ -56,6 +59,7 @@ export function formatMember<T extends MemberRow>(m: T) {
     totalStoreDebt: parseFloat(m.totalStoreDebt),
     fuelVentureBalance: parseFloat(m.fuelVentureBalance),
     landLoanBalance: parseFloat(m.landLoanBalance),
+    obSharesBalance: parseOb(m.obSharesBalance),
     obSavingsBalance: parseOb(m.obSavingsBalance),
     obProvidentBalance: parseOb(m.obProvidentBalance),
     obChristmasBalance: parseOb(m.obChristmasBalance),

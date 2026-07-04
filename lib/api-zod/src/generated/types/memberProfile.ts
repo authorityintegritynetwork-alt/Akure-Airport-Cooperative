@@ -19,6 +19,9 @@ export interface MemberProfile {
   staffId?: string | null;
   role: MemberProfileRole;
   status: MemberProfileStatus;
+  /** @nullable */
+  employeeNo?: string | null;
+  sharesBalance?: number;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;
@@ -34,6 +37,8 @@ export interface MemberProfile {
   totalStoreDebt: number;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
+  /** @nullable */
+  obSharesBalance?: number | null;
   /** @nullable */
   obSavingsBalance?: number | null;
   /** @nullable */

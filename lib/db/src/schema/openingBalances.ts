@@ -39,6 +39,11 @@ export const openingBalancesTable = pgTable(
       onDelete: "set null",
     }),
     reconcileNote: text("reconcile_note"),
+    /** Payroll Employee No. / Pensioner No. when known (from deduction downloads). */
+    employeeNo: text("employee_no"),
+    sharesBalance: numeric("shares_balance", { precision: 15, scale: 2 })
+      .notNull()
+      .default("0"),
     savingsBalance: numeric("savings_balance", { precision: 15, scale: 2 })
       .notNull()
       .default("0"),
@@ -95,6 +100,7 @@ export const openingBalancesTable = pgTable(
     statusIdx: index("opening_balances_status_idx").on(t.status),
     nameIdx: index("opening_balances_name_idx").on(t.fullName),
     linkedMemberIdx: index("opening_balances_linked_member_idx").on(t.linkedMemberId),
+    sharesNonNeg: check("ob_shares_non_neg", sql`${t.sharesBalance} >= 0`),
     savingsNonNeg: check("ob_savings_non_neg", sql`${t.savingsBalance} >= 0`),
     providentNonNeg: check("ob_provident_non_neg", sql`${t.providentBalance} >= 0`),
     christmasNonNeg: check("ob_christmas_non_neg", sql`${t.christmasBalance} >= 0`),

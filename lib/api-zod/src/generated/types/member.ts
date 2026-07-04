@@ -22,6 +22,9 @@ export interface Member {
   role: MemberRole;
   status: MemberStatus;
   organization: string;
+  /** @nullable */
+  employeeNo?: string | null;
+  sharesBalance: number;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;
@@ -37,6 +40,8 @@ export interface Member {
   ghlFormDebt: number;
   fireFundBalance: number;
   totalStoreDebt: number;
+  /** @nullable */
+  obSharesBalance?: number | null;
   /** @nullable */
   obSavingsBalance?: number | null;
   /** @nullable */

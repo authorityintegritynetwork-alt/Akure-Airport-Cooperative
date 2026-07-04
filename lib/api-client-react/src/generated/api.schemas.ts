@@ -41,6 +41,9 @@ export interface Member {
   role: MemberRole;
   status: MemberStatus;
   organization: string;
+  /** @nullable */
+  employeeNo?: string | null;
+  sharesBalance: number;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;
@@ -56,6 +59,8 @@ export interface Member {
   ghlFormDebt: number;
   fireFundBalance: number;
   totalStoreDebt: number;
+  /** @nullable */
+  obSharesBalance?: number | null;
   /** @nullable */
   obSavingsBalance?: number | null;
   /** @nullable */
@@ -109,6 +114,9 @@ export interface OpeningBalance {
   linkedMemberId?: number | null;
   /** @nullable */
   reconcileNote?: string | null;
+  /** @nullable */
+  employeeNo?: string | null;
+  sharesBalance?: number;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;
@@ -186,6 +194,9 @@ export interface MemberProfile {
   staffId?: string | null;
   role: MemberProfileRole;
   status: MemberProfileStatus;
+  /** @nullable */
+  employeeNo?: string | null;
+  sharesBalance?: number;
   savingsBalance: number;
   providentBalance: number;
   christmasBalance: number;
@@ -201,6 +212,8 @@ export interface MemberProfile {
   totalStoreDebt: number;
   fuelVentureBalance?: number;
   landLoanBalance?: number;
+  /** @nullable */
+  obSharesBalance?: number | null;
   /** @nullable */
   obSavingsBalance?: number | null;
   /** @nullable */
@@ -429,6 +442,7 @@ export interface UpdateLoanProductBody {
 export interface MemberSummary {
   memberId: number;
   fullName: string;
+  sharesBalance?: number;
   savingsBalance: number;
   totalLoanBalance: number;
   totalStoreDebt: number;
