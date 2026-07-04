@@ -14,4 +14,5 @@ export const ExcelRowPreviewMatchConfidence = {
   fuzzy: "fuzzy",
   manual: "manual",
   none: "none",
+  employeeNo: "employeeNo",
 } as const;

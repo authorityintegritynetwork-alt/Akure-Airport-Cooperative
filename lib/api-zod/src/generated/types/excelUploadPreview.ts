@@ -6,9 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ExcelRowPreview } from "./excelRowPreview";
+import type { ExcelUploadPreviewFormat } from "./excelUploadPreviewFormat";
+import type { ExcelUploadPreviewSkippedRowsItem } from "./excelUploadPreviewSkippedRowsItem";
 
 export interface ExcelUploadPreview {
+  /** Detected sheet format. 'payroll' = single Amount column split loans-first with remainder to savings. */
+  format?: ExcelUploadPreviewFormat;
   sheetName: string;
+  /** Payroll-format only: sum of all row amounts in the sheet. */
+  totalAmount?: number;
+  /** Payroll-format only: sheet rows that were not parsed (e.g. missing employee number) and will NOT be processed. */
+  skippedRows?: ExcelUploadPreviewSkippedRowsItem[];
   month: string;
   year: number;
   totalRows: number;

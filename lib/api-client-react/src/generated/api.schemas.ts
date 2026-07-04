@@ -526,6 +526,7 @@ export const ExcelRowPreviewMatchConfidence = {
   fuzzy: "fuzzy",
   manual: "manual",
   none: "none",
+  employeeNo: "employeeNo",
 } as const;
 
 export interface ExcelRowPreview {
@@ -536,6 +537,13 @@ export interface ExcelRowPreview {
   /** @nullable */
   matchedMemberName?: string | null;
   matchConfidence: ExcelRowPreviewMatchConfidence;
+  /**
+   * Payroll-format only: the Employee/Pensioner No. from the sheet.
+   * @nullable
+   */
+  employeeNo?: string | null;
+  /** Payroll-format only: the single total deduction for this row. Category fields hold the computed loans-first split. */
+  amount?: number;
   savings: number;
   provident: number;
   christmas: number;
@@ -559,8 +567,31 @@ export interface ExcelRowPreview {
   warnings: string[];
 }
 
+/**
+ * Detected sheet format. 'payroll' = single Amount column split loans-first with remainder to savings.
+ */
+export type ExcelUploadPreviewFormat =
+  (typeof ExcelUploadPreviewFormat)[keyof typeof ExcelUploadPreviewFormat];
+
+export const ExcelUploadPreviewFormat = {
+  categories: "categories",
+  payroll: "payroll",
+} as const;
+
+export type ExcelUploadPreviewSkippedRowsItem = {
+  row: number;
+  name: string;
+  reason: string;
+};
+
 export interface ExcelUploadPreview {
+  /** Detected sheet format. 'payroll' = single Amount column split loans-first with remainder to savings. */
+  format?: ExcelUploadPreviewFormat;
   sheetName: string;
+  /** Payroll-format only: sum of all row amounts in the sheet. */
+  totalAmount?: number;
+  /** Payroll-format only: sheet rows that were not parsed (e.g. missing employee number) and will NOT be processed. */
+  skippedRows?: ExcelUploadPreviewSkippedRowsItem[];
   month: string;
   year: number;
   totalRows: number;

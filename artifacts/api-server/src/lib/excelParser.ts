@@ -325,6 +325,194 @@ export function parseSheet(
   };
 }
 
+// ── Payroll deduction format ─────────────────────────────────────────────────
+// Monthly payroll files (FAAN "476" downloads, pension deduction downloads)
+// carry ONE total deduction per person: Employee/Pensioner No. | Name | Amount.
+// The single amount is split by the cooperative's rule: loans and store debts
+// are repaid first (in DEBT_ORDER), any remainder is credited to savings.
+
+export interface PayrollHeaderMap {
+  headerRowIndex: number;
+  noCol: number;
+  nameCol: number;
+  amountCol: number;
+}
+
+const PAYROLL_NO_RE = /^(employee|pensioner|staff|emp)\.?\s*(no|num|number)\.?$/;
+
+export function detectPayrollHeader(rows: unknown[][]): PayrollHeaderMap | null {
+  const scanLimit = Math.min(rows.length, 25);
+  for (let r = 0; r < scanLimit; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    let noCol = -1;
+    let nameCol = -1;
+    let amountCol = -1;
+    for (let c = 0; c < row.length; c++) {
+      const h = normHeader(row[c]);
+      if (!h) continue;
+      if (noCol < 0 && (PAYROLL_NO_RE.test(h) || /(employee|pensioner|staff)\s*(no|num|number)/.test(h))) {
+        noCol = c;
+        continue;
+      }
+      if (nameCol < 0 && NAME_HEADERS.includes(h)) {
+        nameCol = c;
+        continue;
+      }
+      if (amountCol < 0 && (h === "amount" || h.startsWith("amount"))) {
+        amountCol = c;
+      }
+    }
+    if (noCol >= 0 && nameCol >= 0 && amountCol >= 0) {
+      return { headerRowIndex: r, noCol, nameCol, amountCol };
+    }
+  }
+  return null;
+}
+
+export interface PayrollParsedRow {
+  rowNumber: number;
+  employeeNo: string;
+  rawName: string;
+  amount: number;
+  warnings: string[];
+  errors: string[];
+}
+
+export interface PayrollParsedSheet {
+  format: "payroll";
+  sheetName: string;
+  rows: PayrollParsedRow[];
+  headerRowIndex: number;
+  skipped: ParsedSkip[];
+  totalAmount: number;
+}
+
+export function parsePayrollSheet(
+  workbook: xlsx.WorkBook,
+  sheetName: string,
+): PayrollParsedSheet | null {
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) throw new Error(`Sheet not found: ${sheetName}`);
+  const rows: unknown[][] = xlsx.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: null,
+    blankrows: false,
+  });
+  const header = detectPayrollHeader(rows);
+  if (!header) return null;
+
+  const out: PayrollParsedRow[] = [];
+  const skipped: ParsedSkip[] = [];
+  const seenNos = new Map<string, number[]>();
+
+  for (let r = header.headerRowIndex + 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const rawNo = row[header.noCol];
+    const nameStr = row[header.nameCol] == null ? "" : String(row[header.nameCol]).trim();
+    const amount = toNumber(row[header.amountCol]);
+
+    const lower = nameStr.toLowerCase();
+    if (lower.includes("grand total") || lower === "total" || lower.startsWith("total ")) continue;
+    if (String(rawNo ?? "").toLowerCase().includes("total")) continue;
+
+    const noStr = rawNo == null ? "" : String(rawNo).trim();
+    if (!noStr && !nameStr && amount === 0) continue;
+    if (!noStr) {
+      if (amount > 0) skipped.push({ row: r + 1, name: nameStr || "(blank)", reason: "Missing employee number" });
+      continue;
+    }
+    if (!nameStr) {
+      skipped.push({ row: r + 1, name: "(blank)", reason: "Missing name" });
+      continue;
+    }
+    if (amount <= 0) {
+      skipped.push({ row: r + 1, name: nameStr, reason: "Zero or missing amount" });
+      continue;
+    }
+
+    // Key duplicate detection by the CANONICAL form ("015" ≡ "15" ≡ "emp-15")
+    // — the canonical number is the permanent matching ID, so raw variants of
+    // the same number must be treated as duplicates.
+    const canonNo = canonicalEmployeeNo(noStr);
+    if (!seenNos.has(canonNo)) seenNos.set(canonNo, []);
+    seenNos.get(canonNo)!.push(r + 1);
+
+    out.push({
+      rowNumber: r + 1,
+      employeeNo: noStr,
+      rawName: nameStr.replace(/\s*,\s*/g, " ").replace(/\s+/g, " ").trim(),
+      amount,
+      warnings: [],
+      errors: [],
+    });
+  }
+
+  // Duplicate employee numbers are a data error — the admin must fix the sheet.
+  for (const row of out) {
+    const dupRows = seenNos.get(canonicalEmployeeNo(row.employeeNo))!;
+    if (dupRows.length > 1) {
+      row.errors.push(
+        `Duplicate employee number "${row.employeeNo}" in sheet (rows ${dupRows.join(", ")}). Fix the spreadsheet before processing.`,
+      );
+    }
+  }
+
+  return {
+    format: "payroll",
+    sheetName,
+    rows: out,
+    headerRowIndex: header.headerRowIndex,
+    skipped,
+    totalAmount: out.reduce((s, r) => s + r.amount, 0),
+  };
+}
+
+/** Canonical employee-number form for matching: uppercase, no leading zeros. */
+export function canonicalEmployeeNo(no: string): string {
+  return no.trim().toUpperCase().replace(/^0+(?=\d)/, "");
+}
+
+/**
+ * Debt payoff priority for the single monthly deduction. Any remainder after
+ * all debts are cleared is credited to savings.
+ */
+export const DEBT_ORDER: DeductionCategory[] = [
+  "realLoan",
+  "emergencyLoan",
+  "electronics",
+  "sElectronics",
+  "furniture",
+  "commodity",
+  "ghlForm",
+  "fuelVenture",
+  "landLoan",
+];
+
+/**
+ * Split a single payroll deduction across debts (loans first) with the
+ * remainder going to savings. `balances` holds the member's CURRENT
+ * outstanding amounts per debt category.
+ */
+export function computeDeductionSplit(
+  balances: Partial<Record<DeductionCategory, number>>,
+  amount: number,
+): Record<DeductionCategory, number> {
+  const split = emptyAmounts();
+  let remaining = Math.round(amount * 100);
+  for (const cat of DEBT_ORDER) {
+    if (remaining <= 0) break;
+    const owe = Math.round(Math.max(0, balances[cat] ?? 0) * 100);
+    if (owe <= 0) continue;
+    const pay = Math.min(owe, remaining);
+    split[cat] = pay / 100;
+    remaining -= pay;
+  }
+  if (remaining > 0) split.savings = remaining / 100;
+  return split;
+}
+
 export async function downloadWorkbook(fileObjectPath: string): Promise<xlsx.WorkBook> {
   if (fileObjectPath.startsWith("/tmp/")) {
     const { readFile } = await import("fs/promises");

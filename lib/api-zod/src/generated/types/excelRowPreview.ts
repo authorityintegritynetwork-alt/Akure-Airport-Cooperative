@@ -15,6 +15,13 @@ export interface ExcelRowPreview {
   /** @nullable */
   matchedMemberName?: string | null;
   matchConfidence: ExcelRowPreviewMatchConfidence;
+  /**
+   * Payroll-format only: the Employee/Pensioner No. from the sheet.
+   * @nullable
+   */
+  employeeNo?: string | null;
+  /** Payroll-format only: the single total deduction for this row. Category fields hold the computed loans-first split. */
+  amount?: number;
   savings: number;
   provident: number;
   christmas: number;

@@ -518,6 +518,35 @@ export function UploadPage() {
                 )}
               </div>
             </div>
+            {previewData.format === "payroll" && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-sky-800 dark:text-sky-200 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 rounded-xl p-3" data-testid="payroll-format-banner">
+                <FileSpreadsheet className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Payroll deduction file detected.</strong> Each member's single amount is split
+                  automatically: outstanding loans and debts are repaid first, and the remainder goes to savings.
+                  {typeof previewData.totalAmount === "number" && (
+                    <> Sheet total: <span className="font-semibold tabular-nums">{formatCurrency(previewData.totalAmount)}</span>.</>
+                  )}
+                </span>
+              </div>
+            )}
+            {previewData.format === "payroll" && (previewData.skippedRows?.length ?? 0) > 0 && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3" data-testid="payroll-skipped-banner">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">
+                    {previewData.skippedRows.length} row{previewData.skippedRows.length > 1 ? "s" : ""} in the sheet will NOT be processed:
+                  </p>
+                  <ul className="mt-1 list-disc list-inside space-y-0.5">
+                    {previewData.skippedRows.map((s: any) => (
+                      <li key={s.row}>
+                        Row {s.row} — {s.name}: {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
             {previewData.duplicateMonth && (
               <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -562,13 +591,26 @@ export function UploadPage() {
                 <thead className="bg-muted sticky top-0 z-10">
                   <tr>
                     <th className="text-left p-2">Row</th>
+                    {previewData.format === "payroll" && (
+                      <th className="text-left p-2">Emp. No</th>
+                    )}
                     <th className="text-left p-2 min-w-[140px] sticky left-0 bg-muted z-10">Name in File</th>
                     <th className="text-left p-2 min-w-[200px]">Matched Member</th>
                     <th className="text-left p-2">Org</th>
-                    {CATEGORY_COLUMNS.map((c) => (
-                      <th key={c.key} className="text-right p-2">{c.label}</th>
-                    ))}
-                    <th className="text-right p-2">Total</th>
+                    {previewData.format === "payroll" ? (
+                      <>
+                        <th className="text-right p-2">Amount</th>
+                        <th className="text-right p-2">→ Loans/Debts</th>
+                        <th className="text-right p-2">→ Savings</th>
+                      </>
+                    ) : (
+                      <>
+                        {CATEGORY_COLUMNS.map((c) => (
+                          <th key={c.key} className="text-right p-2">{c.label}</th>
+                        ))}
+                        <th className="text-right p-2">Total</th>
+                      </>
+                    )}
                     <th className="text-center p-2">Status</th>
                   </tr>
                 </thead>
@@ -591,6 +633,9 @@ export function UploadPage() {
                         data-testid={`preview-row-${row.rowNumber}`}
                       >
                         <td className="p-2 text-muted-foreground">{row.rowNumber}</td>
+                        {previewData.format === "payroll" && (
+                          <td className="p-2 font-mono text-[11px]">{row.employeeNo ?? "—"}</td>
+                        )}
                         <td className="p-2 font-medium">{row.rawName}</td>
                         <td className="p-2">
                           {isUnmatched ? (
@@ -628,7 +673,7 @@ export function UploadPage() {
                               <span>{row.matchedMemberName}</span>
                               {row.matchConfidence !== "exact" && (
                                 <Badge variant="outline" className="text-[10px] py-0 px-1">
-                                  {row.matchConfidence}
+                                  {row.matchConfidence === "employeeNo" ? "emp. no" : row.matchConfidence}
                                 </Badge>
                               )}
                             </div>
@@ -647,22 +692,42 @@ export function UploadPage() {
                             <span className="text-muted-foreground text-[10px]">—</span>
                           )}
                         </td>
-                        {CATEGORY_COLUMNS.map((c) => {
-                          const v = row[c.key] || 0;
-                          return (
-                            <td key={c.key} className="p-2 text-right tabular-nums">
-                              {v > 0 ? formatCurrency(v) : <span className="text-muted-foreground">—</span>}
+                        {previewData.format === "payroll" ? (
+                          <>
+                            <td className="p-2 text-right font-medium tabular-nums">
+                              {formatCurrency(row.amount ?? 0)}
                             </td>
-                          );
-                        })}
-                        <td className="p-2 text-right font-medium tabular-nums">
-                          {formatCurrency(row.total)}
-                          {row.totalMismatch && (
-                            <div className="text-[10px] text-amber-700">
-                              calc: {formatCurrency(row.computedTotal)}
-                            </div>
-                          )}
-                        </td>
+                            <td className="p-2 text-right tabular-nums">
+                              {(row.amount ?? 0) - (row.savings ?? 0) > 0
+                                ? formatCurrency((row.amount ?? 0) - (row.savings ?? 0))
+                                : <span className="text-muted-foreground">—</span>}
+                            </td>
+                            <td className="p-2 text-right tabular-nums">
+                              {(row.savings ?? 0) > 0
+                                ? formatCurrency(row.savings)
+                                : <span className="text-muted-foreground">—</span>}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            {CATEGORY_COLUMNS.map((c) => {
+                              const v = row[c.key] || 0;
+                              return (
+                                <td key={c.key} className="p-2 text-right tabular-nums">
+                                  {v > 0 ? formatCurrency(v) : <span className="text-muted-foreground">—</span>}
+                                </td>
+                              );
+                            })}
+                            <td className="p-2 text-right font-medium tabular-nums">
+                              {formatCurrency(row.total)}
+                              {row.totalMismatch && (
+                                <div className="text-[10px] text-amber-700">
+                                  calc: {formatCurrency(row.computedTotal)}
+                                </div>
+                              )}
+                            </td>
+                          </>
+                        )}
                         <td className="p-2 text-center">
                           {isUnmatched ? (
                             <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" />
@@ -683,6 +748,7 @@ export function UploadPage() {
                 disabled={
                   process.isPending ||
                   previewData.hasDuplicateNames ||
+                  (previewData.format === "payroll" && previewData.errorRows > 0) ||
                   (previewData.hasMismatchedTotals && !acknowledgeMismatch)
                 }
                 className="rounded-xl flex-1 min-w-[200px] h-11"
@@ -692,6 +758,8 @@ export function UploadPage() {
                   ? "Processing..."
                   : previewData.hasDuplicateNames
                   ? "Fix duplicate names to continue"
+                  : previewData.format === "payroll" && previewData.errorRows > 0
+                  ? "Fix errors in the sheet to continue"
                   : previewData.hasMismatchedTotals && !acknowledgeMismatch
                   ? "Acknowledge mismatches to continue"
                   : previewData.unmatchedRows > 0

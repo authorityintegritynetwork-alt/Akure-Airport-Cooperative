@@ -2454,7 +2454,13 @@ components:
           type: ["string", "null"]
         matchConfidence:
           type: string
-          enum: [exact, fuzzy, manual, none]
+          enum: [exact, fuzzy, manual, none, employeeNo]
+        employeeNo:
+          type: ["string", "null"]
+          description: "Payroll-format only: the Employee/Pensioner No. from the sheet."
+        amount:
+          type: number
+          description: "Payroll-format only: the single total deduction for this row. Category fields hold the computed loans-first split."
         savings:
           type: number
         provident:
@@ -2526,8 +2532,28 @@ components:
     ExcelUploadPreview:
       type: object
       properties:
+        format:
+          type: string
+          enum: [categories, payroll]
+          description: "Detected sheet format. 'payroll' = single Amount column split loans-first with remainder to savings."
         sheetName:
           type: string
+        totalAmount:
+          type: number
+          description: "Payroll-format only: sum of all row amounts in the sheet."
+        skippedRows:
+          type: array
+          description: "Payroll-format only: sheet rows that were not parsed (e.g. missing employee number) and will NOT be processed."
+          items:
+            type: object
+            properties:
+              row:
+                type: integer
+              name:
+                type: string
+              reason:
+                type: string
+            required: [row, name, reason]
         month:
           type: string
         year:

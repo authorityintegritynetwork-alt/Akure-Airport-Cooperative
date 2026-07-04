@@ -1066,7 +1066,29 @@ export const PreviewExcelUploadBody = zod.object({
 });
 
 export const PreviewExcelUploadResponse = zod.object({
+  format: zod
+    .enum(["categories", "payroll"])
+    .optional()
+    .describe(
+      "Detected sheet format. 'payroll' = single Amount column split loans-first with remainder to savings.",
+    ),
   sheetName: zod.string(),
+  totalAmount: zod
+    .number()
+    .optional()
+    .describe("Payroll-format only: sum of all row amounts in the sheet."),
+  skippedRows: zod
+    .array(
+      zod.object({
+        row: zod.number(),
+        name: zod.string(),
+        reason: zod.string(),
+      }),
+    )
+    .optional()
+    .describe(
+      "Payroll-format only: sheet rows that were not parsed (e.g. missing employee number) and will NOT be processed.",
+    ),
   month: zod.string(),
   year: zod.number(),
   totalRows: zod.number(),
@@ -1080,7 +1102,25 @@ export const PreviewExcelUploadResponse = zod.object({
       rawName: zod.string(),
       matchedMemberId: zod.number().nullish(),
       matchedMemberName: zod.string().nullish(),
-      matchConfidence: zod.enum(["exact", "fuzzy", "manual", "none"]),
+      matchConfidence: zod.enum([
+        "exact",
+        "fuzzy",
+        "manual",
+        "none",
+        "employeeNo",
+      ]),
+      employeeNo: zod
+        .string()
+        .nullish()
+        .describe(
+          "Payroll-format only: the Employee\/Pensioner No. from the sheet.",
+        ),
+      amount: zod
+        .number()
+        .optional()
+        .describe(
+          "Payroll-format only: the single total deduction for this row. Category fields hold the computed loans-first split.",
+        ),
       savings: zod.number(),
       provident: zod.number(),
       christmas: zod.number(),

@@ -45,6 +45,8 @@ export * from "./excelSheetsBody";
 export * from "./excelSheetsResult";
 export * from "./excelUploadPreview";
 export * from "./excelUploadPreviewBody";
+export * from "./excelUploadPreviewFormat";
+export * from "./excelUploadPreviewSkippedRowsItem";
 export * from "./excelUploadProcessBody";
 export * from "./excelUploadResult";
 export * from "./getMatchSuggestionsParams";
