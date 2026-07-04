@@ -40,6 +40,7 @@ export * from "./createSupportTicketBodyPriority";
 export * from "./deleteMember200";
 export * from "./excelRowPreview";
 export * from "./excelRowPreviewMatchConfidence";
+export * from "./excelRowPreviewSuggestionsItem";
 export * from "./excelSheetInfo";
 export * from "./excelSheetsBody";
 export * from "./excelSheetsResult";

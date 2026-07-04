@@ -24,7 +24,20 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   ChevronRight,
+  Check,
+  Pencil,
+  Undo2,
+  UserX,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -53,6 +66,105 @@ const CATEGORY_COLUMNS: { key: string; label: string }[] = [
 
 type Stage = "select" | "pickSheet" | "preview";
 
+interface MatchSuggestion {
+  memberId: number;
+  memberName: string;
+}
+
+function MatchCorrector({
+  rowNumber,
+  matchedMemberId,
+  suggestions,
+  memberOptions,
+  onPick,
+  onReject,
+}: {
+  rowNumber: number;
+  matchedMemberId: number | null;
+  suggestions: MatchSuggestion[];
+  memberOptions: { id: number; label: string }[];
+  onPick: (memberId: number) => void;
+  onReject: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const suggestionIds = new Set(suggestions.map((s) => s.memberId));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-1.5 text-[10px] gap-1"
+          data-testid={`correct-match-${rowNumber}`}
+        >
+          <Pencil className="h-3 w-3" /> Change
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search members…" />
+          <CommandList>
+            <CommandEmpty>No member found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="not a match create new member"
+                onSelect={() => {
+                  onReject();
+                  setOpen(false);
+                }}
+                className="text-destructive"
+                data-testid={`reject-match-${rowNumber}`}
+              >
+                <UserX className="h-3.5 w-3.5 mr-2" />
+                Not a match — create new member
+              </CommandItem>
+            </CommandGroup>
+            {suggestions.length > 0 && (
+              <CommandGroup heading="Closest matches">
+                {suggestions.map((s) => (
+                  <CommandItem
+                    key={`s-${s.memberId}`}
+                    value={`${s.memberName} #${s.memberId}`}
+                    onSelect={() => {
+                      onPick(s.memberId);
+                      setOpen(false);
+                    }}
+                    data-testid={`suggestion-${rowNumber}-${s.memberId}`}
+                  >
+                    {s.memberName}
+                    {s.memberId === matchedMemberId && (
+                      <Check className="ml-auto h-3.5 w-3.5 text-primary" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            <CommandGroup heading="All members">
+              {memberOptions
+                .filter((m) => !suggestionIds.has(m.id))
+                .map((m) => (
+                  <CommandItem
+                    key={m.id}
+                    value={`${m.label} #${m.id}`}
+                    onSelect={() => {
+                      onPick(m.id);
+                      setOpen(false);
+                    }}
+                  >
+                    {m.label}
+                    {m.id === matchedMemberId && (
+                      <Check className="ml-auto h-3.5 w-3.5 text-primary" />
+                    )}
+                  </CommandItem>
+                ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
@@ -65,6 +177,7 @@ export function UploadPage() {
   const [chosenSheet, setChosenSheet] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [manualMatches, setManualMatches] = useState<Record<number, number>>({});
+  const [rejectedRows, setRejectedRows] = useState<Record<number, true>>({});
   const [acknowledgeMismatch, setAcknowledgeMismatch] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showAllSheets, setShowAllSheets] = useState(false);
@@ -101,6 +214,7 @@ export function UploadPage() {
     setChosenSheet(null);
     setPreviewData(null);
     setManualMatches({});
+    setRejectedRows({});
     setAcknowledgeMismatch(false);
   }
 
@@ -153,6 +267,7 @@ export function UploadPage() {
     path: string,
     sheetName: string,
     manual: Record<number, number>,
+    rejected: Record<number, true> = {},
   ) {
     try {
       const data = await preview.mutateAsync({
@@ -166,6 +281,7 @@ export function UploadPage() {
             rowNumber: Number(rowNumber),
             memberId,
           })),
+          rejectedRows: Object.keys(rejected).map(Number),
         },
       });
       setPreviewData(data);
@@ -178,7 +294,11 @@ export function UploadPage() {
   function handlePickSheet(name: string) {
     if (!uploadedPath) return;
     setChosenSheet(name);
-    void loadPreview(uploadedPath, name, {});
+    // Overrides are per-sheet — clear them so process cannot submit stale
+    // corrections from a previously previewed sheet.
+    setManualMatches({});
+    setRejectedRows({});
+    void loadPreview(uploadedPath, name, {}, {});
   }
 
   function handleAssignMember(rowNumber: number, memberId: number | null) {
@@ -188,9 +308,36 @@ export function UploadPage() {
     } else {
       next[rowNumber] = memberId;
     }
+    // Picking a member supersedes any earlier rejection of this row.
+    const nextRejected = { ...rejectedRows };
+    delete nextRejected[rowNumber];
     setManualMatches(next);
+    setRejectedRows(nextRejected);
     if (uploadedPath && chosenSheet) {
-      void loadPreview(uploadedPath, chosenSheet, next);
+      void loadPreview(uploadedPath, chosenSheet, next, nextRejected);
+    }
+  }
+
+  function handleRejectMatch(rowNumber: number) {
+    const nextManual = { ...manualMatches };
+    delete nextManual[rowNumber];
+    const nextRejected = { ...rejectedRows, [rowNumber]: true as const };
+    setManualMatches(nextManual);
+    setRejectedRows(nextRejected);
+    if (uploadedPath && chosenSheet) {
+      void loadPreview(uploadedPath, chosenSheet, nextManual, nextRejected);
+    }
+  }
+
+  function handleRestoreMatch(rowNumber: number) {
+    const nextManual = { ...manualMatches };
+    delete nextManual[rowNumber];
+    const nextRejected = { ...rejectedRows };
+    delete nextRejected[rowNumber];
+    setManualMatches(nextManual);
+    setRejectedRows(nextRejected);
+    if (uploadedPath && chosenSheet) {
+      void loadPreview(uploadedPath, chosenSheet, nextManual, nextRejected);
     }
   }
 
@@ -208,6 +355,7 @@ export function UploadPage() {
           rowNumber: Number(rowNumber),
           memberId,
         })),
+        rejectedRows: Object.keys(rejectedRows).map(Number),
       });
       const parts: string[] = [];
       if ((result.processed ?? 0) > 0) parts.push(`${result.processed} matched`);
@@ -640,17 +788,30 @@ export function UploadPage() {
                         <td className="p-2">
                           {isUnmatched ? (
                             <div className="space-y-1">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] py-0 px-1.5 rounded-full ${
-                                  row.hasOpeningBalance
-                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-                                    : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
-                                }`}
-                                data-testid={`auto-create-badge-${row.rowNumber}`}
-                              >
-                                {row.hasOpeningBalance ? "Will auto-create (OB linked)" : "Will auto-create (no OB)"}
-                              </Badge>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] py-0 px-1.5 rounded-full ${
+                                    row.hasOpeningBalance
+                                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                                      : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+                                  }`}
+                                  data-testid={`auto-create-badge-${row.rowNumber}`}
+                                >
+                                  {row.hasOpeningBalance ? "Will auto-create (OB linked)" : "Will auto-create (no OB)"}
+                                </Badge>
+                                {rejectedRows[row.rowNumber] && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-1 text-[10px] gap-0.5"
+                                    onClick={() => handleRestoreMatch(row.rowNumber)}
+                                    data-testid={`undo-reject-${row.rowNumber}`}
+                                  >
+                                    <Undo2 className="h-3 w-3" /> Undo
+                                  </Button>
+                                )}
+                              </div>
                               <select
                                 className="w-full border border-input rounded px-1 py-1 text-xs bg-background"
                                 value={manualMatches[row.rowNumber] ?? ""}
@@ -669,12 +830,22 @@ export function UploadPage() {
                               </select>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
                               <span>{row.matchedMemberName}</span>
                               {row.matchConfidence !== "exact" && (
                                 <Badge variant="outline" className="text-[10px] py-0 px-1">
                                   {row.matchConfidence === "employeeNo" ? "emp. no" : row.matchConfidence}
                                 </Badge>
+                              )}
+                              {(row.matchConfidence === "fuzzy" || row.matchConfidence === "manual") && (
+                                <MatchCorrector
+                                  rowNumber={row.rowNumber}
+                                  matchedMemberId={row.matchedMemberId}
+                                  suggestions={row.suggestions ?? []}
+                                  memberOptions={memberOptions}
+                                  onPick={(memberId) => handleAssignMember(row.rowNumber, memberId)}
+                                  onReject={() => handleRejectMatch(row.rowNumber)}
+                                />
                               )}
                             </div>
                           )}

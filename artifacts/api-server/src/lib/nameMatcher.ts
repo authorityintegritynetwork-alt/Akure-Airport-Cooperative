@@ -145,4 +145,61 @@ export class NameMatcher {
 
     return { memberId: null, memberName: null, confidence: "none" };
   }
+
+  /**
+   * Return the top `limit` closest member candidates for a raw sheet name,
+   * best first. Scoring favours surname agreement, then initials/given-name
+   * overlap, then general token overlap — mirroring the heuristics used by
+   * `match()` so the top suggestion usually equals the fuzzy match.
+   */
+  suggest(rawName: string, limit = 5): Array<{ memberId: number; memberName: string }> {
+    const norm = normalize(rawName);
+    if (!norm) return [];
+    const raw = decompose(rawName);
+    const rawToks = new Set(tokens(rawName).filter((t) => t.length > 1));
+    const rawInitials = new Set(raw.initials);
+
+    const scored: Array<{ m: MemberLite; score: number }> = [];
+    for (const m of this.members) {
+      const mNorm = normalize(m.fullName);
+      let score = 0;
+      if (mNorm === norm) score += 100;
+
+      const md = decomposeMember(m.fullName);
+      const memberToks = new Set(tokens(m.fullName));
+      const memberInitials = new Set(md.initials);
+
+      // Surname agreement (sheet surname vs either end of the member name).
+      const mFirst = tokens(m.fullName)[0] ?? "";
+      if (raw.surname && (raw.surname === md.surname || raw.surname === mFirst)) {
+        score += 40;
+      }
+
+      // Token overlap (multi-letter tokens).
+      let overlap = 0;
+      for (const t of rawToks) if (memberToks.has(t)) overlap++;
+      score += overlap * 15;
+
+      // Initials overlap.
+      let initialHits = 0;
+      for (const i of rawInitials) if (memberInitials.has(i)) initialHits++;
+      score += initialHits * 5;
+
+      // Prefix similarity fallback (handles minor spelling differences).
+      if (score === 0) {
+        for (const t of rawToks) {
+          for (const mt of memberToks) {
+            if (t.length >= 4 && mt.length >= 4 && (mt.startsWith(t.slice(0, 4)) || t.startsWith(mt.slice(0, 4)))) {
+              score += 3;
+            }
+          }
+        }
+      }
+
+      if (score > 0) scored.push({ m, score });
+    }
+
+    scored.sort((a, b) => b.score - a.score || a.m.fullName.localeCompare(b.m.fullName));
+    return scored.slice(0, limit).map(({ m }) => ({ memberId: m.id, memberName: m.fullName }));
+  }
 }

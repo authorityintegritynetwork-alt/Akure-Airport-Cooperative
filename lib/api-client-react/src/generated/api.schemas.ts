@@ -516,6 +516,8 @@ export interface ExcelUploadPreviewBody {
   year: number;
   organization: string;
   manualMatches?: ManualMatch[];
+  /** Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member). */
+  rejectedRows?: number[];
 }
 
 export type ExcelRowPreviewMatchConfidence =
@@ -528,6 +530,11 @@ export const ExcelRowPreviewMatchConfidence = {
   none: "none",
   employeeNo: "employeeNo",
 } as const;
+
+export type ExcelRowPreviewSuggestionsItem = {
+  memberId: number;
+  memberName: string;
+};
 
 export interface ExcelRowPreview {
   rowNumber: number;
@@ -565,6 +572,8 @@ export interface ExcelRowPreview {
   totalMismatch: boolean;
   errors: string[];
   warnings: string[];
+  /** Top closest member candidates for fuzzy or unmatched rows, best first. */
+  suggestions?: ExcelRowPreviewSuggestionsItem[];
 }
 
 /**
@@ -613,6 +622,8 @@ export interface ExcelUploadProcessBody {
   /** Confirm processing despite rows where the sheet Total disagrees with the sum of columns. */
   acknowledgeMismatch?: boolean;
   manualMatches?: ManualMatch[];
+  /** Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member). */
+  rejectedRows?: number[];
 }
 
 export interface ExcelUploadResult {

@@ -2439,6 +2439,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ManualMatch"
+        rejectedRows:
+          type: array
+          items:
+            type: integer
+          description: "Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member)."
       required: [fileObjectPath, month, year, organization]
 
     ExcelRowPreview:
@@ -2505,6 +2510,17 @@ components:
           type: array
           items:
             type: string
+        suggestions:
+          type: array
+          description: "Top closest member candidates for fuzzy or unmatched rows, best first."
+          items:
+            type: object
+            properties:
+              memberId:
+                type: integer
+              memberName:
+                type: string
+            required: [memberId, memberName]
       required:
         - rowNumber
         - rawName
@@ -2598,6 +2614,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ManualMatch"
+        rejectedRows:
+          type: array
+          items:
+            type: integer
+          description: "Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member)."
       required: [fileObjectPath, month, year, organization]
 
     ExcelUploadResult:

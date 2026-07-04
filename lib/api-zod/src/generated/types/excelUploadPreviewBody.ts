@@ -14,4 +14,6 @@ export interface ExcelUploadPreviewBody {
   year: number;
   organization: string;
   manualMatches?: ManualMatch[];
+  /** Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member). */
+  rejectedRows?: number[];
 }

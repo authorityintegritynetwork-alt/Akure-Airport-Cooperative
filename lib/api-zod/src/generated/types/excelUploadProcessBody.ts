@@ -18,4 +18,6 @@ export interface ExcelUploadProcessBody {
   /** Confirm processing despite rows where the sheet Total disagrees with the sum of columns. */
   acknowledgeMismatch?: boolean;
   manualMatches?: ManualMatch[];
+  /** Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member). */
+  rejectedRows?: number[];
 }

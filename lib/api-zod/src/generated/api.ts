@@ -1063,6 +1063,12 @@ export const PreviewExcelUploadBody = zod.object({
       }),
     )
     .optional(),
+  rejectedRows: zod
+    .array(zod.number())
+    .optional()
+    .describe(
+      "Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member).",
+    ),
 });
 
 export const PreviewExcelUploadResponse = zod.object({
@@ -1141,6 +1147,17 @@ export const PreviewExcelUploadResponse = zod.object({
       totalMismatch: zod.boolean(),
       errors: zod.array(zod.string()),
       warnings: zod.array(zod.string()),
+      suggestions: zod
+        .array(
+          zod.object({
+            memberId: zod.number(),
+            memberName: zod.string(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Top closest member candidates for fuzzy or unmatched rows, best first.",
+        ),
     }),
   ),
 });
@@ -1170,6 +1187,12 @@ export const ProcessExcelUploadBody = zod.object({
       }),
     )
     .optional(),
+  rejectedRows: zod
+    .array(zod.number())
+    .optional()
+    .describe(
+      "Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member).",
+    ),
 });
 
 export const ProcessExcelUploadResponse = zod.object({

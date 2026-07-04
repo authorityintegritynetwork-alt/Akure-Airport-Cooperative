@@ -75,6 +75,7 @@ function applyManualMatches(
   matchResult: MatchResult,
   manualMap: Map<number, number>,
   membersById: Map<number, { id: number; fullName: string }>,
+  rejectedRows: Set<number> = new Set(),
 ): MatchResult {
   const manual = manualMap.get(row.rowNumber);
   if (manual !== undefined) {
@@ -82,6 +83,13 @@ function applyManualMatches(
     if (m) {
       return { memberId: m.id, memberName: m.fullName, confidence: "manual" };
     }
+  }
+  // Admin rejected the automatic name match → treat as unmatched so the row
+  // auto-creates a pending member instead of posting to the wrong person.
+  // Only fuzzy matches can be rejected — exact matches are authoritative, so
+  // stale or crafted payloads can never demote them.
+  if (rejectedRows.has(row.rowNumber) && matchResult.confidence === "fuzzy") {
+    return { memberId: null, memberName: null, confidence: "none" };
   }
   return matchResult;
 }
@@ -118,6 +126,7 @@ function matchPayrollRow<M extends PayrollMemberRef>(
   matcher: NameMatcher,
   manualMap: Map<number, number>,
   membersById: Map<number, M>,
+  rejectedRows: Set<number> = new Set(),
 ): { member: M | null; confidence: PayrollConfidence } {
   const manual = manualMap.get(row.rowNumber);
   if (manual !== undefined) {
@@ -128,6 +137,11 @@ function matchPayrollRow<M extends PayrollMemberRef>(
   if (byNo) return { member: byNo, confidence: "employeeNo" };
   const byName = matcher.match(row.rawName);
   if (byName.memberId != null) {
+    // Rejection only suppresses a FUZZY name match — employee-number and
+    // exact name matches are authoritative and cannot be rejected.
+    if (rejectedRows.has(row.rowNumber) && byName.confidence === "fuzzy") {
+      return { member: null, confidence: "none" };
+    }
     const m = membersById.get(byName.memberId);
     if (m) return { member: m, confidence: byName.confidence as PayrollConfidence };
   }
@@ -312,6 +326,7 @@ router.post(
       for (const m of parsed.data.manualMatches || []) {
         manualMap.set(m.rowNumber, m.memberId);
       }
+      const rejectedSet = new Set<number>(parsed.data.rejectedRows || []);
 
       const uploadOrg = orgRecord.code;
       const dup = await db
@@ -341,7 +356,7 @@ router.post(
 
       const previewRows = sheet.rows.map((row) => {
         const baseMatch = matcher.match(row.rawName);
-        const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
+        const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById, rejectedSet);
         const member =
           finalMatch.memberId != null ? membersById.get(finalMatch.memberId) : null;
         const memberOrg = member?.organization ?? null;
@@ -390,6 +405,10 @@ router.post(
           errors,
           warnings,
           hasOpeningBalance,
+          suggestions:
+            finalMatch.confidence === "fuzzy" || finalMatch.confidence === "none"
+              ? matcher.suggest(row.rawName, 5)
+              : undefined,
         };
       });
 
@@ -465,6 +484,7 @@ router.post(
       for (const m of parsed.data.manualMatches || []) {
         manualMap.set(m.rowNumber, m.memberId);
       }
+      const rejectedSet = new Set<number>(parsed.data.rejectedRows || []);
 
       const uploadOrg = orgRecord.code;
       const autoTag = parsed.data.autoTagOrganization !== false;
@@ -566,7 +586,7 @@ router.post(
 
         for (const row of sheet.rows) {
           const baseMatch = matcher.match(row.rawName);
-          const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById);
+          const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById, rejectedSet);
 
           let rowWasAutoCreated = false;
           if (finalMatch.memberId == null) {
@@ -769,6 +789,7 @@ async function previewPayroll(
     month: string;
     year: number;
     manualMatches?: Array<{ rowNumber: number; memberId: number }> | null;
+    rejectedRows?: number[] | null;
   },
   uploadOrg: string,
   payroll: PayrollParsedSheet,
@@ -796,6 +817,7 @@ async function previewPayroll(
 
   const manualMap = new Map<number, number>();
   for (const m of body.manualMatches || []) manualMap.set(m.rowNumber, m.memberId);
+  const rejectedSet = new Set<number>(body.rejectedRows || []);
 
   const dup = await db
     .select({ id: uploadRecordsTable.id })
@@ -825,6 +847,7 @@ async function previewPayroll(
       matcher,
       manualMap,
       membersById,
+      rejectedSet,
     );
     // Split preview against the member's CURRENT balances (re-computed at
     // process time inside the transaction, so this is indicative).
@@ -885,6 +908,10 @@ async function previewPayroll(
       errors,
       warnings,
       hasOpeningBalance,
+      suggestions:
+        confidence === "fuzzy" || confidence === "none"
+          ? matcher.suggest(row.rawName, 5)
+          : undefined,
     };
   });
 
@@ -926,6 +953,7 @@ async function processPayroll(
     month: string;
     year: number;
     manualMatches?: Array<{ rowNumber: number; memberId: number }> | null;
+    rejectedRows?: number[] | null;
     autoTagOrganization?: boolean | null;
   },
   uploadOrg: string,
@@ -962,6 +990,7 @@ async function processPayroll(
   const autoTag = body.autoTagOrganization !== false;
   const manualMap = new Map<number, number>();
   for (const m of body.manualMatches || []) manualMap.set(m.rowNumber, m.memberId);
+  const rejectedSet = new Set<number>(body.rejectedRows || []);
 
   const periodKey = `${body.month.toLowerCase()}-${body.year}`;
   const result = await db.transaction(async (tx) => {
@@ -1023,7 +1052,7 @@ async function processPayroll(
     const obMatcher = new NameMatcher(unclaimedOpenings);
 
     for (const row of payroll.rows) {
-      const { member } = matchPayrollRow(row, empNoIndex, matcher, manualMap, membersById);
+      const { member } = matchPayrollRow(row, empNoIndex, matcher, manualMap, membersById, rejectedSet);
 
       let memberId: number;
       let rowWasAutoCreated = false;

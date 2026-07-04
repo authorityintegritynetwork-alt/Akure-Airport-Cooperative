@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ExcelRowPreviewMatchConfidence } from "./excelRowPreviewMatchConfidence";
+import type { ExcelRowPreviewSuggestionsItem } from "./excelRowPreviewSuggestionsItem";
 
 export interface ExcelRowPreview {
   rowNumber: number;
@@ -43,4 +44,6 @@ export interface ExcelRowPreview {
   totalMismatch: boolean;
   errors: string[];
   warnings: string[];
+  /** Top closest member candidates for fuzzy or unmatched rows, best first. */
+  suggestions?: ExcelRowPreviewSuggestionsItem[];
 }
