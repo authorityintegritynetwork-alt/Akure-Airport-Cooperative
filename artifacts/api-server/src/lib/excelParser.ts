@@ -120,7 +120,22 @@ const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
   landLoan: ["land", "land loan", "land/loan"],
 };
 
-const NAME_HEADERS = ["name", "names", "member name", "full name"];
+const NAME_HEADERS = [
+  "name",
+  "names",
+  "member name",
+  "members name",
+  "member's name",
+  "members' name",
+  "members names",
+  "member names",
+  "name of member",
+  "names of members",
+  "full name",
+  "full names",
+  "staff name",
+  "staff names",
+];
 const SN_HEADERS = ["n/s", "s/n", "sn", "no", "no.", "#"];
 const TOTAL_HEADERS = ["total", "totals", "grand total"];
 
