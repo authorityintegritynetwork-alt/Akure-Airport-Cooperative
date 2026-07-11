@@ -248,10 +248,19 @@ export interface MemberProfile {
   createdAt: string;
 }
 
+export type RegisterMemberBodyMemberType =
+  (typeof RegisterMemberBodyMemberType)[keyof typeof RegisterMemberBodyMemberType];
+
+export const RegisterMemberBodyMemberType = {
+  staff: "staff",
+  pensioner: "pensioner",
+} as const;
+
 export interface RegisterMemberBody {
   fullName: string;
   phone?: string;
-  staffId?: string;
+  memberType: RegisterMemberBodyMemberType;
+  staffId: string;
   organization: string;
 }
 
@@ -322,11 +331,20 @@ export const CreateMemberBodyStatus = {
   inactive: "inactive",
 } as const;
 
+export type CreateMemberBodyMemberType =
+  (typeof CreateMemberBodyMemberType)[keyof typeof CreateMemberBodyMemberType];
+
+export const CreateMemberBodyMemberType = {
+  staff: "staff",
+  pensioner: "pensioner",
+} as const;
+
 export interface CreateMemberBody {
   fullName: string;
   email: string;
   phone?: string;
-  staffId?: string;
+  memberType: CreateMemberBodyMemberType;
+  staffId: string;
   role?: CreateMemberBodyRole;
   status?: CreateMemberBodyStatus;
   organization?: string;
@@ -352,9 +370,18 @@ export const UpdateMemberBodyStatus = {
   inactive: "inactive",
 } as const;
 
+export type UpdateMemberBodyMemberType =
+  (typeof UpdateMemberBodyMemberType)[keyof typeof UpdateMemberBodyMemberType];
+
+export const UpdateMemberBodyMemberType = {
+  staff: "staff",
+  pensioner: "pensioner",
+} as const;
+
 export interface UpdateMemberBody {
   fullName?: string;
   phone?: string;
+  memberType?: UpdateMemberBodyMemberType;
   staffId?: string;
   role?: UpdateMemberBodyRole;
   status?: UpdateMemberBodyStatus;
