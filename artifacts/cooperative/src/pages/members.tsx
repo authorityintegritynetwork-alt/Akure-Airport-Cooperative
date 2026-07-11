@@ -76,7 +76,8 @@ const createMemberSchema = z.object({
   fullName: z.string().min(2, "Full name required"),
   email: z.string().email("Valid email required"),
   phone: z.string().optional(),
-  staffId: z.string().optional(),
+  memberType: z.enum(["staff", "pensioner"]).default("staff"),
+  staffId: z.string().min(1, "Staff/Pensioner number is required"),
   role: z.enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"]).optional(),
   status: z.enum(["pending", "active", "inactive"]).optional(),
   organization: z.string().optional(),
@@ -86,6 +87,7 @@ type CreateMemberForm = z.infer<typeof createMemberSchema>;
 const editMemberSchema = z.object({
   fullName: z.string().min(2, "Full name required"),
   phone: z.string().optional(),
+  memberType: z.enum(["staff", "pensioner"]).optional(),
   staffId: z.string().optional(),
   role: z.enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"]),
   status: z.enum(["pending", "active", "inactive"]),
@@ -207,13 +209,14 @@ export function MembersPage() {
 
   const editForm = useForm<EditMemberForm>({
     resolver: zodResolver(editMemberSchema),
-    defaultValues: { fullName: "", phone: "", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
+    defaultValues: { fullName: "", phone: "", memberType: "staff", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
   });
 
   function openEdit(member: any) {
     editForm.reset({
       fullName: member.fullName ?? "",
       phone: member.phone ?? "",
+      memberType: member.memberType ?? "staff",
       staffId: member.staffId ?? "",
       role: member.role,
       status: member.status,
@@ -228,6 +231,7 @@ export function MembersPage() {
       await updateMemberWithStepUp(editingMember.id, {
         fullName: data.fullName,
         phone: data.phone || undefined,
+        memberType: data.memberType,
         staffId: data.staffId || undefined,
         role: data.role,
         status: data.status,
@@ -262,7 +266,7 @@ export function MembersPage() {
 
   const form = useForm<CreateMemberForm>({
     resolver: zodResolver(createMemberSchema),
-    defaultValues: { fullName: "", email: "", phone: "", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
+    defaultValues: { fullName: "", email: "", phone: "", memberType: "staff", staffId: "", role: "member", status: "active", organization: defaultOrgCode },
   });
 
   function handleDeactivate(id: number) {
@@ -284,7 +288,8 @@ export function MembersPage() {
           fullName: data.fullName,
           email: data.email,
           phone: data.phone || undefined,
-          staffId: data.staffId || undefined,
+          memberType: data.memberType,
+          staffId: data.staffId,
           role: data.role,
           status: data.status,
           organization: data.organization,
@@ -378,10 +383,42 @@ export function MembersPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={form.control} name="memberType" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Member type *</FormLabel>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => field.onChange("staff")}
+                          className={`border rounded-xl px-3 py-2.5 text-left transition ${
+                            field.value === "staff"
+                              ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="font-semibold text-sm">Active Staff</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">Currently employed</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => field.onChange("pensioner")}
+                          className={`border rounded-xl px-3 py-2.5 text-left transition ${
+                            field.value === "pensioner"
+                              ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="font-semibold text-sm">Pensioner</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">Retired / pensioner</div>
+                        </button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                   <FormField control={form.control} name="staffId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Staff ID (optional)</FormLabel>
-                      <FormControl><Input className="rounded-xl" data-testid="input-member-staffid" {...field} /></FormControl>
+                      <FormLabel>{form.watch("memberType") === "pensioner" ? "Pensioner number *" : "Staff number *"}</FormLabel>
+                      <FormControl><Input className="rounded-xl" data-testid="input-member-staffid" placeholder={form.watch("memberType") === "pensioner" ? "Pensioner number" : "Staff number"} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -872,9 +909,39 @@ export function MembersPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+              <FormField control={editForm.control} name="memberType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Member type</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => field.onChange("staff")}
+                      className={`border rounded-lg px-3 py-2.5 text-left transition ${
+                        field.value === "staff"
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="font-semibold text-sm">Active Staff</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => field.onChange("pensioner")}
+                      className={`border rounded-lg px-3 py-2.5 text-left transition ${
+                        field.value === "pensioner"
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="font-semibold text-sm">Pensioner</div>
+                    </button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={editForm.control} name="staffId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Staff ID</FormLabel>
+                  <FormLabel>{editForm.watch("memberType") === "pensioner" ? "Pensioner number" : "Staff number"}</FormLabel>
                   <FormControl><Input data-testid="input-edit-staffid" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

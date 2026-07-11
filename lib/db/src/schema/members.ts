@@ -6,6 +6,7 @@ import {
   numeric,
   integer,
   check,
+  unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -19,7 +20,9 @@ export const membersTable = pgTable(
     fullName: text("full_name").notNull(),
     email: text("email").unique(),
     phone: text("phone"),
-    staffId: text("staff_id"),
+    staffId: text("staff_id").unique(),
+    /** Whether the member is active staff or a pensioner. Determines label for staffId. */
+    memberType: text("member_type", { enum: ["staff", "pensioner"] }),
     /** Payroll Employee No. / Pensioner No. — permanent ID for monthly deduction matching. */
     employeeNo: text("employee_no"),
     pendingClerkUserId: text("pending_clerk_user_id").unique(),

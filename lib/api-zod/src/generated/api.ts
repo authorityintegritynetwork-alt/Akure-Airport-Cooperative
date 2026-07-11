@@ -102,7 +102,8 @@ export const GetStepUpStatusResponse = zod.object({
 export const RegisterMemberBody = zod.object({
   fullName: zod.string(),
   phone: zod.string().optional(),
-  staffId: zod.string().optional(),
+  memberType: zod.enum(["staff", "pensioner"]),
+  staffId: zod.string().min(1, "Staff/Pensioner number is required"),
   organization: zod.string(),
 });
 
@@ -199,7 +200,8 @@ export const CreateMemberBody = zod.object({
   fullName: zod.string(),
   email: zod.string(),
   phone: zod.string().optional(),
-  staffId: zod.string().optional(),
+  memberType: zod.enum(["staff", "pensioner"]),
+  staffId: zod.string().min(1, "Staff/Pensioner number is required"),
   role: zod
     .enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"])
     .optional(),
@@ -277,6 +279,7 @@ export const UpdateMemberParams = zod.object({
 export const UpdateMemberBody = zod.object({
   fullName: zod.string().optional(),
   phone: zod.string().optional(),
+  memberType: zod.enum(["staff", "pensioner"]).optional(),
   staffId: zod.string().optional(),
   role: zod
     .enum(["member", "admin", "financial_auditor", "treasurer", "super_admin"])

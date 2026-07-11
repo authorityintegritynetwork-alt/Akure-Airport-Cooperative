@@ -24,6 +24,7 @@ export function CompleteProfilePage() {
   const defaultName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "";
   const [fullName, setFullName] = useState(defaultName);
   const [phone, setPhone] = useState("");
+  const [memberType, setMemberType] = useState<"staff" | "pensioner">("staff");
   const [staffId, setStaffId] = useState("");
   const [organization, setOrganization] = useState<string>("");
 
@@ -70,6 +71,11 @@ export function CompleteProfilePage() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
+    if (!staffId.trim()) {
+      const label = memberType === "pensioner" ? "Pensioner number" : "Staff number";
+      toast({ title: `${label} is required`, variant: "destructive" });
+      return;
+    }
     if (!organization) {
       toast({ title: "Please select your employer", variant: "destructive" });
       return;
@@ -78,7 +84,8 @@ export function CompleteProfilePage() {
       data: {
         fullName: fullName.trim(),
         phone: phone.trim() || undefined,
-        staffId: staffId.trim() || undefined,
+        memberType,
+        staffId: staffId.trim(),
         organization,
       },
     });
@@ -116,12 +123,44 @@ export function CompleteProfilePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="staffId">Staff ID</Label>
+              <Label>Member type *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMemberType("staff")}
+                  className={`border rounded-lg px-3 py-3 text-left transition ${
+                    memberType === "staff"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Active Staff</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Currently employed</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMemberType("pensioner")}
+                  className={`border rounded-lg px-3 py-3 text-left transition ${
+                    memberType === "pensioner"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Pensioner</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Retired / pensioner</div>
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="staffId">
+                {memberType === "pensioner" ? "Pensioner number" : "Staff number"} *
+              </Label>
               <Input
                 id="staffId"
                 value={staffId}
                 onChange={(e) => setStaffId(e.target.value)}
-                placeholder="Optional"
+                placeholder={memberType === "pensioner" ? "Your pensioner number" : "Your staff number"}
+                required
               />
             </div>
             <div className="space-y-1.5">

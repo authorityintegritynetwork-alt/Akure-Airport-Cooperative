@@ -12,7 +12,8 @@ export interface CreateMemberBody {
   fullName: string;
   email: string;
   phone?: string;
-  staffId?: string;
+  memberType: 'staff' | 'pensioner';
+  staffId: string;
   role?: CreateMemberBodyRole;
   status?: CreateMemberBodyStatus;
   organization?: string;

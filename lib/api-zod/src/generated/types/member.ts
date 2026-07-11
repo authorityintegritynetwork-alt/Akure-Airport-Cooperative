@@ -19,6 +19,8 @@ export interface Member {
   phone?: string | null;
   /** @nullable */
   staffId?: string | null;
+  /** @nullable */
+  memberType?: 'staff' | 'pensioner' | null;
   role: MemberRole;
   status: MemberStatus;
   organization: string;

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { db, membersTable, organizationsTable } from "@workspace/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, isNotNull, isNull } from "drizzle-orm";
 import { AuthRequest } from "../middlewares/auth";
 import { RegisterMemberBody } from "@workspace/api-zod";
 import { getClerkUser } from "../lib/clerk";
@@ -146,6 +146,19 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
+  // Enforce uniqueness of staffId across all members (active, pending, or records).
+  const staffIdValue = parsed.data.staffId.trim();
+  const [existingStaffId] = await db
+    .select({ id: membersTable.id })
+    .from(membersTable)
+    .where(eq(membersTable.staffId, staffIdValue));
+  if (existingStaffId) {
+    res.status(409).json({
+      error: "A member with this Staff/Pensioner number already exists. If this is your number, please contact an administrator.",
+    });
+    return;
+  }
+
   // The very first app account bootstraps the system as an active super admin.
   const appAccounts = await db
     .select({ id: membersTable.id })
@@ -161,7 +174,8 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
         fullName: parsed.data.fullName,
         email,
         phone: parsed.data.phone ?? undefined,
-        staffId: parsed.data.staffId ?? undefined,
+        memberType: parsed.data.memberType,
+        staffId: staffIdValue,
         organization: orgRow.code,
         role: "super_admin",
         status: "active",
@@ -184,7 +198,8 @@ router.post("/auth/register", async (req: AuthRequest, res): Promise<void> => {
       pendingName: parsed.data.fullName,
       fullName: parsed.data.fullName,
       phone: parsed.data.phone ?? undefined,
-      staffId: parsed.data.staffId ?? undefined,
+      memberType: parsed.data.memberType,
+      staffId: staffIdValue,
       organization: orgRow.code,
       role: "member",
       status: "pending",

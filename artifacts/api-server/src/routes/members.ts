@@ -201,13 +201,28 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
     orgCode = firstOrg.code;
   }
 
+  const staffIdValue = (parsed.data.staffId ?? "").trim();
+  if (!staffIdValue) {
+    res.status(400).json({ error: "Staff/Pensioner number is required." });
+    return;
+  }
+  const [existingStaffId] = await db
+    .select({ id: membersTable.id })
+    .from(membersTable)
+    .where(eq(membersTable.staffId, staffIdValue));
+  if (existingStaffId) {
+    res.status(409).json({ error: `A member with Staff/Pensioner number "${staffIdValue}" already exists.` });
+    return;
+  }
+
   const [member] = await db
     .insert(membersTable)
     .values({
       fullName: parsed.data.fullName,
       email: parsed.data.email,
       phone: parsed.data.phone ?? undefined,
-      staffId: parsed.data.staffId ?? undefined,
+      memberType: (parsed.data as any).memberType ?? "staff",
+      staffId: staffIdValue,
       role: (parsed.data.role as any) ?? "member",
       status: (parsed.data.status as any) ?? "active",
       organization: orgCode,
@@ -276,6 +291,7 @@ router.patch(
   const updateData: any = {};
   if (parsed.data.fullName != null) updateData.fullName = parsed.data.fullName;
   if (parsed.data.phone != null) updateData.phone = parsed.data.phone;
+  if ((parsed.data as any).memberType != null) updateData.memberType = (parsed.data as any).memberType;
   if (parsed.data.staffId != null) updateData.staffId = parsed.data.staffId;
   if (parsed.data.status != null) updateData.status = parsed.data.status;
   if ((parsed.data as any).organization != null) {

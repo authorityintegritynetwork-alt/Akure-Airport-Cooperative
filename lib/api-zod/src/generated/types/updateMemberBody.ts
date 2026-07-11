@@ -11,6 +11,7 @@ import type { UpdateMemberBodyStatus } from "./updateMemberBodyStatus";
 export interface UpdateMemberBody {
   fullName?: string;
   phone?: string;
+  memberType?: 'staff' | 'pensioner';
   staffId?: string;
   role?: UpdateMemberBodyRole;
   status?: UpdateMemberBodyStatus;
