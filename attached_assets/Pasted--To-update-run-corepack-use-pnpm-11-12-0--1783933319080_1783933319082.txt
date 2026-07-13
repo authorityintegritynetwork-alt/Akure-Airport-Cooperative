@@ -1,0 +1,836 @@
+   │   To update, run: corepack use pnpm@11.12.0   │
+   │                                               │
+   ╰───────────────────────────────────────────────╯
+
+Application exited with code 1. This usually indicates an application failure. Check that the command used to launch your application is correct.
+Instance stopped.
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:62b55230-8237-4df8-a6c1-9ad1cc7a99a1
+Download progress: 100% |[32m++++++++[0m| (30.6 MiB/s)
+Download complete for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:62b55230-8237-4df8-a6c1-9ad1cc7a99a1
+Scope: all 10 workspace projects
+ ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY  Aborted removal of modules directory due to no TTY
+
+If you are running pnpm in CI, set the CI environment variable to "true".
+
+   ╭───────────────────────────────────────────────╮
+   │                                               │
+   │     Update available! 10.26.1 → 11.12.0.      │
+   │     Changelog: https://pnpm.io/v/11.12.0      │
+   │   To update, run: corepack use pnpm@11.12.0   │
+   │                                               │
+   ╰───────────────────────────────────────────────╯
+
+Application exited with code 1. This usually indicates an application failure. Check that the command used to launch your application is correct.
+Instance is starting... Waiting for health checks to pass.
+Scope: all 10 workspace projects
+ ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY  Aborted removal of modules directory due to no TTY
+
+If you are running pnpm in CI, set the CI environment variable to "true".
+Application exited with code 1. This usually indicates an application failure. Check that the command used to launch your application is correct.
+
+   ╭───────────────────────────────────────────────╮
+   │                                               │
+   │     Update available! 10.26.1 → 11.12.0.      │
+   │     Changelog: https://pnpm.io/v/11.12.0      │
+   │   To update, run: corepack use pnpm@11.12.0   │
+   │                                               │
+   ╰───────────────────────────────────────────────╯
+
+Instance stopped.
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:c57e557f-c26c-43ac-a5be-512c56e74c1a
+Download progress: 100% |[32m++++++++[0m| (30.6 MiB/s)
+Download complete for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:c57e557f-c26c-43ac-a5be-512c56e74c1a
+Instance is starting... Waiting for health checks to pass.
+Scope: all 10 workspace projects
+Recreating /workspace/node_modules
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +631
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 631, reused 0, downloaded 73, added 43
+Progress: resolved 631, reused 0, downloaded 219, added 109
+Progress: resolved 631, reused 0, downloaded 374, added 252
+Progress: resolved 631, reused 0, downloaded 426, added 271
+Progress: resolved 631, reused 0, downloaded 428, added 274
+Progress: resolved 631, reused 0, downloaded 429, added 274
+ WARN  Tarball download average speed 17 KiB/s (size 22 KiB) is below 50 KiB/s: https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz (GET)
+Progress: resolved 631, reused 0, downloaded 430, added 274
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+bash: line 1:     7 Killed                  pnpm install
+Scope: all 10 workspace projects
+Recreating /workspace/node_modules
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +631
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 631, reused 0, downloaded 91, added 35
+Progress: resolved 631, reused 0, downloaded 244, added 104
+Progress: resolved 631, reused 0, downloaded 382, added 255
+Progress: resolved 631, reused 0, downloaded 427, added 269
+{"level":30,"time":1783932453541,"pid":23,"hostname":"213aa195","req":{"id":10,"method":"GET","url":"/"},"res":{"statusCode":200},"responseTime":2,"msg":"request completed"}
+Application exited with code 255
+Instance stopped.
+Instance created. Preparing to start...
+Scope: all 10 workspace projects
+Instance is starting... Waiting for health checks to pass.
+Recreating /workspace/node_modules
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +631
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 631, reused 0, downloaded 65, added 36
+Progress: resolved 631, reused 0, downloaded 237, added 125
+Progress: resolved 631, reused 0, downloaded 393, added 247
+Progress: resolved 631, reused 0, downloaded 426, added 258
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+bash: line 1:     7 Killed                  pnpm install
+Scope: all 10 workspace projects
+Recreating /workspace/node_modules
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +631
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 631, reused 0, downloaded 123, added 60
+Progress: resolved 631, reused 0, downloaded 250, added 117
+Progress: resolved 631, reused 0, downloaded 413, added 235
+bash: line 1:     7 Killed                  pnpm install
+Application exited with code 137. This usually occurs when the Instance runs out of memory (OOM). Upgrade your Service to a larger Instance to mitigate this issue.
+Instance stopped.
+Instance created. Preparing to start...
+(node:1) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[08:54:02.292] [32mINFO[39m (1): [36mDatabase migrations applied[39m
+[08:54:03.463] [32mINFO[39m (1): [36mServer listening[39m
+    [35mport[39m: 8000
+Instance is starting... Waiting for health checks to pass.
+Instance is healthy. All health checks are passing.
+(node:1) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+[08:57:10.622] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 19
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:10.651] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 6
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:11.466] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "GET",
+      "url": "/favicon.ico"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 6
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:11.494] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "GET",
+      "url": "/favicon.ico"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 3
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:13.081] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 5,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 4
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:13.096] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 6,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:14.554] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 7,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:14.576] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 8,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 4
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:16.916] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 9,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 4
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:16.922] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 10,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 3
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:30.510] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 11,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 3
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:30.513] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 12,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:31.178] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 13,
+      "method": "GET",
+      "url": "/favicon.ico"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:31.196] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 14,
+      "method": "GET",
+      "url": "/favicon.ico"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 3
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:32.822] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 15,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:57:32.832] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 16,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:58:07.738] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 17,
+      "method": "GET",
+      "url": "/wp-admin/install.php"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:58:07.759] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 18,
+      "method": "GET",
+      "url": "/wp-admin/install.php"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:58:41.532] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 19,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:58:41.546] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 20,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:59:20.627] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 21,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 3
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[08:59:20.939] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 22,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:37.827] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 23,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:37.844] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 24,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:39.669] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 25,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:39.692] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 26,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:40.994] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 27,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:41.007] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 28,
+      "method": "GET",
+      "url": "/"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 2
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:43.207] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 29,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 8
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
+[09:01:43.214] [32mINFO[39m (1): [36mrequest errored[39m
+    [35mreq[39m: {
+      "id": 30,
+      "method": "GET",
+      "url": "/sw.js"
+    }
+    [35mres[39m: {
+      "statusCode": 502
+    }
+    [35mresponseTime[39m: 1
+    err: {
+      "type": "Error",
+      "message": "failed with status code 502",
+      "stack":
+          Error: failed with status code 502
+              at onResFinished (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:115:39)
+              at ServerResponse.onResponseComplete (/layers/heroku_nodejs-pnpm-install/virtual/store/pino-http@10.5.0/node_modules/pino-http/logger.js:178:14)
+              at ServerResponse.emit (node:events:530:35)
+              at onFinish (node:_http_outgoing:1081:10)
+              at callback (node:internal/streams/writable:766:21)
+              at afterWrite (node:internal/streams/writable:710:5)
+              at afterWriteTick (node:internal/streams/writable:696:10)
+              at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+    }
