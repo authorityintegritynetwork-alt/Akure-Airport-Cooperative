@@ -4,7 +4,7 @@ import { and, eq, gt, isNull, desc, sql } from "drizzle-orm";
 import { sendMail } from "./mailer";
 
 const CODE_TTL_MIN = 15;
-const GRANT_TTL_MIN = 10;
+const GRANT_TTL_MIN = 20;
 const MAX_OTP_ATTEMPTS = 5;
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_MIN = 15;
