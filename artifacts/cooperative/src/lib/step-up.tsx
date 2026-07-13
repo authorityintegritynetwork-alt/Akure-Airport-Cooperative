@@ -93,7 +93,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
             </DialogTitle>
             <DialogDescription>
               {sentTo
-                ? `We emailed a 6-digit code to ${sentTo}. Enter it below to continue. The code expires in 10 minutes.`
+                ? `We emailed a 6-digit code to ${sentTo}. Enter it below to continue. The code expires in 15 minutes.`
                 : error
                 ? "We couldn't send the code. Click Resend to try again."
                 : "Sending a 6-digit code to your email…"}
@@ -211,7 +211,7 @@ export function StepUpGate({ children }: { children: React.ReactNode }) {
         </div>
         <p className="text-sm text-muted-foreground">
           {sentTo
-            ? `For your security, enter the 6-digit code we just emailed to ${sentTo}. The code expires in 10 minutes.`
+            ? `For your security, enter the 6-digit code we just emailed to ${sentTo}. The code expires in 15 minutes.`
             : error
             ? "We couldn't send the code. Click Resend to try again."
             : "Sending a 6-digit code to your email…"}
