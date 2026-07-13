@@ -1409,3 +1409,22 @@ export const ListAuditLogsFormat = {
 export type GetRecentActivityParams = {
   limit?: number;
 };
+
+export interface SearchAllMembersResponseItem {
+  id: number;
+  fullName: string;
+  organization?: string | null;
+  staffId?: string | null;
+  phone?: string | null;
+  memberType?: "staff" | "pensioner" | null;
+  status: "pending" | "active" | "inactive";
+  isLinked: boolean;
+}
+
+export interface CreateBlankCooperativeRecordBody {
+  fullName: string;
+  organization?: string;
+  staffId?: string;
+  phone?: string;
+  memberType?: "staff" | "pensioner";
+}

@@ -141,3 +141,5 @@ export * from "./uploadRecord";
 export * from "./uploadRecordStatus";
 export * from "./verifyStepUpCode200";
 export * from "./verifyStepUpCodeBody";
+export * from "./searchAllMembersResponseItem";
+export * from "./createBlankCooperativeRecordBody";

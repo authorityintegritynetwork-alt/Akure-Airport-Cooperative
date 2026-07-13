@@ -681,6 +681,32 @@ export const ListCooperativeRecordsResponse = zod.array(
 /**
  * @summary Approve a pending sign-up, optionally linking it to a cooperative record (Admin+, step-up)
  */
+export const SearchAllMembersQueryParams = zod.object({
+  q: zod.coerce.string(),
+  limit: zod.coerce.number().optional(),
+});
+
+export const SearchAllMembersResponseItem = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  organization: zod.string().nullish(),
+  staffId: zod.string().nullish(),
+  phone: zod.string().nullish(),
+  memberType: zod.enum(["staff", "pensioner"]).nullish(),
+  status: zod.enum(["pending", "active", "inactive"]),
+  isLinked: zod.boolean(),
+});
+
+export const SearchAllMembersResponse = zod.array(SearchAllMembersResponseItem);
+
+export const CreateBlankCooperativeRecordBody = zod.object({
+  fullName: zod.string().min(1),
+  organization: zod.string().optional(),
+  staffId: zod.string().optional(),
+  phone: zod.string().optional(),
+  memberType: zod.enum(["staff", "pensioner"]).optional(),
+});
+
 export const ApproveMatchParams = zod.object({
   id: zod.coerce.number(),
 });

@@ -157,6 +157,112 @@ router.get(
   },
 );
 
+// ── Search ALL member rows (linked, pending, unclaimed) ──────────────────────
+// Registered before "/members/:id" so the literal path isn't parsed as an id.
+router.get(
+  "/members/search-all",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const q = req.query.q ? String(req.query.q).trim() : "";
+    const limit = Math.min(parseInt(String(req.query.limit ?? "20"), 10) || 20, 50);
+    if (q.length < 2) {
+      res.json([]);
+      return;
+    }
+    const rows = await db
+      .select()
+      .from(membersTable)
+      .where(
+        or(
+          ilike(membersTable.fullName, `%${q}%`),
+          ilike(membersTable.staffId, `%${q}%`),
+          ilike(membersTable.email, `%${q}%`),
+        )!,
+      )
+      .limit(limit);
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        fullName: r.fullName,
+        organization: r.organization,
+        staffId: r.staffId ?? null,
+        phone: r.phone ?? null,
+        memberType: r.memberType ?? null,
+        status: r.status,
+        isLinked: !!r.clerkUserId,
+      })),
+    );
+  },
+);
+
+// ── Create a blank cooperative record (no Clerk IDs, zero balances) ───────────
+router.post(
+  "/members/blank-record",
+  requireAuth,
+  requireAdminOnly,
+  async (req: AuthRequest, res): Promise<void> => {
+    const { fullName, organization, staffId, phone, memberType } = req.body ?? {};
+    if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
+      res.status(400).json({ error: "Full name is required." });
+      return;
+    }
+
+    // Resolve org
+    let orgCode = "FAAN";
+    const requestedOrg = String(organization || "").trim().toUpperCase();
+    if (requestedOrg) {
+      const [orgRow] = await db
+        .select({ code: organizationsTable.code })
+        .from(organizationsTable)
+        .where(eq(organizationsTable.code, requestedOrg));
+      if (!orgRow) {
+        res.status(400).json({ error: `Unknown organization "${requestedOrg}".` });
+        return;
+      }
+      orgCode = orgRow.code;
+    } else {
+      const [firstOrg] = await db
+        .select({ code: organizationsTable.code })
+        .from(organizationsTable)
+        .where(eq(organizationsTable.isActive, true))
+        .orderBy(organizationsTable.code);
+      if (firstOrg) orgCode = firstOrg.code;
+    }
+
+    const [record] = await db
+      .insert(membersTable)
+      .values({
+        fullName: fullName.trim(),
+        organization: orgCode,
+        staffId: staffId ? String(staffId).trim() || undefined : undefined,
+        phone: phone ? String(phone).trim() || undefined : undefined,
+        memberType: ((memberType === "pensioner" ? "pensioner" : "staff") as any),
+        status: "active" as any,
+      })
+      .returning();
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "CREATE_BLANK_RECORD",
+      entity: "member",
+      entityId: record.id,
+      details: `Admin created blank cooperative record: ${record.fullName}`,
+    });
+
+    res.status(201).json({
+      id: record.id,
+      fullName: record.fullName,
+      organization: record.organization,
+      staffId: record.staffId ?? null,
+      phone: record.phone ?? null,
+      memberType: record.memberType ?? null,
+      status: record.status,
+      isLinked: false,
+    });
+  },
+);
+
 router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const parsed = CreateMemberBody.safeParse(req.body);
   if (!parsed.success) {

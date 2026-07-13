@@ -100,6 +100,8 @@ import type {
   UploadRecord,
   VerifyStepUpCode200,
   VerifyStepUpCodeBody,
+  SearchAllMembersResponseItem,
+  CreateBlankCooperativeRecordBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -7153,4 +7155,130 @@ export const useRequestUploadUrl = <
   TContext
 > => {
   return useMutation(getRequestUploadUrlMutationOptions(options));
+};
+
+// ── Search all members ────────────────────────────────────────────────────────
+export const getSearchAllMembersUrl = (params?: { q?: string; limit?: number }) => {
+  const searchParams = new URLSearchParams();
+  if (params?.q !== undefined) searchParams.set("q", String(params.q));
+  if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+  const qs = searchParams.toString();
+  return `/api/members/search-all${qs ? `?${qs}` : ""}`;
+};
+
+export const searchAllMembers = async (
+  params?: { q?: string; limit?: number },
+  options?: RequestInit,
+): Promise<SearchAllMembersResponseItem[]> => {
+  return customFetch<SearchAllMembersResponseItem[]>(getSearchAllMembersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSearchAllMembersQueryKey = (params?: { q?: string; limit?: number }) =>
+  ["/api/members/search-all", params] as const;
+
+export const getSearchAllMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchAllMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: { q?: string; limit?: number },
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof searchAllMembers>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getSearchAllMembersQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAllMembers>>> = ({ signal }) =>
+    searchAllMembers(params, { signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchAllMembers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export function useSearchAllMembers<
+  TData = Awaited<ReturnType<typeof searchAllMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: { q?: string; limit?: number },
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof searchAllMembers>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchAllMembersQueryOptions(params, options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+// ── Create a blank cooperative record ────────────────────────────────────────
+export const getCreateBlankCooperativeRecordUrl = () => `/api/members/blank-record`;
+
+export const createBlankCooperativeRecord = async (
+  body: CreateBlankCooperativeRecordBody,
+  options?: RequestInit,
+): Promise<SearchAllMembersResponseItem> => {
+  return customFetch<SearchAllMembersResponseItem>(getCreateBlankCooperativeRecordUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(body),
+  });
+};
+
+export const getCreateBlankCooperativeRecordMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBlankCooperativeRecord>>,
+    TError,
+    { data: BodyType<CreateBlankCooperativeRecordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBlankCooperativeRecord>>,
+  TError,
+  { data: BodyType<CreateBlankCooperativeRecordBody> },
+  TContext
+> => {
+  const mutationKey = ["createBlankCooperativeRecord"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBlankCooperativeRecord>>,
+    { data: BodyType<CreateBlankCooperativeRecordBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+    return createBlankCooperativeRecord(data, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useCreateBlankCooperativeRecord = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBlankCooperativeRecord>>,
+    TError,
+    { data: BodyType<CreateBlankCooperativeRecordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBlankCooperativeRecord>>,
+  TError,
+  { data: BodyType<CreateBlankCooperativeRecordBody> },
+  TContext
+> => {
+  return useMutation(getCreateBlankCooperativeRecordMutationOptions(options));
 };

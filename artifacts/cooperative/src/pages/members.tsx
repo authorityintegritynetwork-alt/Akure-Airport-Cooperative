@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import {
   useListMembers,
@@ -12,9 +12,12 @@ import {
   useListPendingSignups,
   useApproveMatch,
   useRejectMatch,
+  useSearchAllMembers,
+  useCreateBlankCooperativeRecord,
   getListMembersQueryKey,
   type PendingSignup,
   type MatchSuggestion,
+  type SearchAllMembersResponseItem,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -1202,6 +1205,7 @@ function ReviewSignupDialog({
   const [editOrganization, setEditOrganization] = useState(firstSug?.organization ?? "");
   const [editMemberType, setEditMemberType] = useState<"staff" | "pensioner">(firstSug?.memberType ?? "staff");
   const { data: organizations } = useListOrganizations();
+  const [changeMatchOpen, setChangeMatchOpen] = useState(false);
   const busy = isApproving || isRejecting;
 
   function selectRecord(recordId: number | null) {
@@ -1215,6 +1219,15 @@ function ReviewSignupDialog({
       setEditOrganization(sug.organization ?? "");
       setEditMemberType(sug.memberType ?? "staff");
     }
+  }
+
+  function setRecordDirect(item: SearchAllMembersResponseItem) {
+    setSelectedRecordId(item.id);
+    setEditFullName(item.fullName);
+    setEditPhone(item.phone ?? "");
+    setEditStaffId(item.staffId ?? "");
+    setEditOrganization(item.organization ?? "");
+    setEditMemberType(item.memberType ?? "staff");
   }
 
   function handleApprove() {
@@ -1252,7 +1265,19 @@ function ReviewSignupDialog({
 
           {/* Match selection */}
           <div>
-            <p className="text-sm font-medium mb-2">Link to cooperative record</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium">Link to cooperative record</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
+                onClick={() => setChangeMatchOpen(true)}
+              >
+                <Search className="w-3 h-3" />
+                Search all records
+              </Button>
+            </div>
             {signup.suggestions.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No matching cooperative records were found. You can still approve this person as a
@@ -1400,6 +1425,11 @@ function ReviewSignupDialog({
           </div>
         </div>
       </DialogContent>
+      <ChangeMatchSheet
+        open={changeMatchOpen}
+        onOpenChange={setChangeMatchOpen}
+        onSelect={setRecordDirect}
+      />
     </Dialog>
   );
 }
