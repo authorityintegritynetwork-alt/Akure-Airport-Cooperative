@@ -39,6 +39,40 @@ import { formatMember } from "../lib/formatMember";
 import { computeMatchSuggestions } from "../lib/matchSuggestions";
 import { requireAdminOnly } from "../middlewares/auth";
 import { ApproveMatchBody } from "@workspace/api-zod";
+import { sendMail } from "../lib/mailer";
+
+/** Fire-and-forget approval welcome email — never blocks the response. */
+function sendApprovalEmail(member: { fullName: string; email: string | null }): void {
+  if (!member.email) return;
+  const appUrl = process.env.APP_URL ?? "https://your-app-url.com";
+  const firstName = member.fullName.split(" ")[0];
+  void sendMail({
+    to: member.email,
+    subject: "Your membership has been approved — Akure Airport Co-op",
+    text:
+      `Dear ${member.fullName},\n\n` +
+      `Great news! Your registration for the Akure Airport Staff Co-operative Multipurpose Society has been reviewed and approved.\n\n` +
+      `You can now log in to your account to view your savings, loans, and other cooperative benefits:\n\n` +
+      `${appUrl}\n\n` +
+      `If you have any questions, please contact the cooperative administrator.\n\n` +
+      `Warm regards,\nAkure Airport Staff Co-operative`,
+    html:
+      `<div style="font-family:system-ui,sans-serif;max-width:540px;margin:auto;color:#1a1a1a;">` +
+      `<div style="background:#0a2452;padding:24px 32px;border-radius:8px 8px 0 0;">` +
+      `<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">Akure Airport Staff Co-operative</h1>` +
+      `</div>` +
+      `<div style="background:#f8f9fb;padding:32px;border-radius:0 0 8px 8px;border:1px solid #e4e7ec;border-top:none;">` +
+      `<h2 style="margin:0 0 16px;font-size:22px;color:#0a2452;">🎉 Membership Approved!</h2>` +
+      `<p style="margin:0 0 12px;">Dear <strong>${firstName}</strong>,</p>` +
+      `<p style="margin:0 0 12px;">Your registration for the <strong>Akure Airport Staff Co-operative Multipurpose Society</strong> has been reviewed and <strong>approved</strong>.</p>` +
+      `<p style="margin:0 0 24px;">You can now log in to your account to view your savings balance, loan history, and other cooperative benefits.</p>` +
+      `<a href="${appUrl}" style="display:inline-block;background:#0a2452;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;">Log in to your account</a>` +
+      `<p style="margin:32px 0 0;font-size:13px;color:#666;">If you have any questions, please contact the cooperative administrator.</p>` +
+      `<p style="margin:8px 0 0;font-size:13px;color:#666;">Warm regards,<br><strong>Akure Airport Staff Co-operative</strong></p>` +
+      `</div>` +
+      `</div>`,
+  });
+}
 
 router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = ListMembersQueryParams.safeParse(req.query);
@@ -630,6 +664,7 @@ router.post(
         details: `Approved sign-up as new member (zero balance): ${member.fullName}`,
       });
 
+      sendApprovalEmail(member);
       res.json(formatMember(member));
       return;
     }
@@ -727,6 +762,7 @@ router.post(
       details: `Linked sign-up "${signup.pendingName ?? signup.fullName}" to cooperative record: ${linked.fullName}`,
     });
 
+    sendApprovalEmail({ fullName: linked.fullName, email: signup.pendingEmail ?? linked.email });
     res.json(formatMember(linked));
   },
 );
