@@ -37,8 +37,31 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Component, type ReactNode } from "react";
 import { Plus, Pencil, Trash2, EyeOff, Eye } from "lucide-react";
+
+class CardErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(e: Error) {
+    return { error: e.message };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 p-4 text-xs text-rose-700 dark:text-rose-400">
+          Balance Visibility card failed to load: {this.state.error}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function BalanceVisibilityCard() {
   const queryClient = useQueryClient();
@@ -163,7 +186,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5 max-w-lg">
-      <BalanceVisibilityCard />
+      <CardErrorBoundary><BalanceVisibilityCard /></CardErrorBoundary>
 
       {/* Hero */}
       <div
