@@ -676,6 +676,13 @@ router.post(
           };
         }
 
+        // Delete the signup row BEFORE updating the target record.
+        // The signup row may share unique-constrained values (staffId, email) with
+        // the data we're about to write to the cooperative record. If we update first,
+        // two rows briefly hold the same unique value → 23505. Deleting first ensures
+        // only one row ever owns each value.
+        await tx.delete(membersTable).where(eq(membersTable.id, id));
+
         const [updated] = await tx
           .update(membersTable)
           .set({
@@ -692,8 +699,6 @@ router.post(
           .where(eq(membersTable.id, cooperativeRecordId))
           .returning();
 
-        // Remove the now-redundant sign-up row (no transactions/balances).
-        await tx.delete(membersTable).where(eq(membersTable.id, id));
         return { ok: true, member: updated };
       });
     } catch (err: any) {
