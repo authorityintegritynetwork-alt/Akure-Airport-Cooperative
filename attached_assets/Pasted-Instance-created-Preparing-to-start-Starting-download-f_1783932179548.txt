@@ -1,0 +1,44 @@
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:62b55230-8237-4df8-a6c1-9ad1cc7a99a1
+Download progress: 100% |[32m++++++++[0m| (30.6 MiB/s)
+Scope: all 10 workspace projects
+ ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY  Aborted removal of modules directory due to no TTY
+
+If you are running pnpm in CI, set the CI environment variable to "true".
+Download complete for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:62b55230-8237-4df8-a6c1-9ad1cc7a99a1
+Instance is starting... Waiting for health checks to pass.
+Application exited with code 1. This usually indicates an application failure. Check that the command used to launch your application is correct.
+Scope: all 10 workspace projects
+ ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY  Aborted removal of modules directory due to no TTY
+
+If you are running pnpm in CI, set the CI environment variable to "true".
+
+   ╭───────────────────────────────────────────────╮
+   │                                               │
+   │     Update available! 10.26.1 → 11.12.0.      │
+   │     Changelog: https://pnpm.io/v/11.12.0      │
+   │   To update, run: corepack use pnpm@11.12.0   │
+   │                                               │
+   ╰───────────────────────────────────────────────╯
+
+Application exited with code 1. This usually indicates an application failure. Check that the command used to launch your application is correct.
+Instance stopped.
+Instance created. Preparing to start...
+Starting download for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:62b55230-8237-4df8-a6c1-9ad1cc7a99a1
+Download progress: 100% |[32m++++++++[0m| (30.6 MiB/s)
+Scope: all 10 workspace projects
+ ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY  Aborted removal of modules directory due to no TTY
+
+If you are running pnpm in CI, set the CI environment variable to "true".
+
+   ╭───────────────────────────────────────────────╮
+   │                                               │
+   │     Update available! 10.26.1 → 11.12.0.      │
+   │     Changelog: https://pnpm.io/v/11.12.0      │
+   │   To update, run: corepack use pnpm@11.12.0   │
+   │                                               │
+   ╰───────────────────────────────────────────────╯
+
+Download complete for registry01.prod.koyeb.com/k-03aaf150-df03-48ef-90bd-5673fcb06be5/c3acfe5f-3c1e-49f2-89b0-30e67e389afe:62b55230-8237-4df8-a6c1-9ad1cc7a99a1
+Application exited with code 1. This usually indicates an application failure. Check that the command used to launch your application is correct.
+Instance is starting... Waiting for health checks to pass.
