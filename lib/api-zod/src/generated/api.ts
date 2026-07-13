@@ -2408,6 +2408,7 @@ export const GetSettingsResponse = zod.object({
   maxLoanAmount: zod.number().nullish(),
   maxLoanTenureMonths: zod.number(),
   cooperativeName: zod.string(),
+  balancesHidden: zod.boolean(),
   updatedAt: zod.coerce.date(),
 });
 
@@ -2427,7 +2428,15 @@ export const UpdateSettingsResponse = zod.object({
   maxLoanAmount: zod.number().nullish(),
   maxLoanTenureMonths: zod.number(),
   cooperativeName: zod.string(),
+  balancesHidden: zod.boolean(),
   updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Toggle balance visibility for all members (Super Admin)
+ */
+export const ToggleBalanceVisibilityBody = zod.object({
+  hidden: zod.boolean(),
 });
 
 /**

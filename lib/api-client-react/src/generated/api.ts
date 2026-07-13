@@ -7072,6 +7072,86 @@ export const useUpdateSettings = <
 };
 
 /**
+ * @summary Toggle balance visibility for all members (Super Admin)
+ */
+export const getToggleBalanceVisibilityUrl = () => {
+  return `/api/settings/balance-visibility`;
+};
+
+export const toggleBalanceVisibility = async (
+  body: { hidden: boolean },
+  options?: RequestInit,
+): Promise<SystemSettings> => {
+  return customFetch<SystemSettings>(getToggleBalanceVisibilityUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(body),
+  });
+};
+
+export const getToggleBalanceVisibilityMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toggleBalanceVisibility>>,
+    TError,
+    { hidden: boolean },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toggleBalanceVisibility>>,
+  TError,
+  { hidden: boolean },
+  TContext
+> => {
+  const mutationKey = ["toggleBalanceVisibility"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toggleBalanceVisibility>>,
+    { hidden: boolean }
+  > = (props) => {
+    return toggleBalanceVisibility(props, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToggleBalanceVisibilityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toggleBalanceVisibility>>
+>;
+export type ToggleBalanceVisibilityMutationError = ErrorType<unknown>;
+
+export function useToggleBalanceVisibility<
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toggleBalanceVisibility>>,
+    TError,
+    { hidden: boolean },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof toggleBalanceVisibility>>,
+  TError,
+  { hidden: boolean },
+  TContext
+> {
+  return useMutation(getToggleBalanceVisibilityMutationOptions(options));
+}
+
+/**
  * @summary Request a presigned upload URL
  */
 export const getRequestUploadUrlUrl = () => {

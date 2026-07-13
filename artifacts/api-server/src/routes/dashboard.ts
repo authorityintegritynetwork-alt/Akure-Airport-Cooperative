@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, membersTable, loansTable, storePurchasesTable, transactionsTable, auditLogsTable, storeItemsTable, notificationsTable } from "@workspace/db";
+import { db, membersTable, loansTable, storePurchasesTable, transactionsTable, auditLogsTable, storeItemsTable, notificationsTable, systemSettingsTable } from "@workspace/db";
 import { eq, and, count, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
 
@@ -38,23 +38,36 @@ router.get("/dashboard/admin-summary", requireAuth, requireAdmin, async (req: Au
 });
 
 router.get("/dashboard/member-summary", requireAuth, async (req: AuthRequest, res): Promise<void> => {
-  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
+  const [[member], [settings]] = await Promise.all([
+    db.select().from(membersTable).where(eq(membersTable.id, req.memberId!)),
+    db.select({ balancesHidden: systemSettingsTable.balancesHidden }).from(systemSettingsTable),
+  ]);
+
   if (!member) {
     res.status(404).json({ error: "Member not found" });
     return;
   }
 
-  const activeLoans = await db
-    .select()
-    .from(loansTable)
-    .where(and(eq(loansTable.memberId, req.memberId!), eq(loansTable.status, "disbursed")));
+  // Mask all financial data for regular members when balance hiding is active.
+  const isMember = !["admin", "financial_auditor", "treasurer", "super_admin"].includes(member.role);
+  if (isMember && settings?.balancesHidden) {
+    res.json({
+      savingsBalance: 0,
+      christmasBalance: 0,
+      providentBalance: 0,
+      fuelVentureBalance: 0,
+      activeLoanCount: 0,
+      outstandingLoanBalance: 0,
+      storeDebt: 0,
+      recentTransactions: [],
+    });
+    return;
+  }
 
-  const recentTx = await db
-    .select()
-    .from(transactionsTable)
-    .where(eq(transactionsTable.memberId, req.memberId!))
-    .orderBy(transactionsTable.createdAt)
-    .limit(5);
+  const [activeLoans, recentTx] = await Promise.all([
+    db.select().from(loansTable).where(and(eq(loansTable.memberId, req.memberId!), eq(loansTable.status, "disbursed"))),
+    db.select().from(transactionsTable).where(eq(transactionsTable.memberId, req.memberId!)).orderBy(transactionsTable.createdAt).limit(5),
+  ]);
 
   res.json({
     savingsBalance: parseFloat(member.savingsBalance),

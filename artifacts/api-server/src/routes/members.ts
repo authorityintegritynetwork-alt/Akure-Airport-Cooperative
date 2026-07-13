@@ -35,11 +35,12 @@ import { inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-import { formatMember } from "../lib/formatMember";
+import { formatMember, maskMemberBalances } from "../lib/formatMember";
 import { computeMatchSuggestions } from "../lib/matchSuggestions";
 import { requireAdminOnly } from "../middlewares/auth";
 import { ApproveMatchBody } from "@workspace/api-zod";
 import { sendMail } from "../lib/mailer";
+import { systemSettingsTable } from "@workspace/db";
 
 /** Fire-and-forget approval welcome email — never blocks the response. */
 function sendApprovalEmail(member: { fullName: string; email: string | null }): void {
@@ -406,7 +407,21 @@ router.get("/members/:id", requireAuth, async (req: AuthRequest, res): Promise<v
     res.status(404).json({ error: "Member not found" });
     return;
   }
-  res.json(formatMember(member));
+
+  const formatted = formatMember(member);
+
+  // Mask balances for regular members when super-admin has enabled balance hiding.
+  if (req.memberRole === "member") {
+    const [settings] = await db
+      .select({ balancesHidden: systemSettingsTable.balancesHidden })
+      .from(systemSettingsTable);
+    if (settings?.balancesHidden) {
+      res.json(maskMemberBalances(formatted));
+      return;
+    }
+  }
+
+  res.json(formatted);
 });
 
 router.patch(

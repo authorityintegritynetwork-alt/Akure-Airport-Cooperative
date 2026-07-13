@@ -40,6 +40,46 @@ function parseOb(v: string | null | undefined): number | null {
   return isNaN(n) ? null : n;
 }
 
+const ZERO_BALANCES = {
+  sharesBalance: 0,
+  savingsBalance: 0,
+  providentBalance: 0,
+  christmasBalance: 0,
+  realLoanBalance: 0,
+  emergencyLoanBalance: 0,
+  totalLoanBalance: 0,
+  electronicsDebt: 0,
+  sElectronicsDebt: 0,
+  furnitureDebt: 0,
+  commodityDebt: 0,
+  ghlFormDebt: 0,
+  fireFundBalance: 0,
+  totalStoreDebt: 0,
+  fuelVentureBalance: 0,
+  landLoanBalance: 0,
+  obSharesBalance: null,
+  obSavingsBalance: null,
+  obProvidentBalance: null,
+  obChristmasBalance: null,
+  obRealLoanBalance: null,
+  obEmergencyLoanBalance: null,
+  obTotalLoanBalance: null,
+  obElectronicsDebt: null,
+  obSElectronicsDebt: null,
+  obFurnitureDebt: null,
+  obCommodityDebt: null,
+  obGhlFormDebt: null,
+  obFireFundBalance: null,
+  obFuelVentureBalance: null,
+  obLandLoanBalance: null,
+  obTotalStoreDebt: null,
+};
+
+/** Zero out all financial figures — used when balances_hidden is enabled. */
+export function maskMemberBalances<T extends ReturnType<typeof formatMember>>(m: T): T {
+  return { ...m, ...ZERO_BALANCES };
+}
+
 export function formatMember<T extends MemberRow>(m: T) {
   return {
     ...m,

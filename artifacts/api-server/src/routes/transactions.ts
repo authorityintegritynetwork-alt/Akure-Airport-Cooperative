@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, transactionsTable, membersTable } from "@workspace/db";
+import { db, transactionsTable, membersTable, systemSettingsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
 import { ListTransactionsQueryParams, ListMyTransactionsQueryParams } from "@workspace/api-zod";
@@ -48,6 +48,17 @@ router.get("/transactions/my", requireAuth, async (req: AuthRequest, res): Promi
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
+  }
+
+  // Return empty history for regular members when balance hiding is active.
+  if (req.memberRole === "member") {
+    const [settings] = await db
+      .select({ balancesHidden: systemSettingsTable.balancesHidden })
+      .from(systemSettingsTable);
+    if (settings?.balancesHidden) {
+      res.json([]);
+      return;
+    }
   }
 
   const conditions = [eq(transactionsTable.memberId, req.memberId!)];

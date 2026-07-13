@@ -12,15 +12,19 @@ function formatSettings(s: any) {
     ...s,
     loanInterestRate: parseFloat(s.loanInterestRate),
     maxLoanAmount: s.maxLoanAmount ? parseFloat(s.maxLoanAmount) : null,
+    balancesHidden: s.balancesHidden ?? false,
   };
 }
 
+/** Read the settings singleton, creating it if it doesn't exist yet. */
+async function getOrCreateSettings() {
+  let [s] = await db.select().from(systemSettingsTable);
+  if (!s) [s] = await db.insert(systemSettingsTable).values({}).returning();
+  return s;
+}
+
 router.get("/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res): Promise<void> => {
-  let [settings] = await db.select().from(systemSettingsTable);
-  if (!settings) {
-    [settings] = await db.insert(systemSettingsTable).values({}).returning();
-  }
-  res.json(formatSettings(settings));
+  res.json(formatSettings(await getOrCreateSettings()));
 });
 
 router.patch("/settings", requireAuth, requireSuperAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
@@ -30,11 +34,7 @@ router.patch("/settings", requireAuth, requireSuperAdmin, requireReverification,
     return;
   }
 
-  let [existing] = await db.select().from(systemSettingsTable);
-  if (!existing) {
-    [existing] = await db.insert(systemSettingsTable).values({}).returning();
-  }
-
+  const existing = await getOrCreateSettings();
   const updateData: any = {};
   if (parsed.data.loanInterestRate != null) updateData.loanInterestRate = parsed.data.loanInterestRate.toString();
   if (parsed.data.maxLoanAmount != null) updateData.maxLoanAmount = parsed.data.maxLoanAmount.toString();
@@ -56,5 +56,38 @@ router.patch("/settings", requireAuth, requireSuperAdmin, requireReverification,
 
   res.json(formatSettings(updated));
 });
+
+/**
+ * Toggle balance visibility for all members.
+ * Super-admin only. No step-up required so the switch can be flipped quickly.
+ */
+router.post(
+  "/settings/balance-visibility",
+  requireAuth,
+  requireSuperAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const { hidden } = req.body ?? {};
+    if (typeof hidden !== "boolean") {
+      res.status(400).json({ error: "hidden must be a boolean" });
+      return;
+    }
+
+    const existing = await getOrCreateSettings();
+    const [updated] = await db
+      .update(systemSettingsTable)
+      .set({ balancesHidden: hidden })
+      .where(eq(systemSettingsTable.id, existing.id))
+      .returning();
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "UPDATE_SETTINGS",
+      entity: "settings",
+      details: `Balance visibility set to ${hidden ? "hidden (members see 0.00)" : "visible (real figures)"}`,
+    });
+
+    res.json(formatSettings(updated));
+  },
+);
 
 export default router;

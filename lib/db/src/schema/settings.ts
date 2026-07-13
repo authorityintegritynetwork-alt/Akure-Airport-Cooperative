@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, numeric, integer, check } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, numeric, integer, boolean, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -15,6 +15,7 @@ export const systemSettingsTable = pgTable(
     cooperativeName: text("cooperative_name")
       .notNull()
       .default("Akure Airport Staff Cooperative Multipurpose Society"),
+    balancesHidden: boolean("balances_hidden").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()

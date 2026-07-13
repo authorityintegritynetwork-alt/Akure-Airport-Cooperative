@@ -1,6 +1,7 @@
 import {
   useGetSettings,
   useUpdateSettings,
+  useToggleBalanceVisibility,
   getGetSettingsQueryKey,
   useListLoanProducts,
   useCreateLoanProduct,
@@ -37,7 +38,73 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, EyeOff, Eye } from "lucide-react";
+
+function BalanceVisibilityCard() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: settings, isLoading } = useGetSettings();
+  const toggleMut = useToggleBalanceVisibility();
+
+  async function handleToggle(hidden: boolean) {
+    try {
+      await toggleMut.mutateAsync({ hidden });
+      queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+      toast({
+        title: hidden ? "Balances hidden" : "Balances visible",
+        description: hidden
+          ? "Members now see ₦0.00 for all balances and no transaction history."
+          : "Members can now see their real balances and transaction history.",
+      });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  }
+
+  const hidden = settings?.balancesHidden ?? false;
+
+  return (
+    <Card className={`rounded-2xl shadow-sm border-2 ${hidden ? "border-amber-400 bg-amber-50 dark:bg-amber-950/20" : "border-border/70"}`}>
+      <CardContent className="p-5">
+        <div className="flex items-start gap-4">
+          <div className={`mt-0.5 rounded-xl p-2.5 ${hidden ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400" : "bg-muted text-muted-foreground"}`}>
+            {hidden ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold leading-tight">Balance Visibility</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {hidden
+                    ? "Members currently see ₦0.00 for all balances and no transaction history."
+                    : "Members can see their real savings, loans, and transaction history."}
+                </p>
+              </div>
+              {isLoading ? (
+                <div className="w-10 h-6 rounded-full bg-muted animate-pulse shrink-0" />
+              ) : (
+                <Switch
+                  checked={!hidden}
+                  disabled={toggleMut.isPending}
+                  onCheckedChange={(checked) => handleToggle(!checked)}
+                  data-testid="switch-balance-visibility"
+                />
+              )}
+            </div>
+            {hidden && (
+              <div className="mt-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 flex items-center gap-2">
+                <EyeOff className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                  Balance hiding is active — members see ₦0.00 everywhere. Toggle on to restore real figures.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const settingsSchema = z.object({
   cooperativeName: z.string().min(2, "Cooperative name required"),
@@ -96,6 +163,8 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5 max-w-lg">
+      <BalanceVisibilityCard />
+
       {/* Hero */}
       <div
         className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"

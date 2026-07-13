@@ -1213,6 +1213,7 @@ export interface SystemSettings {
   maxLoanAmount?: number | null;
   maxLoanTenureMonths: number;
   cooperativeName: string;
+  balancesHidden: boolean;
   updatedAt: string;
 }
 
