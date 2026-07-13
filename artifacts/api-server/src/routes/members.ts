@@ -688,10 +688,11 @@ router.post(
           .set({
             clerkUserId: signup.pendingClerkUserId,
             email: signup.pendingEmail,
-            // Admin overrides take priority; fall back to record value then signup value.
+            // Admin overrides take priority; member's self-reported staffId overrides
+            // the imported cooperative record value (most imported records have no staffId).
             fullName: overrides.fullName ?? current.fullName,
             phone: overrides.phone ?? current.phone ?? signup.phone ?? undefined,
-            staffId: overrides.staffId ?? current.staffId ?? signup.staffId ?? undefined,
+            staffId: overrides.staffId ?? signup.staffId ?? current.staffId ?? undefined,
             organization: overrides.organization ?? current.organization,
             memberType: overrides.memberType ?? current.memberType ?? undefined,
             status: "active",
