@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, storeItemsTable, storePurchasesTable, membersTable } from "@workspace/db";
+import { db, storeItemsTable, storePurchasesTable, membersTable, systemSettingsTable } from "@workspace/db";
 import { eq, and, ilike, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireMember, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
@@ -293,30 +293,45 @@ router.post("/store/purchases", requireAuth, requireMember, async (req: AuthRequ
 });
 
 router.get("/store/purchases/my", requireAuth, async (req: AuthRequest, res): Promise<void> => {
-  const purchases = await db.select().from(storePurchasesTable).where(eq(storePurchasesTable.memberId, req.memberId!));
-  const items = await db.select({ id: storeItemsTable.id, name: storeItemsTable.name }).from(storeItemsTable);
+  const [purchases, items, [member], [settings]] = await Promise.all([
+    db.select().from(storePurchasesTable).where(eq(storePurchasesTable.memberId, req.memberId!)),
+    db.select({ id: storeItemsTable.id, name: storeItemsTable.name }).from(storeItemsTable),
+    db.select().from(membersTable).where(eq(membersTable.id, req.memberId!)),
+    db.select().from(systemSettingsTable),
+  ]);
   const itemMap = Object.fromEntries(items.map((i) => [i.id, i.name]));
-  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
+  const hidden = req.memberRole === "member" && settings?.balancesHidden === true;
 
-  res.json(purchases.map((p) => formatPurchase(p, member?.fullName || "Unknown", itemMap[p.storeItemId] || "Unknown")));
+  res.json(purchases.map((p) => {
+    const formatted = formatPurchase(p, member?.fullName || "Unknown", itemMap[p.storeItemId] || "Unknown");
+    if (hidden) {
+      return { ...formatted, unitPrice: 0, totalPrice: 0, outstandingBalance: 0 };
+    }
+    return formatted;
+  }));
 });
 
 router.get("/store/debt/my", requireAuth, async (req: AuthRequest, res): Promise<void> => {
-  const purchases = await db
-    .select()
-    .from(storePurchasesTable)
-    .where(and(eq(storePurchasesTable.memberId, req.memberId!), eq(storePurchasesTable.status, "outstanding")));
-
-  const items = await db.select({ id: storeItemsTable.id, name: storeItemsTable.name }).from(storeItemsTable);
+  const [purchases, items, [member], [settings]] = await Promise.all([
+    db.select().from(storePurchasesTable).where(and(eq(storePurchasesTable.memberId, req.memberId!), eq(storePurchasesTable.status, "outstanding"))),
+    db.select({ id: storeItemsTable.id, name: storeItemsTable.name }).from(storeItemsTable),
+    db.select().from(membersTable).where(eq(membersTable.id, req.memberId!)),
+    db.select().from(systemSettingsTable),
+  ]);
   const itemMap = Object.fromEntries(items.map((i) => [i.id, i.name]));
-  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
-
+  const hidden = req.memberRole === "member" && settings?.balancesHidden === true;
   const totalDebt = purchases.reduce((sum, p) => sum + parseFloat(p.outstandingBalance), 0);
 
   res.json({
     memberId: req.memberId!,
-    totalDebt,
-    purchases: purchases.map((p) => formatPurchase(p, member?.fullName || "Unknown", itemMap[p.storeItemId] || "Unknown")),
+    totalDebt: hidden ? 0 : totalDebt,
+    purchases: purchases.map((p) => {
+      const formatted = formatPurchase(p, member?.fullName || "Unknown", itemMap[p.storeItemId] || "Unknown");
+      if (hidden) {
+        return { ...formatted, unitPrice: 0, totalPrice: 0, outstandingBalance: 0 };
+      }
+      return formatted;
+    }),
   });
 });
 

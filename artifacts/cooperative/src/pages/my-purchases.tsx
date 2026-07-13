@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ShoppingBag, CheckCircle2, Clock, CircleDot } from "lucide-react";
+import { useBalancesHidden } from "@/hooks/use-balances-hidden";
 
 const STATUS_META: Record<
   string,
@@ -43,6 +44,7 @@ function StatusPill({ status }: { status: string }) {
 export function MyPurchasesPage() {
   const { data: purchases, isLoading } = useListMyStorePurchases();
   const { data: debt } = useGetMyStoreDebt();
+  const hidden = useBalancesHidden();
 
   const totalDebt = Number(debt?.totalDebt ?? 0);
   const purchaseCount = purchases?.length ?? 0;
@@ -77,7 +79,7 @@ export function MyPurchasesPage() {
               {totalDebt > 0 ? "Outstanding store debt" : "All caught up"}
             </p>
             <p className="text-3xl sm:text-4xl font-bold mt-2 tabular-nums tracking-tight">
-              {formatCurrency(totalDebt)}
+              {hidden ? "—" : formatCurrency(totalDebt)}
             </p>
             <p className="text-xs text-white/70 mt-1">
               {purchaseCount} total purchase{purchaseCount === 1 ? "" : "s"}
@@ -142,12 +144,12 @@ export function MyPurchasesPage() {
                     </div>
                     <div className="text-right shrink-0 space-y-1">
                       <p className="font-semibold tabular-nums text-sm">
-                        {formatCurrency(p.totalPrice)}
+                        {hidden ? "—" : formatCurrency(p.totalPrice)}
                       </p>
                       <StatusPill status={p.status} />
                       {p.status !== "settled" && (
                         <p className="text-[10px] text-rose-600 dark:text-rose-400 font-medium tabular-nums">
-                          Owed: {formatCurrency(p.outstandingBalance)}
+                          Owed: {hidden ? "—" : formatCurrency(p.outstandingBalance)}
                         </p>
                       )}
                     </div>

@@ -9,6 +9,7 @@ import {
   getGetAdminDashboardSummaryQueryKey,
   getGetRecentActivityQueryKey,
 } from "@workspace/api-client-react";
+import { useBalancesHidden } from "@/hooks/use-balances-hidden";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -474,6 +475,7 @@ function AdminDashboard() {
 
 function MemberDashboard({ profile }: { profile: any }) {
   const { data: summary, isLoading } = useGetMemberDashboardSummary();
+  const hidden = useBalancesHidden();
 
   if (isLoading) {
     return (
@@ -551,7 +553,7 @@ function MemberDashboard({ profile }: { profile: any }) {
             Total Savings
           </p>
           <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums tracking-tight">
-            {formatCurrency(totalSavings)}
+            {hidden ? "—" : formatCurrency(totalSavings)}
           </p>
           <p className="text-xs text-white/70 mt-1">
             {(summary.christmasBalance ?? 0) > 0 ? "Savings + Christmas" : "Savings"}
@@ -564,7 +566,7 @@ function MemberDashboard({ profile }: { profile: any }) {
               <CreditCard className="w-3 h-3" /> Loan due
             </div>
             <p className="text-lg font-bold mt-1 tabular-nums">
-              {formatCurrency(summary.outstandingLoanBalance)}
+              {hidden ? "—" : formatCurrency(summary.outstandingLoanBalance)}
             </p>
             <p className="text-[10px] text-white/60 mt-0.5">
               {summary.activeLoanCount} active
@@ -575,7 +577,7 @@ function MemberDashboard({ profile }: { profile: any }) {
               <ShoppingBag className="w-3 h-3" /> Store debt
             </div>
             <p className="text-lg font-bold mt-1 tabular-nums">
-              {formatCurrency(summary.storeDebt)}
+              {hidden ? "—" : formatCurrency(summary.storeDebt)}
             </p>
           </div>
         </div>
@@ -672,9 +674,9 @@ function MemberDashboard({ profile }: { profile: any }) {
                         : "text-rose-700 dark:text-rose-300"
                     }`}
                   >
-                    {formatCurrency(value)}
+                    {hidden ? "—" : formatCurrency(value)}
                   </p>
-                  {hasBook && (
+                  {hasBook && !hidden && (
                     <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
                       Book: {formatCurrency(bookValue)}
                     </p>

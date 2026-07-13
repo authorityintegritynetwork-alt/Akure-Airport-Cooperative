@@ -174,17 +174,25 @@ router.post("/loans", requireAuth, requireMember, async (req: AuthRequest, res):
 });
 
 router.get("/loans/my", requireAuth, async (req: AuthRequest, res): Promise<void> => {
-  const loans = await db.select().from(loansTable).where(eq(loansTable.memberId, req.memberId!));
-  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, req.memberId!));
-  const productMap = await getLoanProductMap();
+  const [loans, [member], productMap, settings] = await Promise.all([
+    db.select().from(loansTable).where(eq(loansTable.memberId, req.memberId!)),
+    db.select().from(membersTable).where(eq(membersTable.id, req.memberId!)),
+    getLoanProductMap(),
+    getSettings(),
+  ]);
+  const hidden = req.memberRole === "member" && settings?.balancesHidden === true;
   res.json(
-    loans.map((l) =>
-      formatLoan(
+    loans.map((l) => {
+      const formatted = formatLoan(
         l,
         member?.fullName || "Unknown",
         l.loanProductId ? productMap[l.loanProductId] ?? null : null,
-      ),
-    ),
+      );
+      if (hidden) {
+        return { ...formatted, amount: 0, interestAmount: 0, totalRepayable: 0, monthlyRepayment: 0, outstandingBalance: 0 };
+      }
+      return formatted;
+    }),
   );
 });
 
@@ -223,7 +231,10 @@ router.get("/loans/:id", requireAuth, async (req: AuthRequest, res): Promise<voi
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  const result = await getLoanWithMember(id);
+  const [result, settings] = await Promise.all([
+    getLoanWithMember(id),
+    getSettings(),
+  ]);
   if (!result) {
     res.status(404).json({ error: "Loan not found" });
     return;
@@ -234,7 +245,12 @@ router.get("/loans/:id", requireAuth, async (req: AuthRequest, res): Promise<voi
     return;
   }
 
-  res.json(formatLoan(result.loan, result.memberName));
+  const hidden = req.memberRole === "member" && settings?.balancesHidden === true;
+  let formatted = formatLoan(result.loan, result.memberName);
+  if (hidden) {
+    formatted = { ...formatted, amount: 0, interestAmount: 0, totalRepayable: 0, monthlyRepayment: 0, outstandingBalance: 0 };
+  }
+  res.json(formatted);
 });
 
 router.post("/loans/:id/approve", requireAuth, requireReverification, async (req: AuthRequest, res): Promise<void> => {

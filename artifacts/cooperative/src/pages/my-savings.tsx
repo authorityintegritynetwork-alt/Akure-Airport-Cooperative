@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Wallet, TrendingUp, Calendar, BookOpen } from "lucide-react";
+import { useBalancesHidden } from "@/hooks/use-balances-hidden";
 
 export function MySavingsPage() {
   const { data: savings, isLoading: savingsLoading } = useGetMySavings();
@@ -11,6 +12,7 @@ export function MySavingsPage() {
     { type: "savings" },
     { query: { queryKey: getListMyTransactionsQueryKey({ type: "savings" }) } },
   );
+  const hidden = useBalancesHidden();
 
   const bookSavings = profile?.obSavingsBalance != null ? Number(profile.obSavingsBalance) : null;
 
@@ -42,7 +44,7 @@ export function MySavingsPage() {
                 Current Balance
               </p>
               <p className="text-3xl sm:text-4xl font-bold mt-2 tabular-nums tracking-tight">
-                {formatCurrency(savings?.balance ?? 0)}
+                {hidden ? "—" : formatCurrency(savings?.balance ?? 0)}
               </p>
               {savings?.lastUpdated && (
                 <p className="text-xs text-white/70 mt-2 flex items-center gap-1.5">
@@ -56,7 +58,7 @@ export function MySavingsPage() {
             </div>
           </div>
 
-          {bookSavings != null && (
+          {bookSavings != null && !hidden && (
             <div className="relative mt-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3 flex items-center gap-3">
               <BookOpen className="w-4 h-4 shrink-0 text-white/80" />
               <div>
@@ -112,7 +114,7 @@ export function MySavingsPage() {
                     </p>
                   </div>
                   <span className="font-semibold tabular-nums text-sm text-emerald-700 dark:text-emerald-300">
-                    +{formatCurrency(tx.amount)}
+                    {hidden ? "—" : `+${formatCurrency(tx.amount)}`}
                   </span>
                 </div>
               ))}

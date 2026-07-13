@@ -23,7 +23,9 @@ async function getOrCreateSettings() {
   return s;
 }
 
-router.get("/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res): Promise<void> => {
+// Any authenticated member can read settings — they need to know if balances are hidden.
+// Mutations (PATCH, POST) remain super-admin only.
+router.get("/settings", requireAuth, async (req: AuthRequest, res): Promise<void> => {
   res.json(formatSettings(await getOrCreateSettings()));
 });
 

@@ -8,6 +8,7 @@ import {
   getListMyLoansQueryKey,
   getGetLoanRepaymentsQueryKey,
 } from "@workspace/api-client-react";
+import { useBalancesHidden } from "@/hooks/use-balances-hidden";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -173,6 +174,7 @@ function LoanCard({ loan }: { loan: any }) {
   const { data: repayments } = useGetLoanRepayments(loan.id, {
     query: { enabled: open, queryKey: getGetLoanRepaymentsQueryKey(loan.id) },
   });
+  const hidden = useBalancesHidden();
 
   const principal = Number(loan.amount) || 0;
   const outstanding = Number(loan.outstandingBalance) || 0;
@@ -198,7 +200,7 @@ function LoanCard({ loan }: { loan: any }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-lg font-bold tabular-nums">
-                {formatCurrency(loan.amount)}
+                {hidden ? "—" : formatCurrency(loan.amount)}
               </span>
               <LoanStatusPill status={loan.status} />
             </div>
@@ -225,7 +227,7 @@ function LoanCard({ loan }: { loan: any }) {
                 outstanding > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
               }`}
             >
-              {formatCurrency(outstanding)}
+              {hidden ? "—" : formatCurrency(outstanding)}
             </p>
           </div>
         </div>
@@ -269,18 +271,18 @@ function LoanCard({ loan }: { loan: any }) {
       {open && (
         <div className="border-t border-border/60 p-4 space-y-4 bg-muted/30">
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <Stat label="Principal" value={formatCurrency(loan.amount)} />
+            <Stat label="Principal" value={hidden ? "—" : formatCurrency(loan.amount)} />
             <Stat
               label={`Interest (${loan.interestRate}%)`}
-              value={formatCurrency(loan.interestAmount)}
+              value={hidden ? "—" : formatCurrency(loan.interestAmount)}
             />
             <Stat
               label="Total repayable"
-              value={formatCurrency(loan.totalRepayable)}
+              value={hidden ? "—" : formatCurrency(loan.totalRepayable)}
             />
             <Stat
               label="Monthly"
-              value={formatCurrency(loan.monthlyRepayment)}
+              value={hidden ? "—" : formatCurrency(loan.monthlyRepayment)}
             />
           </div>
 
@@ -345,6 +347,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function MyLoansPage() {
   const { data: loans, isLoading } = useListMyLoans();
   const { data: loanProducts } = useListLoanProducts();
+  const hidden = useBalancesHidden();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [calcResult, setCalcResult] = useState<any>(null);
@@ -783,7 +786,7 @@ export function MyLoansPage() {
               Total Outstanding
             </p>
             <p className="text-3xl sm:text-4xl font-bold mt-2 tabular-nums tracking-tight">
-              {formatCurrency(totalOutstanding)}
+              {hidden ? "—" : formatCurrency(totalOutstanding)}
             </p>
             <p className="text-xs text-white/70 mt-1">
               {activeCount} active loan{activeCount === 1 ? "" : "s"} ·{" "}
