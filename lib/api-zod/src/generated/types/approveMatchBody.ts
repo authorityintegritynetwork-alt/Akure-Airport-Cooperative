@@ -9,4 +9,11 @@
 export interface ApproveMatchBody {
   /** @nullable */
   cooperativeRecordId?: number | null;
+  overrides?: {
+    fullName?: string;
+    phone?: string;
+    staffId?: string;
+    organization?: string;
+    memberType?: "staff" | "pensioner";
+  };
 }

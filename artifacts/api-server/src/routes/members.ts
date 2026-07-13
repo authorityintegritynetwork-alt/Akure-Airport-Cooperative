@@ -498,6 +498,8 @@ router.post(
       return;
     }
 
+    const overrides = (parsed.data as any).overrides ?? {};
+
     // Approve WITHOUT a cooperative record: promote the sign-up row itself into
     // an active app account with zero balances.
     if (cooperativeRecordId == null) {
@@ -573,8 +575,12 @@ router.post(
           .set({
             clerkUserId: signup.pendingClerkUserId,
             email: signup.pendingEmail,
-            phone: current.phone ?? signup.phone ?? undefined,
-            staffId: current.staffId ?? signup.staffId ?? undefined,
+            // Admin overrides take priority; fall back to record value then signup value.
+            fullName: overrides.fullName ?? current.fullName,
+            phone: overrides.phone ?? current.phone ?? signup.phone ?? undefined,
+            staffId: overrides.staffId ?? current.staffId ?? signup.staffId ?? undefined,
+            organization: overrides.organization ?? current.organization,
+            memberType: overrides.memberType ?? current.memberType ?? undefined,
             status: "active",
           })
           .where(eq(membersTable.id, cooperativeRecordId))

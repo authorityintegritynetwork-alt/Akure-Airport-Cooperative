@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -153,9 +154,17 @@ export function MembersPage() {
   const approveMatch = useApproveMatch();
   const rejectMatch = useRejectMatch();
 
+  type RecordOverrides = {
+    fullName?: string;
+    phone?: string;
+    staffId?: string;
+    organization?: string;
+    memberType?: "staff" | "pensioner";
+  };
+
   const approveMatchWithStepUp = useStepUpAction(
-    (id: number, cooperativeRecordId: number | null) =>
-      approveMatch.mutateAsync({ id, data: { cooperativeRecordId } }),
+    (id: number, cooperativeRecordId: number | null, overrides?: RecordOverrides) =>
+      approveMatch.mutateAsync({ id, data: { cooperativeRecordId, overrides } }),
   );
   const rejectMatchWithStepUp = useStepUpAction(
     (id: number) => rejectMatch.mutateAsync({ id }),
@@ -168,9 +177,13 @@ export function MembersPage() {
     });
   }
 
-  async function handleApproveSignup(signup: PendingSignup, cooperativeRecordId: number | null) {
+  async function handleApproveSignup(
+    signup: PendingSignup,
+    cooperativeRecordId: number | null,
+    overrides?: RecordOverrides,
+  ) {
     try {
-      await approveMatchWithStepUp(signup.id, cooperativeRecordId);
+      await approveMatchWithStepUp(signup.id, cooperativeRecordId, overrides);
       toast({
         title: "Sign-up approved",
         description: cooperativeRecordId
@@ -1156,6 +1169,14 @@ function PendingSignupsList({
   );
 }
 
+type RecordOverrides = {
+  fullName?: string;
+  phone?: string;
+  staffId?: string;
+  organization?: string;
+  memberType?: "staff" | "pensioner";
+};
+
 function ReviewSignupDialog({
   signup,
   open,
@@ -1168,15 +1189,47 @@ function ReviewSignupDialog({
   signup: PendingSignup;
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onApprove: (s: PendingSignup, cooperativeRecordId: number | null) => void;
+  onApprove: (s: PendingSignup, cooperativeRecordId: number | null, overrides?: RecordOverrides) => void;
   onReject: (s: PendingSignup) => void;
   isApproving: boolean;
   isRejecting: boolean;
 }) {
-  const [selectedRecordId, setSelectedRecordId] = useState<number | null>(
-    signup.suggestions[0]?.recordId ?? null,
-  );
+  const firstSug = signup.suggestions[0] ?? null;
+  const [selectedRecordId, setSelectedRecordId] = useState<number | null>(firstSug?.recordId ?? null);
+  const [editFullName, setEditFullName] = useState(firstSug?.fullName ?? "");
+  const [editPhone, setEditPhone] = useState(firstSug?.phone ?? "");
+  const [editStaffId, setEditStaffId] = useState(firstSug?.staffId ?? "");
+  const [editOrganization, setEditOrganization] = useState(firstSug?.organization ?? "");
+  const [editMemberType, setEditMemberType] = useState<"staff" | "pensioner">(firstSug?.memberType ?? "staff");
+  const { data: organizations } = useListOrganizations();
   const busy = isApproving || isRejecting;
+
+  function selectRecord(recordId: number | null) {
+    setSelectedRecordId(recordId);
+    if (recordId === null) return;
+    const sug = signup.suggestions.find((s) => s.recordId === recordId);
+    if (sug) {
+      setEditFullName(sug.fullName);
+      setEditPhone(sug.phone ?? "");
+      setEditStaffId(sug.staffId ?? "");
+      setEditOrganization(sug.organization ?? "");
+      setEditMemberType(sug.memberType ?? "staff");
+    }
+  }
+
+  function handleApprove() {
+    if (selectedRecordId !== null) {
+      onApprove(signup, selectedRecordId, {
+        fullName: editFullName.trim() || undefined,
+        phone: editPhone.trim() || undefined,
+        staffId: editStaffId.trim() || undefined,
+        organization: editOrganization || undefined,
+        memberType: editMemberType,
+      });
+    } else {
+      onApprove(signup, null);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1185,26 +1238,19 @@ function ReviewSignupDialog({
           <DialogTitle>Review sign-up</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Info submitted by the member */}
           <div className="rounded-xl bg-muted/50 p-3 text-sm space-y-1">
+            <p className="text-[11px] text-muted-foreground uppercase font-medium tracking-wide mb-1">Submitted by member</p>
             <p className="font-semibold">{signup.fullName}</p>
             <p className="text-muted-foreground text-xs">{signup.pendingEmail || "—"}</p>
             <div className="flex flex-wrap gap-1.5 pt-1">
-              <Badge variant="outline" className="text-[10px] uppercase rounded-full px-2">
-                {signup.organization || "—"}
-              </Badge>
-              {signup.staffId && (
-                <Badge variant="outline" className="text-[10px] rounded-full px-2">
-                  ID {signup.staffId}
-                </Badge>
-              )}
-              {signup.phone && (
-                <Badge variant="outline" className="text-[10px] rounded-full px-2">
-                  {signup.phone}
-                </Badge>
-              )}
+              <Badge variant="outline" className="text-[10px] uppercase rounded-full px-2">{signup.organization || "—"}</Badge>
+              {signup.staffId && <Badge variant="outline" className="text-[10px] rounded-full px-2">ID {signup.staffId}</Badge>}
+              {signup.phone && <Badge variant="outline" className="text-[10px] rounded-full px-2">{signup.phone}</Badge>}
             </div>
           </div>
 
+          {/* Match selection */}
           <div>
             <p className="text-sm font-medium mb-2">Link to cooperative record</p>
             {signup.suggestions.length === 0 ? (
@@ -1218,7 +1264,7 @@ function ReviewSignupDialog({
                   <button
                     key={sug.recordId}
                     type="button"
-                    onClick={() => setSelectedRecordId(sug.recordId)}
+                    onClick={() => selectRecord(sug.recordId)}
                     className={`w-full text-left border rounded-xl p-3 transition ${
                       selectedRecordId === sug.recordId
                         ? "border-primary ring-2 ring-primary/30 bg-primary/5"
@@ -1241,6 +1287,79 @@ function ReviewSignupDialog({
             )}
           </div>
 
+          {/* Inline edit form — only visible when a match is selected */}
+          {selectedRecordId !== null && (
+            <div className="rounded-xl border border-border/70 bg-card p-3 space-y-3">
+              <p className="text-[11px] text-muted-foreground uppercase font-medium tracking-wide">
+                Edit record before approving
+              </p>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Full name</Label>
+                  <Input
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    placeholder="Full name on cooperative record"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Staff / pensioner ID</Label>
+                    <Input
+                      value={editStaffId}
+                      onChange={(e) => setEditStaffId(e.target.value)}
+                      placeholder="e.g. 1001"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Phone</Label>
+                    <Input
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="08012345678"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Organization</Label>
+                  <select
+                    value={editOrganization}
+                    onChange={(e) => setEditOrganization(e.target.value)}
+                    className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    <option value="">— select —</option>
+                    {organizations?.map((o) => (
+                      <option key={o.code} value={o.code}>{o.code} — {o.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Member type</Label>
+                  <div className="flex gap-2">
+                    {(["staff", "pensioner"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setEditMemberType(t)}
+                        className={`flex-1 border rounded-lg px-3 py-1.5 text-xs text-left transition ${
+                          editMemberType === t
+                            ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        {t === "staff" ? "Active Staff" : "Pensioner"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Approve as new member (no existing record) */}
           <label
             className={`flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 transition ${
               selectedRecordId === null
@@ -1253,7 +1372,7 @@ function ReviewSignupDialog({
               type="radio"
               className="accent-primary"
               checked={selectedRecordId === null}
-              onChange={() => setSelectedRecordId(null)}
+              onChange={() => selectRecord(null)}
             />
             Approve as a new member (zero opening balance)
           </label>
@@ -1271,7 +1390,7 @@ function ReviewSignupDialog({
             </Button>
             <Button
               className="flex-1 rounded-xl"
-              onClick={() => onApprove(signup, selectedRecordId)}
+              onClick={handleApprove}
               disabled={busy}
               data-testid="button-approve-signup"
             >

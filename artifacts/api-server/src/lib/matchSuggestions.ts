@@ -7,6 +7,8 @@ export interface MatchSuggestionDTO {
   fullName: string;
   organization: string | null;
   staffId: string | null;
+  phone: string | null;
+  memberType: "staff" | "pensioner" | null;
   confidence: "exact" | "fuzzy" | "none";
   savingsBalance: number;
   totalLoanBalance: number;
@@ -60,6 +62,8 @@ export async function computeMatchSuggestions(
     fullName: r.fullName,
     organization: r.organization,
     staffId: r.staffId,
+    phone: r.phone ?? null,
+    memberType: (r.memberType as "staff" | "pensioner" | null) ?? null,
     confidence,
     savingsBalance: includeFinancials ? parseFloat(r.savingsBalance) : 0,
     totalLoanBalance: includeFinancials ? parseFloat(r.totalLoanBalance) : 0,

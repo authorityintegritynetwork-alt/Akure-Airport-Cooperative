@@ -122,6 +122,8 @@ export const GetMatchSuggestionsResponse = zod.object({
       fullName: zod.string(),
       organization: zod.string().nullish(),
       staffId: zod.string().nullish(),
+      phone: zod.string().nullish(),
+      memberType: zod.enum(["staff", "pensioner"]).nullish(),
       confidence: zod.enum(["exact", "fuzzy", "none"]),
       savingsBalance: zod.number(),
       totalLoanBalance: zod.number(),
@@ -685,6 +687,15 @@ export const ApproveMatchParams = zod.object({
 
 export const ApproveMatchBody = zod.object({
   cooperativeRecordId: zod.number().nullish(),
+  overrides: zod
+    .object({
+      fullName: zod.string().min(1).optional(),
+      phone: zod.string().optional(),
+      staffId: zod.string().optional(),
+      organization: zod.string().optional(),
+      memberType: zod.enum(["staff", "pensioner"]).optional(),
+    })
+    .optional(),
 });
 
 export const ApproveMatchResponse = zod.object({

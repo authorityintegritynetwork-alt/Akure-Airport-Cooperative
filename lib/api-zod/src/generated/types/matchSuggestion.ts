@@ -14,6 +14,10 @@ export interface MatchSuggestion {
   organization?: string | null;
   /** @nullable */
   staffId?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  memberType?: "staff" | "pensioner" | null;
   confidence: MatchSuggestionConfidence;
   savingsBalance: number;
   totalLoanBalance: number;

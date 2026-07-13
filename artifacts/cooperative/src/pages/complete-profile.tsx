@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useUser, useClerk } from "@clerk/react";
 import {
   useRegisterMember,
   useListOrganizations,
-  useGetMatchSuggestions,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -12,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Search } from "lucide-react";
 
 export function CompleteProfilePage() {
   const { user } = useUser();
@@ -29,21 +27,6 @@ export function CompleteProfilePage() {
   const [organization, setOrganization] = useState<string>("");
 
   const { data: organizations, isLoading: orgsLoading } = useListOrganizations();
-
-  // Debounce name + org so we can preview a likely cooperative-record match
-  // without firing a request on every keystroke.
-  const [debouncedName, setDebouncedName] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedName(fullName.trim()), 400);
-    return () => clearTimeout(t);
-  }, [fullName]);
-
-  const canPreview = debouncedName.length >= 2 && !!organization;
-  const { data: matchData, isFetching: matchLoading } = useGetMatchSuggestions(
-    { fullName: debouncedName, organization },
-    { query: { enabled: canPreview, queryKey: ["matchPreview", debouncedName, organization] } },
-  );
-  const topMatch = matchData?.suggestions?.[0];
 
   const register = useRegisterMember({
     mutation: {
@@ -199,37 +182,6 @@ export function CompleteProfilePage() {
                 ))}
               </div>
             </div>
-            {canPreview && (
-              <div className="rounded-lg border border-border/70 bg-muted/40 p-3 text-sm">
-                {matchLoading ? (
-                  <p className="flex items-center gap-2 text-muted-foreground">
-                    <Search className="w-4 h-4 animate-pulse" />
-                    Checking cooperative records...
-                  </p>
-                ) : topMatch ? (
-                  <div className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-medium text-foreground">
-                        We found a likely match in our records
-                      </p>
-                      <p className="text-muted-foreground mt-0.5">
-                        {topMatch.fullName}
-                        {topMatch.organization ? ` · ${topMatch.organization}` : ""}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Your existing balances will be linked once an administrator approves your account.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">
-                    No existing cooperative record matched this name yet. You can still continue —
-                    an administrator will review your account.
-                  </p>
-                )}
-              </div>
-            )}
             <Button type="submit" className="w-full mt-2" disabled={register.isPending}>
               {register.isPending ? "Submitting..." : "Submit for approval"}
             </Button>
