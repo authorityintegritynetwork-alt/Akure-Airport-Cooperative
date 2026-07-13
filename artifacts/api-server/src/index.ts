@@ -104,10 +104,32 @@ async function runMigrations(migrationsFolder: string) {
   }
 }
 
+async function applyIdempotentPatches() {
+  // Run any DDL that must be present regardless of migration tracking state.
+  // Each statement uses IF NOT EXISTS / IF EXISTS so it is a no-op when already applied.
+  const patches = [
+    `ALTER TABLE "system_settings" ADD COLUMN IF NOT EXISTS "balances_hidden" boolean NOT NULL DEFAULT false`,
+  ];
+  for (const patch of patches) {
+    try {
+      await db.execute(sql.raw(patch));
+    } catch (err) {
+      logger.error({ err, patch }, "Idempotent patch failed");
+      process.exit(1);
+    }
+  }
+  logger.info("Idempotent schema patches applied");
+}
+
 async function bootstrap() {
   // __dirname is injected by the esbuild banner (resolves to dist/ at runtime).
   // Migration files live at lib/db/migrations/ relative to the workspace root.
   const migrationsFolder = path.resolve(__dirname, "../../../lib/db/migrations");
+
+  // Apply idempotent patches BEFORE running migrations so columns are always
+  // present even when the Drizzle tracking table believes a migration is already
+  // recorded (e.g. Koyeb's DB sharing the same tracking table as dev).
+  await applyIdempotentPatches();
 
   await runMigrations(migrationsFolder);
 
