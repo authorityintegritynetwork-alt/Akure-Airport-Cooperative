@@ -100,7 +100,7 @@ app.use("/api", (err: any, req: Request, res: Response, _next: NextFunction) => 
   });
 });
 
-const isDev = process.env.NODE_ENV !== "production";
+const isDev = process.env.NODE_ENV === "development";
 
 if (isDev) {
   const vitePort = process.env.VITE_PORT || "5173";
