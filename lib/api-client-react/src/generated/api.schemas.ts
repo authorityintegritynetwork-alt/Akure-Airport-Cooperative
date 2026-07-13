@@ -280,6 +280,9 @@ export interface MatchSuggestion {
   organization?: string | null;
   /** @nullable */
   staffId?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  memberType?: "staff" | "pensioner";
   confidence: MatchSuggestionConfidence;
   savingsBalance: number;
   totalLoanBalance: number;
@@ -309,6 +312,13 @@ export interface PendingSignup {
 export interface ApproveMatchBody {
   /** @nullable */
   cooperativeRecordId?: number | null;
+  overrides?: {
+    fullName?: string;
+    phone?: string;
+    staffId?: string;
+    organization?: string;
+    memberType?: "staff" | "pensioner";
+  };
 }
 
 export type CreateMemberBodyRole =

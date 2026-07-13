@@ -1225,7 +1225,6 @@ function ReviewSignupDialog({
 
   const { data: searchResults, isFetching: isSearching } = useSearchAllMembers(
     { q: debouncedQuery },
-    { query: { enabled: debouncedQuery.length >= 2 } },
   );
 
   const createRecord = useCreateBlankCooperativeRecord();
