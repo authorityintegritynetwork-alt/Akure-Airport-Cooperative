@@ -1205,29 +1205,74 @@ function ReviewSignupDialog({
   const [editOrganization, setEditOrganization] = useState(firstSug?.organization ?? "");
   const [editMemberType, setEditMemberType] = useState<"staff" | "pensioner">(firstSug?.memberType ?? "staff");
   const { data: organizations } = useListOrganizations();
-  const [changeMatchOpen, setChangeMatchOpen] = useState(false);
   const busy = isApproving || isRejecting;
 
-  function selectRecord(recordId: number | null) {
-    setSelectedRecordId(recordId);
-    if (recordId === null) return;
+  // Inline search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createOrg, setCreateOrg] = useState("");
+  const [createStaffId, setCreateStaffId] = useState("");
+  const [createPhone, setCreatePhone] = useState("");
+  const [createMemberType, setCreateMemberType] = useState<"staff" | "pensioner">("staff");
+  const [createError, setCreateError] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: searchResults, isFetching: isSearching } = useSearchAllMembers(
+    { q: debouncedQuery },
+    { query: { enabled: debouncedQuery.length >= 2 } },
+  );
+
+  const createRecord = useCreateBlankCooperativeRecord();
+
+  function pickRecord(id: number, name: string, phone: string, staffId: string, org: string, memberType: "staff" | "pensioner") {
+    setSelectedRecordId(id);
+    setEditFullName(name);
+    setEditPhone(phone);
+    setEditStaffId(staffId);
+    setEditOrganization(org);
+    setEditMemberType(memberType);
+  }
+
+  function selectSuggestion(recordId: number) {
     const sug = signup.suggestions.find((s) => s.recordId === recordId);
     if (sug) {
-      setEditFullName(sug.fullName);
-      setEditPhone(sug.phone ?? "");
-      setEditStaffId(sug.staffId ?? "");
-      setEditOrganization(sug.organization ?? "");
-      setEditMemberType(sug.memberType ?? "staff");
+      pickRecord(recordId, sug.fullName, sug.phone ?? "", sug.staffId ?? "", sug.organization ?? "", sug.memberType ?? "staff");
+    } else {
+      setSelectedRecordId(recordId);
     }
   }
 
-  function setRecordDirect(item: SearchAllMembersResponseItem) {
-    setSelectedRecordId(item.id);
-    setEditFullName(item.fullName);
-    setEditPhone(item.phone ?? "");
-    setEditStaffId(item.staffId ?? "");
-    setEditOrganization(item.organization ?? "");
-    setEditMemberType(item.memberType ?? "staff");
+  function selectSearchResult(item: SearchAllMembersResponseItem) {
+    pickRecord(item.id, item.fullName, item.phone ?? "", item.staffId ?? "", item.organization ?? "", item.memberType ?? "staff");
+    setSearchQuery("");
+    setDebouncedQuery("");
+  }
+
+  async function handleCreate() {
+    setCreateError("");
+    if (!createName.trim()) return;
+    try {
+      const record = await createRecord.mutateAsync({
+        data: {
+          fullName: createName.trim(),
+          organization: createOrg || undefined,
+          staffId: createStaffId.trim() || undefined,
+          phone: createPhone.trim() || undefined,
+          memberType: createMemberType,
+        },
+      });
+      pickRecord(record.id, record.fullName, record.phone ?? "", record.staffId ?? "", record.organization ?? "", record.memberType ?? "staff");
+      setShowCreateForm(false);
+      setCreateName(""); setCreateOrg(""); setCreateStaffId(""); setCreatePhone(""); setCreateMemberType("staff");
+    } catch (err: any) {
+      setCreateError(err?.message ?? "Failed to create record.");
+    }
   }
 
   function handleApprove() {
@@ -1243,6 +1288,8 @@ function ReviewSignupDialog({
       onApprove(signup, null);
     }
   }
+
+  const isSearchMode = debouncedQuery.length >= 2;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1263,51 +1310,174 @@ function ReviewSignupDialog({
             </div>
           </div>
 
-          {/* Match selection */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium">Link to cooperative record</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
-                onClick={() => setChangeMatchOpen(true)}
-              >
-                <Search className="w-3 h-3" />
-                Search all records
-              </Button>
+          {/* Match / search section */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Link to cooperative record</p>
+
+            {/* Search input — always visible */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9 h-9 text-sm"
+                placeholder="Search all records by name, ID or email…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            {signup.suggestions.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No matching cooperative records were found. You can still approve this person as a
-                new member with a zero opening balance.
-              </p>
+
+            {/* Search results (when query is active) */}
+            {isSearchMode ? (
+              isSearching ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+                </div>
+              ) : searchResults && searchResults.length > 0 ? (
+                <div className="space-y-2">
+                  {searchResults.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => selectSearchResult(r)}
+                      className={`w-full text-left border rounded-xl p-3 transition ${
+                        selectedRecordId === r.id
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm">{r.fullName}</span>
+                        {r.isLinked && (
+                          <Badge variant="outline" className="text-[10px] rounded-full px-2 text-amber-600 border-amber-400">
+                            Already linked
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {r.organization || "—"}
+                        {r.staffId ? ` · ID ${r.staffId}` : ""}
+                        {r.phone ? ` · ${r.phone}` : ""}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-3">
+                  No records found for "{debouncedQuery}"
+                </p>
+              )
             ) : (
-              <div className="space-y-2">
-                {signup.suggestions.map((sug) => (
-                  <button
-                    key={sug.recordId}
-                    type="button"
-                    onClick={() => selectRecord(sug.recordId)}
-                    className={`w-full text-left border rounded-xl p-3 transition ${
-                      selectedRecordId === sug.recordId
-                        ? "border-primary ring-2 ring-primary/30 bg-primary/5"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                    data-testid={`match-option-${sug.recordId}`}
+              /* Auto-suggestions when search is empty */
+              signup.suggestions.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No automatic matches found. Search above to link to an existing record, or approve as a new member below.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {signup.suggestions.map((sug) => (
+                    <button
+                      key={sug.recordId}
+                      type="button"
+                      onClick={() => selectSuggestion(sug.recordId)}
+                      className={`w-full text-left border rounded-xl p-3 transition ${
+                        selectedRecordId === sug.recordId
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      data-testid={`match-option-${sug.recordId}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm">{sug.fullName}</span>
+                        {confidenceBadge(sug.confidence)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {sug.organization || "—"}
+                        {sug.staffId ? ` · ID ${sug.staffId}` : ""}
+                        {" · "}{formatCurrency(sug.savingsBalance)} savings
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+
+            {/* Create new cooperative record option */}
+            {!showCreateForm ? (
+              <button
+                type="button"
+                className="w-full text-xs text-muted-foreground hover:text-foreground border border-dashed border-border/60 rounded-xl px-3 py-2 transition flex items-center gap-1.5 justify-center"
+                onClick={() => setShowCreateForm(true)}
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Create a new cooperative record
+              </button>
+            ) : (
+              <div className="rounded-xl border border-border/70 p-3 space-y-2 bg-card">
+                <p className="text-xs font-medium uppercase text-muted-foreground tracking-wide">New cooperative record</p>
+                <Input
+                  placeholder="Full name (required)"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  className="h-8 text-sm"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Staff / pensioner ID"
+                    value={createStaffId}
+                    onChange={(e) => setCreateStaffId(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                  <Input
+                    placeholder="Phone"
+                    value={createPhone}
+                    onChange={(e) => setCreatePhone(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <select
+                  value={createOrg}
+                  onChange={(e) => setCreateOrg(e.target.value)}
+                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">— Organization —</option>
+                  {organizations?.map((o) => (
+                    <option key={o.code} value={o.code}>{o.code} — {o.name}</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  {(["staff", "pensioner"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setCreateMemberType(t)}
+                      className={`flex-1 border rounded-lg px-3 py-1.5 text-xs transition ${
+                        createMemberType === t
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {t === "staff" ? "Active Staff" : "Pensioner"}
+                    </button>
+                  ))}
+                </div>
+                {createError && <p className="text-xs text-destructive">{createError}</p>}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-lg"
+                    onClick={() => { setShowCreateForm(false); setCreateError(""); }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-sm">{sug.fullName}</span>
-                      {confidenceBadge(sug.confidence)}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {sug.organization || "—"}
-                      {sug.staffId ? ` · ID ${sug.staffId}` : ""}
-                      {" · "}{formatCurrency(sug.savingsBalance)} savings
-                    </p>
-                  </button>
-                ))}
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 rounded-lg"
+                    disabled={!createName.trim() || createRecord.isPending}
+                    onClick={handleCreate}
+                  >
+                    {createRecord.isPending ? "Creating…" : "Create & select"}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -1397,7 +1567,7 @@ function ReviewSignupDialog({
               type="radio"
               className="accent-primary"
               checked={selectedRecordId === null}
-              onChange={() => selectRecord(null)}
+              onChange={() => { setSelectedRecordId(null); setSearchQuery(""); setDebouncedQuery(""); }}
             />
             Approve as a new member (zero opening balance)
           </label>
@@ -1425,11 +1595,6 @@ function ReviewSignupDialog({
           </div>
         </div>
       </DialogContent>
-      <ChangeMatchSheet
-        open={changeMatchOpen}
-        onOpenChange={setChangeMatchOpen}
-        onSelect={setRecordDirect}
-      />
     </Dialog>
   );
 }
