@@ -46,6 +46,29 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
+  // Email-based fallback: look up by the email address on the Clerk account.
+  // This handles existing/imported members whose clerk_user_id was set for a
+  // different Clerk instance (dev → prod migration) or was never set at all.
+  // If found, auto-link the current Clerk user ID so subsequent logins are fast.
+  const clerkUser = await getClerkUser(userId);
+  if (clerkUser?.emailAddress) {
+    const [byEmail] = await db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.email, clerkUser.emailAddress));
+
+    if (byEmail && byEmail.status === "active") {
+      // Link this Clerk user ID to the member record permanently.
+      await db
+        .update(membersTable)
+        .set({ clerkUserId: userId })
+        .where(eq(membersTable.id, byEmail.id));
+
+      res.json(formatMember({ ...byEmail, clerkUserId: userId }));
+      return;
+    }
+  }
+
   res.status(404).json({ error: "Member not found" });
 });
 
