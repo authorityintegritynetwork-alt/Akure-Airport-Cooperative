@@ -1,10 +1,14 @@
-import { SignInButton, SignUpButton, useClerk } from "@clerk/react";
+import { useClerk } from "@clerk/react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, ShieldCheck, TrendingUp, Users, CheckCircle2, Sparkles, LogOut } from "lucide-react";
 import logoUrl from "@assets/aacs-logo_1776751208467.png";
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export function LandingPage() {
+  const [, setLocation] = useLocation();
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
       <header className="px-6 lg:px-12 py-5 flex items-center justify-between border-b border-border/60 backdrop-blur-sm sticky top-0 bg-background/80 z-10">
@@ -15,12 +19,8 @@ export function LandingPage() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <SignInButton mode="modal">
-            <Button variant="ghost" size="sm">Sign In</Button>
-          </SignInButton>
-          <SignUpButton mode="modal">
-            <Button size="sm" className="shadow-sm">Get Started</Button>
-          </SignUpButton>
+          <Button variant="ghost" size="sm" onClick={() => setLocation("/sign-in")}>Sign In</Button>
+          <Button size="sm" className="shadow-sm" onClick={() => setLocation("/sign-up")}>Get Started</Button>
         </div>
       </header>
 
@@ -42,17 +42,13 @@ export function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <SignUpButton mode="modal">
-                <Button size="lg" className="text-base px-7 shadow-md group">
-                  Join the Cooperative
-                  <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
-                </Button>
-              </SignUpButton>
-              <SignInButton mode="modal">
-                <Button variant="outline" size="lg" className="text-base px-7">
-                  Member Sign In
-                </Button>
-              </SignInButton>
+              <Button size="lg" className="text-base px-7 shadow-md group" onClick={() => setLocation("/sign-up")}>
+                Join the Cooperative
+                <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </Button>
+              <Button variant="outline" size="lg" className="text-base px-7" onClick={() => setLocation("/sign-in")}>
+                Member Sign In
+              </Button>
             </div>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
@@ -124,12 +120,10 @@ export function LandingPage() {
               <p className="text-sidebar-foreground/70 max-w-xl mx-auto mb-7">
                 Join hundreds of airport staff already building wealth together.
               </p>
-              <SignUpButton mode="modal">
-                <Button size="lg" variant="secondary" className="text-base px-7 shadow-lg">
-                  Create Your Account
-                  <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </SignUpButton>
+              <Button size="lg" variant="secondary" className="text-base px-7 shadow-lg" onClick={() => setLocation("/sign-up")}>
+                Create Your Account
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
           </div>
         </section>
