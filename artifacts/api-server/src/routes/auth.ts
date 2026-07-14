@@ -5,10 +5,31 @@ import { eq, and, isNotNull, isNull } from "drizzle-orm";
 import { AuthRequest } from "../middlewares/auth";
 import { RegisterMemberBody } from "@workspace/api-zod";
 import { getClerkUser } from "../lib/clerk";
-import { formatMember } from "../lib/formatMember";
+import { formatMember, maskMemberBalances } from "../lib/formatMember";
 import { computeMatchSuggestions } from "../lib/matchSuggestions";
+import { systemSettingsTable } from "@workspace/db";
 
 const router: IRouter = Router();
+
+/** Return true when the super-admin has enabled balance hiding. */
+async function isBalancesHidden(): Promise<boolean> {
+  const [s] = await db.select().from(systemSettingsTable);
+  return s?.balancesHidden === true;
+}
+
+/**
+ * Apply maskMemberBalances only when the setting is on AND the member is a
+ * regular member (staff always see real figures).
+ */
+function maybeHide<T extends ReturnType<typeof formatMember>>(
+  formatted: T,
+  hidden: boolean,
+): T {
+  if (hidden && formatted.role === "member") {
+    return maskMemberBalances(formatted);
+  }
+  return formatted;
+}
 
 router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
   const auth = getAuth(req);
@@ -18,6 +39,8 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
     return;
   }
 
+  const hidden = await isBalancesHidden();
+
   // An active app account has its clerkUserId set.
   const [member] = await db
     .select()
@@ -25,7 +48,7 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
     .where(eq(membersTable.clerkUserId, userId));
 
   if (member) {
-    res.json(formatMember(member));
+    res.json(maybeHide(formatMember(member), hidden));
     return;
   }
 
@@ -39,7 +62,7 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
 
   if (pending) {
     res.json({
-      ...formatMember(pending),
+      ...maybeHide(formatMember(pending), hidden),
       clerkUserId: pending.clerkUserId ?? pending.pendingClerkUserId,
       status: "pending",
     });
@@ -64,7 +87,7 @@ router.get("/auth/profile", async (req: AuthRequest, res): Promise<void> => {
         .set({ clerkUserId: userId })
         .where(eq(membersTable.id, byEmail.id));
 
-      res.json(formatMember({ ...byEmail, clerkUserId: userId }));
+      res.json(maybeHide(formatMember({ ...byEmail, clerkUserId: userId }), hidden));
       return;
     }
   }
