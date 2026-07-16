@@ -536,6 +536,13 @@ export function computeDeductionSplit(
   return split;
 }
 
+/** Read a workbook directly from a local filesystem path (batch-processing use). */
+export async function readLocalWorkbook(filePath: string): Promise<xlsx.WorkBook> {
+  const { readFile } = await import("fs/promises");
+  const buf = await readFile(filePath);
+  return xlsx.read(buf, { type: "buffer" });
+}
+
 export async function downloadWorkbook(fileObjectPath: string): Promise<xlsx.WorkBook> {
   if (fileObjectPath.startsWith("/tmp/")) {
     const { readFile } = await import("fs/promises");
@@ -553,8 +560,10 @@ export async function downloadWorkbook(fileObjectPath: string): Promise<xlsx.Wor
 
 export interface CategoryConfig {
   txType:
+    | "shares"
     | "savings"
     | "provident"
+    | "provident_loan_repayment"
     | "christmas"
     | "real_loan_repayment"
     | "emergency_loan_repayment"

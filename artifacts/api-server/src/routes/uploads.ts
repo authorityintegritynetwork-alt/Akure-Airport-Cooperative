@@ -23,6 +23,7 @@ import {
   CATEGORY_CONFIG,
   DeductionCategory,
   downloadWorkbook,
+  readLocalWorkbook,
   parseSheet,
   ParsedRow,
   summarizeSheets,
@@ -1212,5 +1213,11 @@ async function processPayroll(
     openingBalancesFlagged: openingFlagged,
   });
 }
+
+// NOTE: A one-time batch-process script lives at scripts/batch-process.ts.
+// It was used to apply Jan 2026 and Apr 2026 FAAN/NAMA deductions from
+// attached_assets. Run it again if additional historical months need to be
+// loaded: rebuild with the same esbuild call in scripts/, update JOBS[], then
+// `node scripts/batch-process.mjs`.
 
 export default router;
