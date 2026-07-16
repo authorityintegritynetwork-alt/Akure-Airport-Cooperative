@@ -109,6 +109,11 @@ async function applyIdempotentPatches() {
   // Each statement uses IF NOT EXISTS / IF EXISTS so it is a no-op when already applied.
   const patches = [
     `ALTER TABLE "system_settings" ADD COLUMN IF NOT EXISTS "balances_hidden" boolean NOT NULL DEFAULT false`,
+    // shares_balance / ob_shares_balance were added to the schema but may not
+    // yet exist in older DB instances — safe to add idempotently.
+    `ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "shares_balance" numeric(15,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "ob_shares_balance" numeric(15,2)`,
+    `ALTER TABLE "opening_balances" ADD COLUMN IF NOT EXISTS "shares_balance" numeric(15,2) NOT NULL DEFAULT 0`,
   ];
   for (const patch of patches) {
     try {

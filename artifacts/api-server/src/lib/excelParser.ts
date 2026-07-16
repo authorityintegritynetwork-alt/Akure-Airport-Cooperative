@@ -2,6 +2,7 @@ import xlsx from "xlsx";
 import { ObjectStorageService } from "./objectStorage";
 
 export type DeductionCategory =
+  | "shares"
   | "savings"
   | "provident"
   | "christmas"
@@ -17,6 +18,7 @@ export type DeductionCategory =
   | "landLoan";
 
 export const ALL_CATEGORIES: DeductionCategory[] = [
+  "shares",
   "savings",
   "provident",
   "christmas",
@@ -38,7 +40,12 @@ export type Organization = "faan" | "nama";
 // categories. Columns the org does not use are simply left blank. The
 // `furniture` legacy bucket is intentionally omitted — no current spreadsheet
 // uses it, the DB column is being phased out.
+// `shares` is an opening-balance-only column (capital contribution) — included
+// here so the opening-balances parser picks it up from the October balances
+// sheet. Monthly deduction sheets never carry a SHARES column, so amounts.shares
+// will always be 0 in the deduction context and is harmlessly skipped.
 const UNIFIED_CATEGORIES: DeductionCategory[] = [
+  "shares",
   "savings",
   "provident",
   "christmas",
@@ -59,6 +66,7 @@ export const ORG_CATEGORIES: Record<Organization, DeductionCategory[]> = {
 };
 
 const HEADER_ALIASES: Record<DeductionCategory, string[]> = {
+  shares: ["shares", "share", "share capital", "shares capital"],
   savings: ["savings", "saving"],
   provident: ["prov", "prov.", "provident"],
   christmas: ["xmass", "xmas", "christmas"],
@@ -565,8 +573,12 @@ export interface CategoryConfig {
 }
 
 export const CATEGORY_CONFIG: Record<DeductionCategory, CategoryConfig> = {
+  // Share capital — opening-balance-only; never appears in monthly deductions.
+  shares: { txType: "shares", balanceField: "sharesBalance", direction: "credit", label: "Share Capital" },
   savings: { txType: "savings", balanceField: "savingsBalance", direction: "credit", label: "Savings" },
-  provident: { txType: "provident", balanceField: "providentBalance", direction: "credit", label: "Provision" },
+  // Provident is a LOAN (members borrow, then repay monthly). Direction is
+  // "debit" — each PROV deduction reduces the outstanding providentBalance.
+  provident: { txType: "provident_loan_repayment", balanceField: "providentBalance", direction: "debit", label: "Provision Loan Repayment" },
   christmas: { txType: "christmas", balanceField: "christmasBalance", direction: "credit", label: "Christmas Savings" },
   realLoan: { txType: "real_loan_repayment", balanceField: "realLoanBalance", direction: "debit", label: "Real Loan Repayment", loanStatus: "real" },
   emergencyLoan: { txType: "emergency_loan_repayment", balanceField: "emergencyLoanBalance", direction: "debit", label: "Emergency Loan Repayment", loanStatus: "emergency" },

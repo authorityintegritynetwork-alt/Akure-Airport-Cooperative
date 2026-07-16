@@ -45,8 +45,9 @@ export const OPENING_BALANCE_FIELDS: Array<{
   category: string;
   label: string;
 }> = [
+  { field: "sharesBalance", category: "shares", label: "Share Capital" },
   { field: "savingsBalance", category: "savings", label: "Savings" },
-  { field: "providentBalance", category: "provident", label: "Provision" },
+  { field: "providentBalance", category: "provident", label: "Provision Loan" },
   { field: "christmasBalance", category: "christmas", label: "Christmas Savings" },
   { field: "realLoanBalance", category: "realLoan", label: "Real Loan" },
   { field: "emergencyLoanBalance", category: "emergencyLoan", label: "Emergency Loan" },
@@ -63,6 +64,7 @@ export const OPENING_BALANCE_FIELDS: Array<{
 function formatOpeningBalance(o: OpeningBalance) {
   return {
     ...o,
+    sharesBalance: parseFloat(o.sharesBalance),
     savingsBalance: parseFloat(o.savingsBalance),
     providentBalance: parseFloat(o.providentBalance),
     christmasBalance: parseFloat(o.christmasBalance),
@@ -313,6 +315,7 @@ const ObUploadProcessBody = z.object({
 
 // Helper: compute all balance values from parsed row amounts
 function computeObValues(row: { amounts: Record<string, number> }) {
+  const sharesBalance = row.amounts.shares ?? 0;
   const savingsBalance = row.amounts.savings ?? 0;
   const providentBalance = row.amounts.provident ?? 0;
   const christmasBalance = row.amounts.christmas ?? 0;
@@ -329,6 +332,7 @@ function computeObValues(row: { amounts: Record<string, number> }) {
   const fuelVentureBalance = row.amounts.fuelVenture ?? 0;
   const landLoanBalance = row.amounts.landLoan ?? 0;
   return {
+    sharesBalance,
     savingsBalance, providentBalance, christmasBalance,
     realLoanBalance, emergencyLoanBalance, totalLoanBalance,
     electronicsDebt, sElectronicsDebt, furnitureDebt,
@@ -465,6 +469,7 @@ router.post(
             fullName: name,
             organization: org,
             status: "unclaimed",
+            sharesBalance: vals.sharesBalance.toString(),
             savingsBalance: vals.savingsBalance.toString(),
             providentBalance: vals.providentBalance.toString(),
             christmasBalance: vals.christmasBalance.toString(),
@@ -489,6 +494,7 @@ router.post(
             await tx
               .update(membersTable)
               .set({
+                obSharesBalance: vals.sharesBalance.toString(),
                 obSavingsBalance: vals.savingsBalance.toString(),
                 obProvidentBalance: vals.providentBalance.toString(),
                 obChristmasBalance: vals.christmasBalance.toString(),

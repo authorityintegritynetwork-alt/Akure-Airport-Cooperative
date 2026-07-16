@@ -965,11 +965,14 @@ const MONTH_ORDER: Record<string, number> = {
 };
 
 const SAVINGS_CREDIT_TYPES = new Set([
-  "savings", "provident", "christmas", "fire",
+  "savings", "christmas", "fire", "shares",
 ]);
 const LOAN_DEBIT_TYPES = new Set([
   "real_loan_repayment", "emergency_loan_repayment", "loan_repayment",
   "fuel_venture_repayment", "land_loan_repayment",
+  // Provident is a loan repayment — deducted monthly to reduce an outstanding
+  // provident loan balance, not a savings contribution.
+  "provident_loan_repayment",
 ]);
 const STORE_DEBIT_TYPES = new Set([
   "electronics_repayment", "s_electronics_repayment", "furniture_repayment",
@@ -977,8 +980,13 @@ const STORE_DEBIT_TYPES = new Set([
 ]);
 
 const TX_LABELS: Record<string, string> = {
-  savings: "Savings", provident: "Provident", christmas: "Christmas",
-  fire: "Fire Fund", real_loan_repayment: "Real Loan Repayment",
+  shares: "Share Capital",
+  savings: "Savings", christmas: "Christmas",
+  fire: "Fire Fund",
+  provident_loan_repayment: "Provision Loan Repayment",
+  // Legacy txType kept for any historical rows recorded before the direction fix
+  provident: "Provision Loan Repayment",
+  real_loan_repayment: "Real Loan Repayment",
   emergency_loan_repayment: "Emergency Loan Repayment",
   loan_repayment: "Loan Repayment",
   fuel_venture_repayment: "Fuel Venture Repayment",
@@ -1016,22 +1024,22 @@ router.get(
       v == null ? 0 : parseFloat(v) || 0;
 
     const opening = {
+      // Provident is a loan (repaid monthly), not savings — exclude from
+      // savings total and add to loans so the timeline stays accurate.
       savings:
         num(member.obSavingsBalance) +
-        num(member.obProvidentBalance) +
         num(member.obChristmasBalance) +
         num(member.obFireFundBalance),
-      loan: num(member.obTotalLoanBalance),
+      loan: num(member.obTotalLoanBalance) + num(member.obProvidentBalance),
       store: num(member.obTotalStoreDebt),
     };
 
     const current = {
       savings:
         num(member.savingsBalance) +
-        num(member.providentBalance) +
         num(member.christmasBalance) +
         num(member.fireFundBalance),
-      loan: num(member.totalLoanBalance),
+      loan: num(member.totalLoanBalance) + num(member.providentBalance),
       store: num(member.totalStoreDebt),
     };
 

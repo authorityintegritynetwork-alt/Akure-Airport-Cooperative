@@ -2,7 +2,7 @@ import { useGetMySavings, useGetProfile, useListMyTransactions, getListMyTransac
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Wallet, TrendingUp, Calendar, BookOpen } from "lucide-react";
+import { Wallet, TrendingUp, Calendar, BookOpen, Landmark } from "lucide-react";
 import { useBalancesHidden } from "@/hooks/use-balances-hidden";
 
 export function MySavingsPage() {
@@ -15,6 +15,7 @@ export function MySavingsPage() {
   const hidden = useBalancesHidden();
 
   const bookSavings = profile?.obSavingsBalance != null ? Number(profile.obSavingsBalance) : null;
+  const shareCapital = profile?.sharesBalance != null ? Number(profile.sharesBalance) : 0;
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -58,15 +59,26 @@ export function MySavingsPage() {
             </div>
           </div>
 
-          {bookSavings != null && !hidden && (
-            <div className="relative mt-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3 flex items-center gap-3">
-              <BookOpen className="w-4 h-4 shrink-0 text-white/80" />
-              <div>
-                <p className="text-[10px] text-white/70 uppercase tracking-wide font-semibold">Book Balance</p>
-                <p className="text-base font-bold tabular-nums">{formatCurrency(bookSavings)}</p>
+          <div className="relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {bookSavings != null && !hidden && (
+              <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3 flex items-center gap-3">
+                <BookOpen className="w-4 h-4 shrink-0 text-white/80" />
+                <div>
+                  <p className="text-[10px] text-white/70 uppercase tracking-wide font-semibold">Book Balance</p>
+                  <p className="text-base font-bold tabular-nums">{formatCurrency(bookSavings)}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            {shareCapital > 0 && (
+              <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3 flex items-center gap-3">
+                <Landmark className="w-4 h-4 shrink-0 text-white/80" />
+                <div>
+                  <p className="text-[10px] text-white/70 uppercase tracking-wide font-semibold">Share Capital</p>
+                  <p className="text-base font-bold tabular-nums">{hidden ? "—" : formatCurrency(shareCapital)}</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -70,6 +70,7 @@ type Org = "faan" | "nama";
 type BalanceCardCfg = BalanceCard & { hideWhenZeroFor?: Org[] };
 
 const BALANCE_CARDS: BalanceCardCfg[] = [
+  { key: "sharesBalance", label: "Share Capital", direction: "credit" },
   { key: "savingsBalance", label: "Savings", direction: "credit" },
   { key: "christmasBalance", label: "Christmas", direction: "credit", hideWhenZeroFor: ["nama"] },
   { key: "fireFundBalance", label: "Fire Fund", direction: "credit", hideWhenZeroFor: ["nama"] },
@@ -503,10 +504,10 @@ function MemberDashboard({ profile }: { profile: any }) {
     return !c.hideWhenZeroFor?.includes(org);
   });
 
-  // Total Savings = Savings + Christmas. Provision is a loan, not savings.
-  // Christmas is always included; for orgs that don't run a Christmas pool
-  // (e.g. NAMA today) the balance is just zero so the math is unchanged.
-  // Shares will be added here once the field is plumbed through.
+  // Total Savings = Savings + Christmas. Provision is a loan (debit), not
+  // savings. Christmas is always included; for orgs that don't run a Christmas
+  // pool (e.g. NAMA today) the balance is just zero so the math is unchanged.
+  // Share capital is shown separately in the breakdown cards, not here.
   const totalSavings =
     (summary.savingsBalance ?? 0) + (summary.christmasBalance ?? 0);
 
