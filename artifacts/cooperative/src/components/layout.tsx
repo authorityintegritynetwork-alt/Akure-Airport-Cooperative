@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, FileSpreadsheet, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, CalendarRange } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, BookOpen, Upload, Archive, History } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -97,23 +97,49 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarGroup>
 
             {isAdmin && (
-              <SidebarGroup>
-                <SidebarGroupLabel>Administration</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {navItem("/members", <Users className="w-4 h-4" />, "Members")}
-                    {navItem("/opening-balances", <Wallet className="w-4 h-4" />, "Opening Balances")}
-                    {navItem("/loans", <CreditCard className="w-4 h-4" />, "All Loans")}
-                    {navItem("/upload", <FileSpreadsheet className="w-4 h-4" />, "Upload Deductions")}
-                    {navItem("/uploaded-months", <CalendarRange className="w-4 h-4" />, "Uploaded Months")}
-                    {navItem("/store-admin", <ShoppingCart className="w-4 h-4" />, "Store Admin")}
-                    {navItem("/organizations", <Building2 className="w-4 h-4" />, "Organizations")}
-                    {navItem("/cooperative-records", <FileSpreadsheet className="w-4 h-4" />, "Cooperative Records")}
-                    {navItem("/announcements", <Megaphone className="w-4 h-4" />, "Announcements")}
-                    {navItem("/support-admin", <Headphones className="w-4 h-4" />, "Support Queue")}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
+              <>
+                <SidebarGroup>
+                  <SidebarGroupLabel>Members & Finance</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {navItem("/members", <Users className="w-4 h-4" />, "Members")}
+                      {navItem("/opening-balances", <BookOpen className="w-4 h-4" />, "Opening Balances")}
+                      {navItem("/loans", <CreditCard className="w-4 h-4" />, "Loans")}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                  <SidebarGroupLabel>Uploads</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {navItem("/upload", <Upload className="w-4 h-4" />, "Upload Deductions")}
+                      {navItem("/upload-history", <History className="w-4 h-4" />, "Upload History")}
+                      {navItem("/cooperative-records", <Archive className="w-4 h-4" />, "Cooperative Records")}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                  <SidebarGroupLabel>Commerce</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {navItem("/store-admin", <ShoppingCart className="w-4 h-4" />, "Store Admin")}
+                      {navItem("/organizations", <Building2 className="w-4 h-4" />, "Organizations")}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                  <SidebarGroupLabel>Communications</SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {navItem("/announcements", <Megaphone className="w-4 h-4" />, "Announcements")}
+                      {navItem("/support-admin", <Headphones className="w-4 h-4" />, "Support Queue")}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </>
             )}
 
             {isSuperAdmin && (
