@@ -41,10 +41,14 @@ async function downloadPdfBuffer(fileObjectPath: string): Promise<Buffer> {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const EMP_ID_RE = /^Emp-\d+$/;
+// Case-insensitive: handles both "Emp-03506" (standard) and "EMP-06070" (newer entries)
+const EMP_ID_RE = /^[Ee][Mm][Pp]-\d+$/;
 
 function parseAmount(raw: string): number {
-  return parseFloat(raw.replace(/,/g, "").trim()) || 0;
+  // "-" (dash) appears in the PDF when a member's amount is nil — treat as 0.
+  const cleaned = raw.replace(/,/g, "").trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
 }
 
 /** Canonical employee-number key for duplicate detection (strips "Emp-" prefix and leading zeros). */
@@ -75,8 +79,8 @@ export async function parsePdfRoster(
   let rowNumber = 0;
 
   for (const line of lines) {
-    if (!line.includes("\t")) continue;           // skip non-tabular lines fast
-    if (!line.includes("Emp-")) continue;         // skip non-data lines fast
+    if (!line.includes("\t")) continue;                    // skip non-tabular lines fast
+    if (!/[Ee][Mm][Pp]-\d/.test(line)) continue;          // skip non-data lines fast (case-insensitive)
 
     const tabs = line.split("\t");
 
