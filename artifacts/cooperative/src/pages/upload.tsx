@@ -8,7 +8,7 @@ import {
   useListOrganizations,
   getListUploadHistoryQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,9 @@ import {
   Pencil,
   Undo2,
   UserX,
+  ListChecks,
+  Link2,
+  Ban,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -171,6 +174,8 @@ export function UploadPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [selectedOrgCode, setSelectedOrgCode] = useState<string>("");
   const [organization, setOrganization] = useState<string>("");
+  const [uploadType, setUploadType] = useState<"standalone" | "payroll_summary" | "category_breakdown">("standalone");
+  const [linkedPayrollUploadId, setLinkedPayrollUploadId] = useState<number | null>(null);
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean; detectedMonth?: string; detectedYear?: number }[]>([]);
@@ -197,6 +202,29 @@ export function UploadPage() {
     }
   }, [orgList, selectedOrgCode]);
 
+  // Reset upload type when org changes — "none" orgs are always standalone.
+  const selectedOrg = (orgList ?? []).find((o) => o.code === selectedOrgCode);
+  const isDualUploadOrg = selectedOrg != null && selectedOrg.excelFormat !== "none";
+  useEffect(() => {
+    if (!isDualUploadOrg) {
+      setUploadType("standalone");
+      setLinkedPayrollUploadId(null);
+    }
+  }, [isDualUploadOrg]);
+
+  // Fetch available payroll-summary rosters when Cooperative Archive is selected.
+  const { data: rostersData } = useQuery({
+    queryKey: ["payroll-rosters", selectedOrgCode, month, year],
+    queryFn: async () => {
+      const res = await fetch(
+        `${basePath}/api/uploads/payroll-rosters?month=${encodeURIComponent(month)}&year=${year}&organization=${encodeURIComponent(selectedOrgCode)}`,
+      );
+      if (!res.ok) throw new Error("Failed to fetch rosters");
+      return res.json() as Promise<{ rosters: { id: number; month: string; year: number; organization: string; rosterSize: number; createdAt: string }[] }>;
+    },
+    enabled: uploadType === "category_breakdown" && !!selectedOrgCode,
+  });
+
   const memberOptions = useMemo(
     () =>
       (members || [])
@@ -216,6 +244,8 @@ export function UploadPage() {
     setManualMatches({});
     setRejectedRows({});
     setAcknowledgeMismatch(false);
+    setUploadType("standalone");
+    setLinkedPayrollUploadId(null);
   }
 
   async function handleUpload() {
@@ -277,6 +307,7 @@ export function UploadPage() {
           month,
           year,
           organization,
+          uploadType,
           manualMatches: Object.entries(manual).map(([rowNumber, memberId]) => ({
             rowNumber: Number(rowNumber),
             memberId,
@@ -350,6 +381,8 @@ export function UploadPage() {
         month,
         year,
         organization,
+        uploadType,
+        linkedPayrollUploadId: linkedPayrollUploadId ?? undefined,
         acknowledgeMismatch: acknowledgeMismatch || undefined,
         manualMatches: Object.entries(manualMatches).map(([rowNumber, memberId]) => ({
           rowNumber: Number(rowNumber),
@@ -357,14 +390,23 @@ export function UploadPage() {
         })),
         rejectedRows: Object.keys(rejectedRows).map(Number),
       });
-      const parts: string[] = [];
-      if ((result.processed ?? 0) > 0) parts.push(`${result.processed} matched`);
-      if ((result.autoCreated ?? 0) > 0) parts.push(`${result.autoCreated} auto-created`);
-      if ((result.skipped ?? 0) > 0) parts.push(`${result.skipped} skipped`);
-      toast({
-        title: "Upload processed",
-        description: parts.join(", ") + " members.",
-      });
+
+      if (result.uploadType === "payroll_summary") {
+        toast({
+          title: "Payroll roster saved",
+          description: `Active member roster for ${month} ${year} captured — ${result.processed ?? 0} members. No transactions created. Upload the cooperative archive next.`,
+        });
+      } else {
+        const parts: string[] = [];
+        if ((result.processed ?? 0) > 0) parts.push(`${result.processed} matched`);
+        if ((result.autoCreated ?? 0) > 0) parts.push(`${result.autoCreated} auto-created`);
+        if ((result.skipped ?? 0) > 0) parts.push(`${result.skipped} skipped`);
+        if ((result.rosterSkipped ?? 0) > 0) parts.push(`${result.rosterSkipped} roster-skipped`);
+        toast({
+          title: "Upload processed",
+          description: parts.join(", ") + " members.",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: getListUploadHistoryQueryKey() });
       reset();
     } catch (err: any) {
@@ -468,6 +510,70 @@ export function UploadPage() {
                 Pick the employer this spreadsheet is from.
               </p>
             </div>
+
+            {/* Upload type — only shown for orgs that have a payroll sheet */}
+            {isDualUploadOrg && (
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Upload Type</label>
+                <div className="flex flex-col sm:flex-row gap-2 mt-1.5">
+                  {([
+                    { value: "standalone", label: "Standalone", icon: <Upload className="w-3.5 h-3.5" />, desc: "Direct upload — processes transactions immediately." },
+                    { value: "payroll_summary", label: "Payroll Roster", icon: <ListChecks className="w-3.5 h-3.5" />, desc: "Head-office payroll sheet — saves active member list, no transactions." },
+                    { value: "category_breakdown", label: "Cooperative Archive", icon: <Link2 className="w-3.5 h-3.5" />, desc: "Cooperative deduction sheet — linked to a payroll roster; absent members are skipped." },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setUploadType(opt.value); setLinkedPayrollUploadId(null); }}
+                      className={`flex-1 text-left border rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                        uploadType === opt.value
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background hover:bg-muted border-border/60"
+                      }`}
+                      data-testid={`upload-type-${opt.value}`}
+                    >
+                      <div className="flex items-center gap-1.5 font-semibold">{opt.icon}{opt.label}</div>
+                      <p className={`text-[11px] mt-0.5 leading-snug ${uploadType === opt.value ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                        {opt.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Roster picker — only for Cooperative Archive mode */}
+            {uploadType === "category_breakdown" && (
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Link to Payroll Roster *
+                </label>
+                {(rostersData?.rosters ?? []).length === 0 ? (
+                  <div className="mt-1.5 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      No payroll roster found for <strong>{selectedOrgCode} — {month} {year}</strong>.
+                      Upload a <strong>Payroll Roster</strong> for this period first, then come back to upload the cooperative archive.
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full mt-1.5 border border-input rounded-xl px-3 py-2 text-sm bg-background h-10"
+                    value={linkedPayrollUploadId ?? ""}
+                    onChange={(e) => setLinkedPayrollUploadId(e.target.value ? Number(e.target.value) : null)}
+                    data-testid="select-linked-roster"
+                  >
+                    <option value="">— Select a payroll roster —</option>
+                    {(rostersData?.rosters ?? []).map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.month} {r.year} · {r.rosterSize} active members · uploaded {new Date(r.createdAt).toLocaleDateString()}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Month</label>
@@ -505,12 +611,19 @@ export function UploadPage() {
 
             <Button
               onClick={handleUpload}
-              disabled={!file || !organization || uploading || listSheets.isPending}
+              disabled={
+                !file || !organization || uploading || listSheets.isPending ||
+                (uploadType === "category_breakdown" && !linkedPayrollUploadId)
+              }
               className="w-full rounded-xl h-11"
               data-testid="button-upload-preview"
             >
               <Upload className="w-4 h-4 mr-2" />
-              {uploading || listSheets.isPending ? "Uploading..." : "Upload & Continue"}
+              {uploading || listSheets.isPending
+                ? "Uploading..."
+                : uploadType === "category_breakdown" && !linkedPayrollUploadId
+                ? "Select a payroll roster to continue"
+                : "Upload & Continue"}
             </Button>
           </CardContent>
         </Card>
@@ -651,22 +764,55 @@ export function UploadPage() {
                 })()}
               </div>
               <div className="flex flex-wrap gap-1.5 justify-end">
-                <Badge className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" variant="outline">
-                  {previewData.matchedRows} matched
-                </Badge>
-                {previewData.unmatchedRows > 0 && (
-                  <Badge className="rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20" variant="outline">
-                    {previewData.unmatchedRows} unmatched
+                {uploadType === "payroll_summary" ? (
+                  <Badge className="rounded-full bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20" variant="outline">
+                    {previewData.totalRows} roster members
                   </Badge>
-                )}
-                {previewData.errorRows > 0 && (
-                  <Badge className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20" variant="outline">
-                    {previewData.errorRows} errors
-                  </Badge>
+                ) : (
+                  <>
+                    <Badge className="rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" variant="outline">
+                      {previewData.matchedRows} matched
+                    </Badge>
+                    {previewData.unmatchedRows > 0 && (
+                      <Badge className="rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20" variant="outline">
+                        {previewData.unmatchedRows} unmatched
+                      </Badge>
+                    )}
+                    {previewData.errorRows > 0 && (
+                      <Badge className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20" variant="outline">
+                        {previewData.errorRows} errors
+                      </Badge>
+                    )}
+                    {(previewData.rows ?? []).filter((r: any) => r.rosterStatus === "absent").length > 0 && (
+                      <Badge className="rounded-full bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20" variant="outline">
+                        {previewData.rows.filter((r: any) => r.rosterStatus === "absent").length} roster-skipped
+                      </Badge>
+                    )}
+                  </>
                 )}
               </div>
             </div>
-            {previewData.format === "payroll" && (
+            {/* Payroll roster mode — no transactions, just roster capture */}
+            {uploadType === "payroll_summary" && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-sky-800 dark:text-sky-200 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 rounded-xl p-3" data-testid="payroll-roster-banner">
+                <ListChecks className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Payroll Roster mode.</strong> This upload will save the active member list for {month} {year} — no transactions will be created.
+                  Upload the cooperative archive sheet next and link it to this roster to process deductions.
+                </span>
+              </div>
+            )}
+            {/* Cooperative Archive mode — roster-gated */}
+            {uploadType === "category_breakdown" && previewData.rosterGated && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-sky-800 dark:text-sky-200 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 rounded-xl p-3" data-testid="roster-gated-banner">
+                <Link2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Cooperative Archive — roster gate active.</strong> Members not on the linked payroll roster will be skipped automatically
+                  (shown as <span className="font-medium">Roster skip</span> below).
+                </span>
+              </div>
+            )}
+            {previewData.format === "payroll" && uploadType !== "payroll_summary" && (
               <div className="mt-3 flex items-start gap-2 text-xs text-sky-800 dark:text-sky-200 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/30 rounded-xl p-3" data-testid="payroll-format-banner">
                 <FileSpreadsheet className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
@@ -900,7 +1046,11 @@ export function UploadPage() {
                           </>
                         )}
                         <td className="p-2 text-center">
-                          {isUnmatched ? (
+                          {row.rosterStatus === "absent" ? (
+                            <span title="Not on active payroll roster — will be skipped">
+                              <Ban className="w-4 h-4 text-slate-400 mx-auto" />
+                            </span>
+                          ) : isUnmatched ? (
                             <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" />
                           ) : (
                             <CheckCircle className="w-4 h-4 text-primary mx-auto" />
@@ -919,7 +1069,7 @@ export function UploadPage() {
                 disabled={
                   process.isPending ||
                   previewData.hasDuplicateNames ||
-                  (previewData.format === "payroll" && previewData.errorRows > 0) ||
+                  (previewData.format === "payroll" && previewData.errorRows > 0 && uploadType !== "payroll_summary") ||
                   (previewData.hasMismatchedTotals && !acknowledgeMismatch)
                 }
                 className="rounded-xl flex-1 min-w-[200px] h-11"
@@ -929,10 +1079,12 @@ export function UploadPage() {
                   ? "Processing..."
                   : previewData.hasDuplicateNames
                   ? "Fix duplicate names to continue"
-                  : previewData.format === "payroll" && previewData.errorRows > 0
+                  : previewData.format === "payroll" && previewData.errorRows > 0 && uploadType !== "payroll_summary"
                   ? "Fix errors in the sheet to continue"
                   : previewData.hasMismatchedTotals && !acknowledgeMismatch
                   ? "Acknowledge mismatches to continue"
+                  : uploadType === "payroll_summary"
+                  ? `Save Roster — ${previewData.totalRows} Members`
                   : previewData.unmatchedRows > 0
                   ? `Process ${previewData.matchedRows} matched + ${previewData.unmatchedRows} auto-create`
                   : `Process ${previewData.matchedRows} Members`}
@@ -996,7 +1148,19 @@ export function UploadHistoryPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-sm truncate">{record.month} {record.year}</p>
+                  <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                    <p className="font-semibold text-sm truncate">{record.month} {record.year}</p>
+                    {record.uploadType === "payroll_summary" && (
+                      <Badge variant="outline" className="rounded-full text-[10px] shrink-0 bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20">
+                        Payroll Roster
+                      </Badge>
+                    )}
+                    {record.uploadType === "category_breakdown" && (
+                      <Badge variant="outline" className="rounded-full text-[10px] shrink-0 bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">
+                        Coop Archive
+                      </Badge>
+                    )}
+                  </div>
                   <Badge
                     variant="outline"
                     className={`rounded-full text-[10px] shrink-0 ${
@@ -1009,16 +1173,24 @@ export function UploadHistoryPage() {
                   </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                  By {record.uploaderName} · {formatDate(record.createdAt)}
+                  {record.organization} · By {record.uploaderName} · {formatDate(record.createdAt)}
                 </p>
                 <div className="flex gap-3 mt-2 text-[11px]">
-                  <span className="text-muted-foreground">
-                    <span className="font-bold text-foreground tabular-nums">{record.rowsProcessed}</span> processed
-                  </span>
-                  {record.rowsSkipped > 0 && (
-                    <span className="text-destructive">
-                      <span className="font-bold tabular-nums">{record.rowsSkipped}</span> skipped
+                  {record.uploadType === "payroll_summary" ? (
+                    <span className="text-muted-foreground">
+                      <span className="font-bold text-foreground tabular-nums">{record.rowsProcessed}</span> roster members
                     </span>
+                  ) : (
+                    <>
+                      <span className="text-muted-foreground">
+                        <span className="font-bold text-foreground tabular-nums">{record.rowsProcessed}</span> processed
+                      </span>
+                      {record.rowsSkipped > 0 && (
+                        <span className="text-destructive">
+                          <span className="font-bold tabular-nums">{record.rowsSkipped}</span> skipped
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
