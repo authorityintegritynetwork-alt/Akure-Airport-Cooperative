@@ -33,10 +33,10 @@ const SEED = [
     excelFormat: "faan",
   },
   {
-    code: "NON_STAFF",
-    name: "Non-Staff",
-    description: "Members outside payroll; payments recorded manually by the admin.",
-    excelFormat: "faan",
+    code: "INDEPENDENT_MEMBER",
+    name: "Independent Member",
+    description: "Members who are not employed by any of the listed organisations (e.g. contractors, associates). Deductions are recorded manually by the admin.",
+    excelFormat: "none",
   },
   {
     code: "COOPERATIVE_STAFF",
