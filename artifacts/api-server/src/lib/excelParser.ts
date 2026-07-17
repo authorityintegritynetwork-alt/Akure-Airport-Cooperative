@@ -34,7 +34,7 @@ export const ALL_CATEGORIES: DeductionCategory[] = [
   "landLoan",
 ];
 
-export type Organization = "faan" | "nama";
+export type Organization = "faan" | "nama" | "cooperative_staff";
 
 // Unified template: every organisation's spreadsheet may carry any of these
 // categories. Columns the org does not use are simply left blank. The
@@ -63,6 +63,7 @@ const UNIFIED_CATEGORIES: DeductionCategory[] = [
 export const ORG_CATEGORIES: Record<Organization, DeductionCategory[]> = {
   faan: UNIFIED_CATEGORIES,
   nama: UNIFIED_CATEGORIES,
+  cooperative_staff: UNIFIED_CATEGORIES,
 };
 
 const HEADER_ALIASES: Record<DeductionCategory, string[]> = {

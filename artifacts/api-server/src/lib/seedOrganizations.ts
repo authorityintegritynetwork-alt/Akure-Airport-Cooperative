@@ -38,6 +38,12 @@ const SEED = [
     description: "Members outside payroll; payments recorded manually by the admin.",
     excelFormat: "faan",
   },
+  {
+    code: "COOPERATIVE_STAFF",
+    name: "Cooperative Staff",
+    description: "Employees of the cooperative itself (secretary, accountant, etc.) who are members but do not appear on any employer's payroll sheet. Deductions are recorded manually by the admin.",
+    excelFormat: "none",
+  },
 ];
 
 export async function seedOrganizations(): Promise<void> {

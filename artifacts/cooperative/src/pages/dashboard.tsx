@@ -66,7 +66,7 @@ type BalanceCard = { key: string; label: string; direction: "credit" | "debit" }
 // hidden via `hideWhenZeroFor` so NAMA members don't see empty Christmas /
 // Fire / S-Electronics cards and FAAN members don't see an empty Land Loan
 // card. A non-zero balance always renders, regardless of org.
-type Org = "faan" | "nama";
+type Org = "faan" | "nama" | "cooperative_staff";
 type BalanceCardCfg = BalanceCard & { hideWhenZeroFor?: Org[] };
 
 const BALANCE_CARDS: BalanceCardCfg[] = [
@@ -493,7 +493,7 @@ function MemberDashboard({ profile }: { profile: any }) {
   if (!summary) return null;
 
   const orgCode = (profile.organization || "faan").toString().toLowerCase();
-  const org: Org = orgCode === "nama" ? "nama" : "faan";
+  const org: Org = orgCode === "nama" ? "nama" : orgCode === "cooperative_staff" ? "cooperative_staff" : "faan";
   const orgLabel = (profile.organization || "FAAN").toString().toUpperCase();
 
   // Pick which cards to render: always show a card if it has a non-zero

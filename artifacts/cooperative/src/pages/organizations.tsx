@@ -53,14 +53,14 @@ const createSchema = z.object({
     ),
   name: z.string().min(2, "Display name required"),
   description: z.string().optional(),
-  excelFormat: z.enum(["faan", "nama"], { required_error: "Please select an Excel format" }),
+  excelFormat: z.enum(["faan", "nama", "none"], { required_error: "Please select an Excel format" }),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
 const editSchema = z.object({
   name: z.string().min(2, "Display name required"),
   description: z.string().optional(),
-  excelFormat: z.enum(["faan", "nama"]),
+  excelFormat: z.enum(["faan", "nama", "none"]),
 });
 type EditForm = z.infer<typeof editSchema>;
 
@@ -106,7 +106,7 @@ export function OrganizationsPage() {
     editForm.reset({
       name: org.name ?? "",
       description: org.description ?? "",
-      excelFormat: (org.excelFormat ?? "faan") as "faan" | "nama",
+      excelFormat: (org.excelFormat ?? "faan") as "faan" | "nama" | "none",
     });
     setEditing(org);
   }
@@ -287,19 +287,23 @@ export function OrganizationsPage() {
                         Which column layout does this employer's payroll sheet use?
                       </FormDescription>
                       <div className="flex gap-2 pt-1">
-                        {(["faan", "nama"] as const).map((fmt) => (
+                        {([
+                          { value: "faan", label: "FAAN format" },
+                          { value: "nama", label: "NAMA format" },
+                          { value: "none", label: "Manual / none" },
+                        ] as const).map((fmt) => (
                           <button
-                            key={fmt}
+                            key={fmt.value}
                             type="button"
-                            onClick={() => field.onChange(fmt)}
+                            onClick={() => field.onChange(fmt.value)}
                             className={`flex-1 border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
-                              field.value === fmt
+                              field.value === fmt.value
                                 ? "bg-primary text-primary-foreground border-primary shadow-sm"
                                 : "bg-background hover:bg-muted border-border/60"
                             }`}
-                            data-testid={`org-format-${fmt}`}
+                            data-testid={`org-format-${fmt.value}`}
                           >
-                            {fmt.toUpperCase()} format
+                            {fmt.label}
                           </button>
                         ))}
                       </div>
@@ -426,19 +430,23 @@ export function OrganizationsPage() {
                     Which column layout does this employer's payroll sheet use?
                   </FormDescription>
                   <div className="flex gap-2 pt-1">
-                    {(["faan", "nama"] as const).map((fmt) => (
+                    {([
+                      { value: "faan", label: "FAAN format" },
+                      { value: "nama", label: "NAMA format" },
+                      { value: "none", label: "Manual / none" },
+                    ] as const).map((fmt) => (
                       <button
-                        key={fmt}
+                        key={fmt.value}
                         type="button"
-                        onClick={() => field.onChange(fmt)}
+                        onClick={() => field.onChange(fmt.value)}
                         className={`flex-1 border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
-                          field.value === fmt
+                          field.value === fmt.value
                             ? "bg-primary text-primary-foreground border-primary shadow-sm"
                             : "bg-background hover:bg-muted border-border/60"
                         }`}
-                        data-testid={`edit-org-format-${fmt}`}
+                        data-testid={`edit-org-format-${fmt.value}`}
                       >
-                        {fmt.toUpperCase()} format
+                        {fmt.label}
                       </button>
                     ))}
                   </div>
