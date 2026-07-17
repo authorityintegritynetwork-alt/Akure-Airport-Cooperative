@@ -155,4 +155,15 @@ async function bootstrap() {
   });
 }
 
+// Crash safety: log and exit cleanly so the process manager can restart.
+// Without these, Node silently swallows unhandled rejections in some versions.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled promise rejection — exiting");
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception — exiting");
+  process.exit(1);
+});
+
 void bootstrap();

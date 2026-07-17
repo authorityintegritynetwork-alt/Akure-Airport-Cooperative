@@ -324,7 +324,9 @@ export function parseSheet(
     if (!row) continue;
 
     const rawName = row[header.nameCol];
-    const nameStr = rawName == null ? "" : String(rawName).trim();
+    // Strip Excel formula prefixes (=, @, +, -) to prevent formula injection
+    // from maliciously crafted spreadsheets being evaluated as member names.
+    const nameStr = rawName == null ? "" : String(rawName).trim().replace(/^[=@+\-]+/, "").trim();
 
     // Extract employee number from dedicated column when the sheet has one.
     const empNoRaw = header.empNoCol != null ? row[header.empNoCol] : null;
@@ -514,7 +516,7 @@ export function parsePayrollSheet(
     out.push({
       rowNumber: r + 1,
       employeeNo: noStr,
-      rawName: nameStr.replace(/\s*,\s*/g, " ").replace(/\s+/g, " ").trim(),
+      rawName: nameStr.replace(/^[=@+\-]+/, "").replace(/\s*,\s*/g, " ").replace(/\s+/g, " ").trim(),
       amount,
       warnings: [],
       errors: [],

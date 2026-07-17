@@ -42,6 +42,13 @@ export async function requireAuth(
   req.memberRole = member.role;
   req.memberStatus = member.status;
 
+  if (member.status === "deactivated") {
+    res.status(403).json({
+      error: "Your account has been deactivated. Please contact the cooperative administrator.",
+    });
+    return;
+  }
+
   next();
 }
 

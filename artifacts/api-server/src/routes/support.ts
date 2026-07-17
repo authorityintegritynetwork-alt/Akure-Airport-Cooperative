@@ -169,9 +169,85 @@ router.get(
       .orderBy(desc(supportTicketsTable.lastMessageAt))
       .limit(200);
 
-    const summaries = await Promise.all(
-      tickets.map((t) => buildTicketSummary(t, req.memberId!, viewerIsAdmin)),
-    );
+    if (tickets.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    // ── Batched enrichment: 3 queries regardless of ticket count ─────────────
+    const ticketIds = tickets.map((t) => t.id);
+    const memberIds = [
+      ...new Set(
+        tickets.flatMap((t) =>
+          [t.memberId, t.assignedToMemberId].filter((id): id is number => id != null),
+        ),
+      ),
+    ];
+
+    const [memberRows, msgCountRows, lastSelfRows] = await Promise.all([
+      memberIds.length > 0
+        ? db
+            .select({ id: membersTable.id, fullName: membersTable.fullName, role: membersTable.role })
+            .from(membersTable)
+            .where(inArray(membersTable.id, memberIds))
+        : Promise.resolve([]),
+      db
+        .select({ ticketId: supportMessagesTable.ticketId, value: count() })
+        .from(supportMessagesTable)
+        .where(inArray(supportMessagesTable.ticketId, ticketIds))
+        .groupBy(supportMessagesTable.ticketId),
+      db
+        .select({
+          ticketId: supportMessagesTable.ticketId,
+          value: sql<Date | null>`max(${supportMessagesTable.createdAt})`,
+        })
+        .from(supportMessagesTable)
+        .where(
+          and(
+            inArray(supportMessagesTable.ticketId, ticketIds),
+            eq(supportMessagesTable.senderMemberId, req.memberId!),
+          ),
+        )
+        .groupBy(supportMessagesTable.ticketId),
+    ]);
+
+    const memberMap = new Map(memberRows.map((m) => [m.id, m]));
+    const msgCountMap = new Map(msgCountRows.map((r) => [r.ticketId, Number(r.value)]));
+    const lastSelfMap = new Map(lastSelfRows.map((r) => [r.ticketId, r.value]));
+
+    const summaries = tickets.map((ticket) => {
+      const owner = ticket.memberId != null ? memberMap.get(ticket.memberId) : null;
+      const assignee =
+        ticket.assignedToMemberId != null ? memberMap.get(ticket.assignedToMemberId) : null;
+      const messageCount = msgCountMap.get(ticket.id) ?? 0;
+      const lastSelf = lastSelfMap.get(ticket.id) ?? null;
+
+      let unreadForViewer = false;
+      const lastMsgAt = ticket.lastMessageAt;
+      if (lastMsgAt) {
+        if (!lastSelf) unreadForViewer = true;
+        else if (new Date(lastMsgAt).getTime() > new Date(lastSelf as Date).getTime())
+          unreadForViewer = true;
+      }
+
+      return {
+        id: ticket.id,
+        memberId: ticket.memberId,
+        memberName: owner?.fullName ?? "Unknown",
+        subject: ticket.subject,
+        category: ticket.category,
+        status: ticket.status,
+        priority: ticket.priority,
+        assignedToMemberId: ticket.assignedToMemberId,
+        assignedToName: assignee?.fullName ?? null,
+        unreadForViewer,
+        messageCount,
+        lastMessageAt: ticket.lastMessageAt,
+        createdAt: ticket.createdAt,
+        updatedAt: ticket.updatedAt,
+      };
+    });
+
     res.json(summaries);
   },
 );
