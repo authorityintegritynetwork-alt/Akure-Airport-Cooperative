@@ -1109,6 +1109,12 @@ export const PreviewExcelUploadBody = zod.object({
     .describe(
       "Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member).",
     ),
+  linkedPayrollUploadId: zod
+    .number()
+    .optional()
+    .describe(
+      "For category_breakdown previews: the id of the payroll_summary upload to gate the preview against. Rows whose matched member is not in the active roster are flagged as inactive.",
+    ),
 });
 
 export const PreviewExcelUploadResponse = zod.object({
@@ -1142,6 +1148,12 @@ export const PreviewExcelUploadResponse = zod.object({
   unmatchedRows: zod.number(),
   errorRows: zod.number(),
   duplicateMonth: zod.boolean(),
+  rosterGated: zod
+    .boolean()
+    .optional()
+    .describe(
+      "True when this preview was filtered by a linked payroll_summary roster. Rows not in the active roster are flagged with rosterStatus='inactive'.",
+    ),
   rows: zod.array(
     zod.object({
       rowNumber: zod.number(),
@@ -1159,7 +1171,7 @@ export const PreviewExcelUploadResponse = zod.object({
         .string()
         .nullish()
         .describe(
-          "Payroll-format only: the Employee\/Pensioner No. from the sheet.",
+          "Employee/staff/pensioner number from the sheet, available for both payroll and category-breakdown formats when the sheet includes a dedicated ID column.",
         ),
       amount: zod
         .number()
@@ -1187,6 +1199,12 @@ export const PreviewExcelUploadResponse = zod.object({
       totalMismatch: zod.boolean(),
       errors: zod.array(zod.string()),
       warnings: zod.array(zod.string()),
+      rosterStatus: zod
+        .enum(["active", "inactive"])
+        .nullish()
+        .describe(
+          "Roster gate result. 'active' = member found in linked payroll roster. 'inactive' = matched member NOT in active payroll — row will be skipped. null when no roster is linked.",
+        ),
       suggestions: zod
         .array(
           zod.object({
@@ -1233,13 +1251,30 @@ export const ProcessExcelUploadBody = zod.object({
     .describe(
       "Row numbers whose automatic name match the admin rejected — treated as unmatched (auto-create a pending member).",
     ),
+  uploadType: zod
+    .enum(["standalone", "payroll_summary", "category_breakdown"])
+    .optional()
+    .describe(
+      "standalone (default): creates transactions immediately. payroll_summary: head-office payroll doc — establishes active roster, no transactions. category_breakdown: cooperative archive linked to a payroll_summary via linkedPayrollUploadId.",
+    ),
+  linkedPayrollUploadId: zod
+    .number()
+    .optional()
+    .describe(
+      "Required when uploadType is category_breakdown. The id of the payroll_summary upload whose active roster gates this breakdown.",
+    ),
 });
 
 export const ProcessExcelUploadResponse = zod.object({
   uploadRecordId: zod.number(),
   processed: zod.number(),
   skipped: zod.number(),
+  rosterSkipped: zod
+    .number()
+    .optional()
+    .describe("For category_breakdown: rows skipped because the matched member was not in the active payroll roster."),
   errors: zod.array(zod.string()),
+  uploadType: zod.string().optional(),
 });
 
 /**
@@ -1256,7 +1291,26 @@ export const ListUploadHistoryResponseItem = zod.object({
   rowsProcessed: zod.number(),
   rowsSkipped: zod.number(),
   status: zod.enum(["pending", "processed", "failed"]),
+  uploadType: zod.enum(["standalone", "payroll_summary", "category_breakdown"]),
+  linkedUploadId: zod.number().nullish(),
   createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List available payroll-summary rosters for a given period/org (Admin)
+ * GET /uploads/payroll-rosters?month=November&year=2026&organization=FAAN
+ */
+export const GetPayrollRostersResponse = zod.object({
+  rosters: zod.array(
+    zod.object({
+      id: zod.number(),
+      month: zod.string(),
+      year: zod.number(),
+      organization: zod.string(),
+      rosterSize: zod.number().describe("Number of active members in the roster."),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
 });
 export const ListUploadHistoryResponse = zod.array(
   ListUploadHistoryResponseItem,

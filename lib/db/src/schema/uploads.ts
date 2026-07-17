@@ -1,7 +1,23 @@
-import { pgTable, text, serial, timestamp, integer, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  timestamp,
+  integer,
+  index,
+  jsonb,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { membersTable } from "./members";
+
+/** Member entry stored in roster_data for a payroll_summary upload. */
+export interface RosterMember {
+  memberId: number;
+  employeeNo: string | null;
+  amount: number;
+}
 
 export const uploadRecordsTable = pgTable(
   "upload_records",
@@ -19,6 +35,39 @@ export const uploadRecordsTable = pgTable(
     status: text("status", { enum: ["pending", "processed", "failed"] })
       .notNull()
       .default("pending"),
+    /**
+     * Upload mode:
+     *   standalone         – legacy single-upload path (default); creates
+     *                        transactions immediately from whatever format is
+     *                        detected (multi-column or payroll).
+     *   payroll_summary    – head-office payroll doc (Emp No | Name | Total).
+     *                        Establishes the active-member roster for the
+     *                        month; NO transactions are created. Breakdown
+     *                        upload must follow.
+     *   category_breakdown – cooperative archive (per-category columns).
+     *                        Linked to a payroll_summary via linkedUploadId;
+     *                        only roster members are processed.
+     */
+    uploadType: text("upload_type", {
+      enum: ["standalone", "payroll_summary", "category_breakdown"],
+    })
+      .notNull()
+      .default("standalone"),
+    /**
+     * For category_breakdown uploads: the id of the payroll_summary upload
+     * that provides the active-member roster gate.
+     */
+    linkedUploadId: integer("linked_upload_id").references(
+      (): AnyPgColumn => uploadRecordsTable.id,
+      { onDelete: "set null" },
+    ),
+    /**
+     * Populated for payroll_summary uploads. Stores the active roster so
+     * a subsequent category_breakdown upload can gate on it without re-
+     * parsing the original file.
+     * Shape: { members: RosterMember[] }
+     */
+    rosterData: jsonb("roster_data"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -28,6 +77,7 @@ export const uploadRecordsTable = pgTable(
       t.month,
       t.organization,
     ),
+    linkedIdx: index("upload_records_linked_idx").on(t.linkedUploadId),
   }),
 );
 

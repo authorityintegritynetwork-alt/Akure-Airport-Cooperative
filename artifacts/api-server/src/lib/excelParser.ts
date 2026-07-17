@@ -145,6 +145,37 @@ const NAME_HEADERS = [
   "staff names",
 ];
 const SN_HEADERS = ["n/s", "s/n", "sn", "no", "no.", "#"];
+
+/**
+ * Headers that identify a dedicated employee / staff / pensioner number
+ * column in the cooperative archive multi-column format.  These are
+ * intentionally more specific than SN_HEADERS so generic serial-number
+ * columns ("No.", "#") are not misidentified as employee IDs.
+ */
+const EMP_NO_COL_HEADERS = [
+  "staff no",
+  "staff no.",
+  "staff num",
+  "staff number",
+  "emp no",
+  "emp no.",
+  "emp num",
+  "emp number",
+  "employee no",
+  "employee no.",
+  "employee num",
+  "employee number",
+  "pensioner no",
+  "pensioner no.",
+  "pensioner num",
+  "pensioner number",
+  "member id",
+  "member no",
+  "member no.",
+  "id no",
+  "id no.",
+  "id number",
+];
 const TOTAL_HEADERS = ["total", "totals", "grand total"];
 
 function normHeader(v: unknown): string {
@@ -164,6 +195,7 @@ function toNumber(v: unknown): number {
 interface HeaderMap {
   headerRowIndex: number;
   nameCol: number;
+  empNoCol: number | null;
   totalCol: number | null;
   categoryCols: Partial<Record<DeductionCategory, number>>;
 }
@@ -188,12 +220,19 @@ function detectHeader(
 
     const categoryCols: Partial<Record<DeductionCategory, number>> = {};
     let totalCol: number | null = null;
+    let empNoCol: number | null = null;
 
     for (let c = 0; c < row.length; c++) {
       const h = normHeader(row[c]);
       if (!h) continue;
       if (c === nameCol) continue;
       if (SN_HEADERS.includes(h)) continue;
+
+      // Dedicated employee-number column (more specific than SN_HEADERS).
+      if (empNoCol === null && EMP_NO_COL_HEADERS.includes(h)) {
+        empNoCol = c;
+        continue;
+      }
 
       if (TOTAL_HEADERS.includes(h)) {
         totalCol = c;
@@ -209,7 +248,7 @@ function detectHeader(
     }
 
     if (Object.keys(categoryCols).length >= 2) {
-      return { headerRowIndex: r, nameCol, totalCol, categoryCols };
+      return { headerRowIndex: r, nameCol, empNoCol, totalCol, categoryCols };
     }
   }
   return null;
@@ -218,6 +257,8 @@ function detectHeader(
 export interface ParsedRow {
   rowNumber: number;
   rawName: string;
+  /** Employee / staff / pensioner number from a dedicated column in the sheet, if present. */
+  employeeNo: string | null;
   amounts: Record<DeductionCategory, number>;
   total: number;
   computedTotal: number;
@@ -285,6 +326,13 @@ export function parseSheet(
     const rawName = row[header.nameCol];
     const nameStr = rawName == null ? "" : String(rawName).trim();
 
+    // Extract employee number from dedicated column when the sheet has one.
+    const empNoRaw = header.empNoCol != null ? row[header.empNoCol] : null;
+    const employeeNo =
+      empNoRaw != null && String(empNoRaw).trim() !== ""
+        ? String(empNoRaw).trim()
+        : null;
+
     const amounts = emptyAmounts();
     for (const cat of detectedColumns) {
       const col = header.categoryCols[cat]!;
@@ -330,6 +378,7 @@ export function parseSheet(
     out.push({
       rowNumber: r + 1,
       rawName: nameStr,
+      employeeNo,
       amounts,
       total,
       computedTotal,

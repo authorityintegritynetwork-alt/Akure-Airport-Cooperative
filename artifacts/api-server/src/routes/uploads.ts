@@ -8,6 +8,7 @@ import {
   loansTable,
   organizationsTable,
   openingBalancesTable,
+  type RosterMember,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
@@ -64,12 +65,6 @@ async function loadOrgOrFail(
   return org;
 }
 
-async function loadMatcher(): Promise<NameMatcher> {
-  const all = await db
-    .select({ id: membersTable.id, fullName: membersTable.fullName })
-    .from(membersTable);
-  return new NameMatcher(all);
-}
 
 function applyManualMatches(
   row: ParsedRow,
@@ -147,6 +142,48 @@ function matchPayrollRow<M extends PayrollMemberRef>(
     if (m) return { member: m, confidence: byName.confidence as PayrollConfidence };
   }
   return { member: null, confidence: "none" };
+}
+
+interface SheetMemberRef {
+  id: number;
+  fullName: string;
+  organization: string;
+  employeeNo: string | null;
+}
+
+/**
+ * Priority: manual override → employee number (org-scoped, exact) → name
+ * match (org-filtered, fuzzy).  Mirrors matchPayrollRow but operates on a
+ * ParsedRow from the multi-column cooperative-archive format.
+ */
+function matchSheetRow(
+  row: import("../lib/excelParser").ParsedRow,
+  empNoIndex: Map<string, SheetMemberRef>,
+  matcher: NameMatcher,
+  manualMap: Map<number, number>,
+  membersById: Map<number, SheetMemberRef>,
+  rejectedSet: Set<number> = new Set(),
+): { memberId: number | null; memberName: string | null; confidence: string } {
+  // 1. Manual override — admin explicitly mapped this row to a member.
+  const manual = manualMap.get(row.rowNumber);
+  if (manual !== undefined) {
+    const m = membersById.get(manual);
+    if (m) return { memberId: m.id, memberName: m.fullName, confidence: "manual" };
+  }
+  // 2. Employee number (exact, org-scoped) — most reliable; skips name fuzzing.
+  if (row.employeeNo) {
+    const byNo = empNoIndex.get(canonicalEmployeeNo(row.employeeNo));
+    if (byNo) return { memberId: byNo.id, memberName: byNo.fullName, confidence: "employeeNo" };
+  }
+  // 3. Name match (org-filtered matcher — cross-org false positives are impossible).
+  const byName = matcher.match(row.rawName);
+  if (byName.memberId != null) {
+    if (rejectedSet.has(row.rowNumber) && byName.confidence === "fuzzy") {
+      return { memberId: null, memberName: null, confidence: "none" };
+    }
+    return { memberId: byName.memberId, memberName: byName.memberName, confidence: byName.confidence };
+  }
+  return { memberId: null, memberName: null, confidence: "none" };
 }
 
 /** Map a member record's current debt columns into split-input balances. */
@@ -312,16 +349,27 @@ router.post(
       }
 
       const sheet = parseSheet(wb, sheetName);
-      const matcher = await loadMatcher();
 
+      // Load all members with org + employee number so we can build an
+      // org-filtered name matcher and an employee-number index.
       const allMembers = await db
         .select({
           id: membersTable.id,
           fullName: membersTable.fullName,
           organization: membersTable.organization,
+          employeeNo: membersTable.employeeNo,
         })
         .from(membersTable);
       const membersById = new Map(allMembers.map((m) => [m.id, m]));
+
+      const uploadOrg = orgRecord.code;
+
+      // Org-filtered name matcher — only matches members of the same org.
+      // This eliminates cross-org false positives at the source.
+      const orgMembers = allMembers.filter((m) => m.organization === uploadOrg);
+      const matcher = new NameMatcher(orgMembers);
+      // Employee-number index: org-scoped exact matching (takes precedence over names).
+      const empNoIndex = buildEmpNoIndex(allMembers, uploadOrg) as Map<string, SheetMemberRef>;
 
       const manualMap = new Map<number, number>();
       for (const m of parsed.data.manualMatches || []) {
@@ -329,7 +377,6 @@ router.post(
       }
       const rejectedSet = new Set<number>(parsed.data.rejectedRows || []);
 
-      const uploadOrg = orgRecord.code;
       const dup = await db
         .select({ id: uploadRecordsTable.id })
         .from(uploadRecordsTable)
@@ -341,12 +388,32 @@ router.post(
             eq(uploadRecordsTable.status, "processed"),
           ),
         );
+
       // For unmatched rows, check whether an unclaimed opening balance exists — surfaced in preview UI
       const unclaimedObPreview = await db
         .select({ id: openingBalancesTable.id, fullName: openingBalancesTable.fullName })
         .from(openingBalancesTable)
         .where(eq(openingBalancesTable.status, "unclaimed"));
       const obPreviewMatcher = new NameMatcher(unclaimedObPreview);
+
+      // Load active-member roster when this preview is linked to a payroll summary.
+      let rosterMemberIds: Set<number> | null = null;
+      if (parsed.data.linkedPayrollUploadId != null) {
+        const [rosterRecord] = await db
+          .select({ rosterData: uploadRecordsTable.rosterData })
+          .from(uploadRecordsTable)
+          .where(
+            and(
+              eq(uploadRecordsTable.id, parsed.data.linkedPayrollUploadId),
+              eq(uploadRecordsTable.uploadType, "payroll_summary"),
+              eq(uploadRecordsTable.status, "processed"),
+            ),
+          );
+        if (rosterRecord?.rosterData) {
+          const rd = rosterRecord.rosterData as { members: RosterMember[] };
+          rosterMemberIds = new Set(rd.members.map((m) => m.memberId));
+        }
+      }
 
       // Detect duplicate names within the sheet before building preview rows.
       const rawNameCounts = new Map<string, number>();
@@ -356,11 +423,14 @@ router.post(
       }
 
       const previewRows = sheet.rows.map((row) => {
-        const baseMatch = matcher.match(row.rawName);
-        const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById, rejectedSet);
+        const finalMatch = matchSheetRow(
+          row, empNoIndex, matcher, manualMap, membersById as Map<number, SheetMemberRef>, rejectedSet,
+        );
         const member =
           finalMatch.memberId != null ? membersById.get(finalMatch.memberId) : null;
         const memberOrg = member?.organization ?? null;
+        // Org mismatch can only happen via a manual override now — the name
+        // matcher is already org-filtered. Warn but don't error.
         const orgMismatch = memberOrg != null && memberOrg !== uploadOrg;
         const isDuplicateName = (rawNameCounts.get(row.rawName.toUpperCase()) ?? 0) > 1;
         const warnings = [...row.warnings];
@@ -373,14 +443,21 @@ router.post(
         if (isDuplicateName) {
           errors.push(`Duplicate name in sheet: "${row.rawName}" appears more than once. Fix the spreadsheet before processing.`);
         }
-        // null for matched rows; true/false for unmatched rows
         const hasOpeningBalance =
           finalMatch.memberId == null
             ? obPreviewMatcher.match(row.rawName).memberId != null
             : null;
+
+        // Roster gate: active = in roster, inactive = matched but absent from roster.
+        let rosterStatus: "active" | "inactive" | null = null;
+        if (rosterMemberIds != null && finalMatch.memberId != null) {
+          rosterStatus = rosterMemberIds.has(finalMatch.memberId) ? "active" : "inactive";
+        }
+
         return {
           rowNumber: row.rowNumber,
           rawName: row.rawName,
+          employeeNo: row.employeeNo ?? null,
           matchedMemberId: finalMatch.memberId,
           matchedMemberName: finalMatch.memberName,
           matchConfidence: finalMatch.confidence,
@@ -406,6 +483,7 @@ router.post(
           errors,
           warnings,
           hasOpeningBalance,
+          rosterStatus,
           suggestions:
             finalMatch.confidence === "fuzzy" || finalMatch.confidence === "none"
               ? matcher.suggest(row.rawName, 5)
@@ -431,6 +509,7 @@ router.post(
         duplicateMonth: dup.length > 0,
         hasMismatchedTotals,
         hasDuplicateNames,
+        rosterGated: rosterMemberIds != null,
         rows: previewRows,
       });
     } catch (err: any) {
@@ -465,21 +544,36 @@ router.post(
       // Payroll single-amount format takes precedence when detected.
       const payroll = parsePayrollSheet(wb, sheetName);
       if (payroll) {
-        await processPayroll(req, res, parsed.data, orgRecord.code, payroll, sheetName);
+        const processUploadType = (parsed.data.uploadType ?? "standalone") as
+          "standalone" | "payroll_summary" | "category_breakdown";
+        await processPayroll(req, res, parsed.data, orgRecord.code, payroll, sheetName, processUploadType);
         return;
       }
 
       const sheet = parseSheet(wb, sheetName);
-      const matcher = await loadMatcher();
 
-      const allMembers = await db
+      // ── Member loading with org + employee number ─────────────────────────
+      const allMembersForProcess = await db
         .select({
           id: membersTable.id,
           fullName: membersTable.fullName,
           organization: membersTable.organization,
+          employeeNo: membersTable.employeeNo,
         })
         .from(membersTable);
-      const membersById = new Map(allMembers.map((m) => [m.id, m]));
+      const membersByIdForProcess = new Map(allMembersForProcess.map((m) => [m.id, m]));
+
+      const uploadOrg = orgRecord.code;
+      const autoTag = parsed.data.autoTagOrganization !== false;
+      const uploadType = parsed.data.uploadType ?? "standalone";
+      const linkedPayrollUploadId = parsed.data.linkedPayrollUploadId ?? null;
+
+      // Org-filtered matcher + emp-no index (prevents cross-org false positives).
+      const orgMembersForProcess = allMembersForProcess.filter((m) => m.organization === uploadOrg);
+      const matcherForProcess = new NameMatcher(orgMembersForProcess);
+      const empNoIndexForProcess = buildEmpNoIndex(
+        allMembersForProcess, uploadOrg,
+      ) as Map<string, SheetMemberRef>;
 
       const manualMap = new Map<number, number>();
       for (const m of parsed.data.manualMatches || []) {
@@ -487,8 +581,42 @@ router.post(
       }
       const rejectedSet = new Set<number>(parsed.data.rejectedRows || []);
 
-      const uploadOrg = orgRecord.code;
-      const autoTag = parsed.data.autoTagOrganization !== false;
+      // ── Validate category_breakdown prerequisites ─────────────────────────
+      if (uploadType === "category_breakdown" && linkedPayrollUploadId == null) {
+        res.status(422).json({
+          error: "category_breakdown upload requires linkedPayrollUploadId pointing to a processed payroll_summary upload.",
+        });
+        return;
+      }
+
+      // Load the active-member roster when this is a roster-gated breakdown.
+      let rosterMemberIdsForProcess: Set<number> | null = null;
+      if (uploadType === "category_breakdown" && linkedPayrollUploadId != null) {
+        const [rosterRec] = await db
+          .select({ rosterData: uploadRecordsTable.rosterData, organization: uploadRecordsTable.organization })
+          .from(uploadRecordsTable)
+          .where(
+            and(
+              eq(uploadRecordsTable.id, linkedPayrollUploadId),
+              eq(uploadRecordsTable.uploadType, "payroll_summary"),
+              eq(uploadRecordsTable.status, "processed"),
+            ),
+          );
+        if (!rosterRec) {
+          res.status(404).json({
+            error: `Payroll summary upload #${linkedPayrollUploadId} not found or not yet processed.`,
+          });
+          return;
+        }
+        if (rosterRec.organization !== uploadOrg) {
+          res.status(422).json({
+            error: `Payroll summary upload #${linkedPayrollUploadId} is for org "${rosterRec.organization}" but this upload is for "${uploadOrg}".`,
+          });
+          return;
+        }
+        const rd = rosterRec.rosterData as { members: RosterMember[] } | null;
+        rosterMemberIdsForProcess = new Set((rd?.members ?? []).map((m) => m.memberId));
+      }
 
       // ── Pre-flight: reject if the sheet contains duplicate names ──────────
       const processNameCounts = new Map<string, number[]>();
@@ -518,36 +646,44 @@ router.post(
         return;
       }
 
-      // Run the entire processing in a single DB transaction so that any
-      // failure rolls back all transaction inserts and balance/loan mutations.
-      // Use SQL arithmetic (col = col + amt) for race-safe updates and
-      // SELECT ... FOR UPDATE to lock member rows during the batch.
-      // A Postgres advisory lock keyed on (month, year) serializes any
-      // concurrent attempts for the same period so the duplicate check
-      // and insertion happen atomically.
-      const periodKey = `${parsed.data.month.toLowerCase()}-${parsed.data.year}`;
+      // Duplicate-check key differs by uploadType so that a payroll_summary
+      // and category_breakdown for the same period are both allowed.
+      const periodKey = `${parsed.data.month.toLowerCase()}-${parsed.data.year}-${uploadOrg}-${uploadType}`;
       const result = await db.transaction(async (tx) => {
-        // Acquire a transaction-scoped advisory lock for this period.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${periodKey}))`);
 
-        // Re-check duplicates inside the lock so two concurrent requests
-        // cannot both pass the guard.
-        const dupInTx = await tx
-          .select({ id: uploadRecordsTable.id })
-          .from(uploadRecordsTable)
-          .where(
-            and(
-              eq(uploadRecordsTable.month, parsed.data.month),
-              eq(uploadRecordsTable.year, parsed.data.year),
-              eq(uploadRecordsTable.organization, uploadOrg),
-              eq(uploadRecordsTable.status, "processed"),
-            ),
-          );
-        if (dupInTx.length > 0) {
-          return {
-            __duplicate: true as const,
-            existingUploadId: dupInTx[0].id,
-          };
+        // For category_breakdown: check no other breakdown is already linked.
+        // For standalone: check no processed upload exists for period/org.
+        if (uploadType === "category_breakdown" && linkedPayrollUploadId != null) {
+          const existingBreakdown = await tx
+            .select({ id: uploadRecordsTable.id })
+            .from(uploadRecordsTable)
+            .where(
+              and(
+                eq(uploadRecordsTable.linkedUploadId, linkedPayrollUploadId),
+                eq(uploadRecordsTable.uploadType, "category_breakdown"),
+                eq(uploadRecordsTable.status, "processed"),
+              ),
+            );
+          if (existingBreakdown.length > 0) {
+            return { __duplicate: true as const, existingUploadId: existingBreakdown[0].id };
+          }
+        } else if (uploadType === "standalone") {
+          const dupInTx = await tx
+            .select({ id: uploadRecordsTable.id })
+            .from(uploadRecordsTable)
+            .where(
+              and(
+                eq(uploadRecordsTable.month, parsed.data.month),
+                eq(uploadRecordsTable.year, parsed.data.year),
+                eq(uploadRecordsTable.organization, uploadOrg),
+                eq(uploadRecordsTable.status, "processed"),
+                eq(uploadRecordsTable.uploadType, "standalone"),
+              ),
+            );
+          if (dupInTx.length > 0) {
+            return { __duplicate: true as const, existingUploadId: dupInTx[0].id };
+          }
         }
 
         const [uploadRecord] = await tx
@@ -559,25 +695,20 @@ router.post(
             organization: uploadOrg,
             fileObjectPath: parsed.data.fileObjectPath,
             status: "pending",
+            uploadType,
+            linkedUploadId: linkedPayrollUploadId,
           })
           .returning();
 
         let processed = 0;
         let skipped = 0;
+        let rosterSkipped = 0;
         let autoCreated = 0;
         const errors: string[] = [];
         const notifications: Array<{ memberId: number; total: number }> = [];
-        // Track which sheet rows matched a registered member so the opening
-        // balance pass below can detect (and flag) double matches.
         const memberMatchedRows = new Set<number>();
-        // Track rows for which we auto-created a brand-new pending member. Their
-        // matching opening balance (if any) is deliberately left UNCLAIMED so it
-        // is only linked/copied when an admin approves the member. These rows are
-        // therefore excluded from the needs_reconcile double-match pass below.
         const autoCreatedRows = new Set<number>();
 
-        // Pre-load unclaimed OB rows once for the entire transaction (FOR UPDATE
-        // so concurrent processes see a stable snapshot).
         const unclaimedOpenings = await tx
           .select({ id: openingBalancesTable.id, fullName: openingBalancesTable.fullName })
           .from(openingBalancesTable)
@@ -586,60 +717,64 @@ router.post(
         const obMatcher = new NameMatcher(unclaimedOpenings);
 
         for (const row of sheet.rows) {
-          const baseMatch = matcher.match(row.rawName);
-          const finalMatch = applyManualMatches(row, baseMatch, manualMap, membersById, rejectedSet);
+          const finalMatch = matchSheetRow(
+            row,
+            empNoIndexForProcess,
+            matcherForProcess,
+            manualMap,
+            membersByIdForProcess as Map<number, SheetMemberRef>,
+            rejectedSet,
+          );
+
+          // Roster gate: skip matched members who are not in the active payroll.
+          if (
+            rosterMemberIdsForProcess != null &&
+            finalMatch.memberId != null &&
+            !rosterMemberIdsForProcess.has(finalMatch.memberId)
+          ) {
+            rosterSkipped++;
+            continue;
+          }
 
           let rowWasAutoCreated = false;
           if (finalMatch.memberId == null) {
-            // Auto-create a pending member so deductions are never silently lost.
-            // We intentionally do NOT copy any matching opening balance onto the
-            // member or mark that OB as claimed here — claiming only happens when
-            // an admin approves the member. The OB stays unclaimed and is picked
-            // up at approval time. This avoids "claiming" balances for someone who
-            // was never approved.
             rowWasAutoCreated = true;
             autoCreatedRows.add(row.rowNumber);
-            const newMemberId = await (async () => {
-              const placeholderEmail = `unmatched-${randomUUID()}@placeholder.aacsms.internal`;
-              const [newMember] = await tx
-                .insert(membersTable)
-                .values({
-                  fullName: row.rawName,
-                  email: placeholderEmail,
-                  organization: uploadOrg,
-                  status: "pending",
-                })
-                .returning({ id: membersTable.id });
-
-              autoCreated++;
-              return newMember.id;
-            })();
-
-            // Re-assign memberId and fall through to transaction processing.
-            (finalMatch as { memberId: number | null }).memberId = newMemberId;
+            const placeholderEmail = `unmatched-${randomUUID()}@placeholder.aacsms.internal`;
+            const [newMember] = await tx
+              .insert(membersTable)
+              .values({
+                fullName: row.rawName,
+                email: placeholderEmail,
+                organization: uploadOrg,
+                employeeNo: row.employeeNo ?? undefined,
+                status: "pending",
+              })
+              .returning({ id: membersTable.id });
+            autoCreated++;
+            (finalMatch as { memberId: number | null }).memberId = newMember.id;
           }
 
           const memberId = finalMatch.memberId!;
           memberMatchedRows.add(row.rowNumber);
 
-          // Lock the member row for the duration of this row's processing.
-          const lockedRows = await tx.execute<{ id: number; organization: string }>(
-            sql`SELECT id, organization FROM ${membersTable} WHERE id = ${memberId} FOR UPDATE`,
+          // Lock member row; read employee_no to write it back if missing.
+          const lockedRows = await tx.execute<{ id: number; organization: string; employee_no: string | null }>(
+            sql`SELECT id, organization, employee_no FROM ${membersTable} WHERE id = ${memberId} FOR UPDATE`,
           );
-          if (!lockedRows.rows || lockedRows.rows.length === 0) {
-            skipped++;
-            continue;
-          }
-          const lockedMemberOrg = (lockedRows.rows[0] as any).organization as
-            | "faan"
-            | "nama";
+          if (!lockedRows.rows || lockedRows.rows.length === 0) { skipped++; continue; }
+          const locked = lockedRows.rows[0] as { organization: string; employee_no: string | null };
 
-          // Auto-tag matched member to upload's organization when configured.
-          if (autoTag && lockedMemberOrg !== uploadOrg) {
-            await tx
-              .update(membersTable)
-              .set({ organization: uploadOrg })
-              .where(eq(membersTable.id, memberId));
+          // Auto-tag org and write permanent employee number when needed.
+          const memberFieldUpdates: { organization?: string; employeeNo?: string } = {};
+          if (autoTag && locked.organization !== uploadOrg) {
+            memberFieldUpdates.organization = uploadOrg;
+          }
+          if (!locked.employee_no && row.employeeNo) {
+            memberFieldUpdates.employeeNo = row.employeeNo;
+          }
+          if (Object.keys(memberFieldUpdates).length > 0) {
+            await tx.update(membersTable).set(memberFieldUpdates).where(eq(membersTable.id, memberId));
           }
 
           const rowTouched = await applyDeductionAmounts(tx, memberId, row.amounts, {
@@ -649,8 +784,6 @@ router.post(
           });
 
           if (rowTouched) {
-            // Only notify and count as "processed" for existing matched members.
-            // Auto-created rows are tracked separately via autoCreated counter.
             if (!rowWasAutoCreated) {
               notifications.push({ memberId, total: row.computedTotal });
               processed++;
@@ -660,28 +793,15 @@ router.post(
           }
         }
 
-        // ── Opening-balance reconcile pass ──────────────────────────────────
-        // Unmatched rows now auto-create members and claim their OB directly
-        // in the main loop above. This pass only handles the remaining edge
-        // case: a sheet row matched a *registered* member but an unclaimed OB
-        // row also matches the same name — flag those for admin review so they
-        // are not silently double-counted.
+        // ── Opening-balance reconcile pass ────────────────────────────────
         let openingFlagged = 0;
-
-        // Build a Set of still-unclaimed OB IDs for O(1) lookup.
-        // The auto-create loop above splices claimed entries from unclaimedOpenings,
-        // so this set correctly excludes OBs that were already claimed.
         const stillUnclaimedIds = new Set(unclaimedOpenings.map((r) => r.id));
-
         if (stillUnclaimedIds.size > 0) {
           for (const row of sheet.rows) {
             if (!memberMatchedRows.has(row.rowNumber)) continue;
-            // Auto-created members leave their matching OB unclaimed for approval —
-            // do not flag it for reconcile.
             if (autoCreatedRows.has(row.rowNumber)) continue;
             const obMatch = obMatcher.match(row.rawName);
             if (obMatch.memberId == null) continue;
-            // Skip if this OB was already claimed by the auto-create step above.
             if (!stillUnclaimedIds.has(obMatch.memberId)) continue;
             await tx
               .update(openingBalancesTable)
@@ -696,37 +816,22 @@ router.post(
 
         await tx
           .update(uploadRecordsTable)
-          .set({
-            rowsProcessed: processed,
-            rowsSkipped: skipped,
-            status: "processed",
-          })
+          .set({ rowsProcessed: processed, rowsSkipped: skipped, status: "processed" })
           .where(eq(uploadRecordsTable.id, uploadRecord.id));
 
-        return {
-          uploadRecord,
-          processed,
-          skipped,
-          autoCreated,
-          errors,
-          notifications,
-          openingFlagged,
-        };
+        return { uploadRecord, processed, skipped, rosterSkipped, autoCreated, errors, notifications, openingFlagged };
       });
 
       if ("__duplicate" in result && result.__duplicate) {
         res.status(409).json({
-          error: `An upload for ${parsed.data.month} ${parsed.data.year} has already been processed (record #${result.existingUploadId}). Void it first if you need to re-run.`,
+          error: `A ${uploadType} upload for ${parsed.data.month} ${parsed.data.year} has already been processed (record #${result.existingUploadId}). Void it first if you need to re-run.`,
           existingUploadId: result.existingUploadId,
         });
         return;
       }
 
-      const { uploadRecord, processed, skipped, autoCreated, errors, notifications, openingFlagged } =
-        result;
+      const { uploadRecord, processed, skipped, rosterSkipped, autoCreated, errors, notifications, openingFlagged } = result;
 
-      // Notifications are sent post-commit so that a rollback never leaves
-      // members notified about transactions that did not actually persist.
       for (const n of notifications) {
         await sendNotification({
           memberId: n.memberId,
@@ -741,15 +846,17 @@ router.post(
         action: "PROCESS_EXCEL_UPLOAD",
         entity: "upload_record",
         entityId: uploadRecord.id,
-        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year}: ${processed} processed, ${autoCreated} auto-created, ${skipped} skipped, ${openingFlagged} OB rows flagged for review`,
+        details: `Sheet "${sheetName}" for ${parsed.data.month} ${parsed.data.year} [${uploadType}]: ${processed} processed, ${autoCreated} auto-created, ${skipped} skipped, ${rosterSkipped} roster-skipped, ${openingFlagged} OB rows flagged`,
       });
 
       res.json({
         uploadRecordId: uploadRecord.id,
         processed,
         skipped,
+        rosterSkipped,
         autoCreated,
         errors,
+        uploadType,
         openingBalancesFlagged: openingFlagged,
       });
     } catch (err: any) {
@@ -780,6 +887,48 @@ router.get(
         uploaderName: memberMap[r.uploadedBy] || "Unknown",
       })),
     );
+  },
+);
+
+// ── List available payroll-summary rosters ───────────────────────────────────
+router.get(
+  "/uploads/payroll-rosters",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const { month, year, organization } = req.query as Record<string, string | undefined>;
+
+    const conditions = [
+      eq(uploadRecordsTable.uploadType, "payroll_summary"),
+      eq(uploadRecordsTable.status, "processed"),
+    ];
+    if (month) conditions.push(eq(uploadRecordsTable.month, month));
+    if (year && !isNaN(parseInt(year))) conditions.push(eq(uploadRecordsTable.year, parseInt(year)));
+    if (organization) conditions.push(eq(uploadRecordsTable.organization, organization.toUpperCase()));
+
+    const records = await db
+      .select({
+        id: uploadRecordsTable.id,
+        month: uploadRecordsTable.month,
+        year: uploadRecordsTable.year,
+        organization: uploadRecordsTable.organization,
+        rosterData: uploadRecordsTable.rosterData,
+        createdAt: uploadRecordsTable.createdAt,
+      })
+      .from(uploadRecordsTable)
+      .where(and(...conditions))
+      .orderBy(asc(uploadRecordsTable.createdAt));
+
+    res.json({
+      rosters: records.map((r) => ({
+        id: r.id,
+        month: r.month,
+        year: r.year,
+        organization: r.organization,
+        rosterSize: ((r.rosterData as { members: RosterMember[] } | null)?.members?.length) ?? 0,
+        createdAt: r.createdAt,
+      })),
+    });
   },
 );
 
@@ -960,6 +1109,7 @@ async function processPayroll(
   uploadOrg: string,
   payroll: PayrollParsedSheet,
   sheetName: string,
+  uploadType: "standalone" | "payroll_summary" | "category_breakdown" = "standalone",
 ): Promise<void> {
   // Duplicate employee numbers are a data error that must be fixed upstream.
   // Defensive re-check on CANONICAL numbers ("015" ≡ "15") in addition to the
@@ -993,7 +1143,9 @@ async function processPayroll(
   for (const m of body.manualMatches || []) manualMap.set(m.rowNumber, m.memberId);
   const rejectedSet = new Set<number>(body.rejectedRows || []);
 
-  const periodKey = `${body.month.toLowerCase()}-${body.year}`;
+  // Duplicate-check key is scoped by uploadType so payroll_summary and
+  // standalone can coexist for the same period without blocking each other.
+  const periodKey = `${body.month.toLowerCase()}-${body.year}-${uploadOrg}-${uploadType}`;
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${periodKey}))`);
 
@@ -1006,6 +1158,7 @@ async function processPayroll(
           eq(uploadRecordsTable.year, body.year),
           eq(uploadRecordsTable.organization, uploadOrg),
           eq(uploadRecordsTable.status, "processed"),
+          eq(uploadRecordsTable.uploadType, uploadType),
         ),
       );
     if (dupInTx.length > 0) {
@@ -1021,6 +1174,7 @@ async function processPayroll(
         organization: uploadOrg,
         fileObjectPath: body.fileObjectPath,
         status: "pending",
+        uploadType,
       })
       .returning();
 
@@ -1034,7 +1188,64 @@ async function processPayroll(
       .from(membersTable);
     const membersById = new Map(allMembers.map((m) => [m.id, m]));
     const empNoIndex = buildEmpNoIndex(allMembers, uploadOrg);
-    const matcher = new NameMatcher(allMembers);
+    // Payroll format already relies on emp no as primary key; name matcher
+    // used only as fallback — keep it org-filtered for consistency.
+    const matcher = new NameMatcher(allMembers.filter((m) => m.organization === uploadOrg));
+
+    // ── payroll_summary mode: build roster without creating transactions ────
+    if (uploadType === "payroll_summary") {
+      const rosterMembers: RosterMember[] = [];
+      let rosterMatched = 0;
+      let rosterAutoCreated = 0;
+
+      for (const row of payroll.rows) {
+        const { member } = matchPayrollRow(row, empNoIndex, matcher, manualMap, membersById, rejectedSet);
+
+        if (member) {
+          // Persist employee number on first encounter.
+          if (!member.employeeNo) {
+            await tx.update(membersTable).set({ employeeNo: row.employeeNo }).where(eq(membersTable.id, member.id));
+          }
+          rosterMembers.push({ memberId: member.id, employeeNo: row.employeeNo, amount: row.amount });
+          rosterMatched++;
+        } else {
+          // Auto-create a pending member so the employee exists in the DB
+          // for matching when the cooperative archive is uploaded next.
+          const placeholderEmail = `unmatched-${randomUUID()}@placeholder.aacsms.internal`;
+          const [newMember] = await tx
+            .insert(membersTable)
+            .values({
+              fullName: row.rawName,
+              email: placeholderEmail,
+              organization: uploadOrg,
+              employeeNo: row.employeeNo,
+              status: "pending",
+            })
+            .returning({ id: membersTable.id });
+          rosterAutoCreated++;
+          rosterMembers.push({ memberId: newMember.id, employeeNo: row.employeeNo, amount: row.amount });
+        }
+      }
+
+      await tx
+        .update(uploadRecordsTable)
+        .set({
+          rowsProcessed: rosterMatched,
+          rowsSkipped: 0,
+          status: "processed",
+          rosterData: { members: rosterMembers },
+        })
+        .where(eq(uploadRecordsTable.id, uploadRecord.id));
+
+      return {
+        __rosterOnly: true as const,
+        uploadRecord,
+        rosterMatched,
+        rosterAutoCreated,
+        rosterSize: rosterMembers.length,
+      };
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     let processed = 0;
     let skipped = 0;
@@ -1110,7 +1321,7 @@ async function processPayroll(
       }
       const locked = lockedRows.rows[0] as Record<string, unknown>;
 
-      const memberUpdates: Record<string, unknown> = {};
+      const memberUpdates: { organization?: string; employeeNo?: string } = {};
       if (autoTag && locked.organization !== uploadOrg) {
         memberUpdates.organization = uploadOrg;
       }
@@ -1182,11 +1393,31 @@ async function processPayroll(
     return;
   }
 
+  // ── payroll_summary (roster-only) result ──────────────────────────────────
+  if ("__rosterOnly" in result && result.__rosterOnly) {
+    await logAudit({
+      actorId: req.memberId,
+      action: "PROCESS_EXCEL_UPLOAD",
+      entity: "upload_record",
+      entityId: result.uploadRecord.id,
+      details: `Payroll roster "${sheetName}" for ${body.month} ${body.year} [payroll_summary]: ${result.rosterMatched} matched, ${result.rosterAutoCreated} auto-created, roster size ${result.rosterSize}`,
+    });
+    res.json({
+      uploadRecordId: result.uploadRecord.id,
+      uploadType: "payroll_summary",
+      processed: result.rosterMatched,
+      skipped: 0,
+      rosterSize: result.rosterSize,
+      autoCreated: result.rosterAutoCreated,
+      errors: [],
+    });
+    return;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const { uploadRecord, processed, skipped, autoCreated, errors, notifications, openingFlagged } =
     result;
 
-  // Notifications are sent post-commit so that a rollback never leaves
-  // members notified about transactions that did not actually persist.
   for (const n of notifications) {
     await sendNotification({
       memberId: n.memberId,
@@ -1201,7 +1432,7 @@ async function processPayroll(
     action: "PROCESS_EXCEL_UPLOAD",
     entity: "upload_record",
     entityId: uploadRecord.id,
-    details: `Payroll sheet "${sheetName}" for ${body.month} ${body.year}: ${processed} processed, ${autoCreated} auto-created, ${skipped} skipped, ${openingFlagged} OB rows flagged for review`,
+    details: `Payroll sheet "${sheetName}" for ${body.month} ${body.year} [${uploadType}]: ${processed} processed, ${autoCreated} auto-created, ${skipped} skipped, ${openingFlagged} OB rows flagged`,
   });
 
   res.json({
@@ -1210,6 +1441,7 @@ async function processPayroll(
     skipped,
     autoCreated,
     errors,
+    uploadType,
     openingBalancesFlagged: openingFlagged,
   });
 }
