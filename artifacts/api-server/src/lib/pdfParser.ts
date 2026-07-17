@@ -1,19 +1,29 @@
 /**
- * PDF Payroll Roster Parser
+ * PDF Payroll Roster Parser — NAMA "COOP MULTIPURPOSE Analysis Report"
  *
- * Parses a clean-table PDF payroll (e.g. NAMA head-office payroll) into the
- * same PayrollParsedSheet shape that the Excel pipeline uses, so the existing
- * previewPayroll / processPayroll functions work unchanged.
+ * pdf-parse v2 renders each data row as a tab-separated string.
+ * Actual column order in the text stream (differs from visual order):
  *
- * Only used for "payroll_summary" (Roster - Step 1) uploads where the source
- * file is a PDF.  We only need employee number + name; amount is set to 0.
+ *   [0] Amount      e.g. "288,958.00"
+ *   [1] Name        e.g. "BALOGUN OLALEKAN KAZEEM "
+ *   [2] GL/Step     e.g. "GL_13_09 "
+ *   [3] Location    e.g. "HEADQUATERS LAGOS ANNEX"
+ *   [4] Employee ID e.g. "Emp-03506"
+ *   [5] Serial No   e.g. "1 "          (resets per location section)
+ *   [6] Department  e.g. "COMMERCIAL"
+ *
+ * A data row is identified by the presence of an "Emp-NNNNN" token in field[4].
+ * The amount IS captured — NAMA PDFs carry each member's monthly deduction.
+ *
+ * Returns a PayrollParsedSheet compatible with the existing previewPayroll /
+ * processPayroll pipeline — no changes to those functions required.
  */
 
 import { ObjectStorageService } from "./objectStorage";
 import type { PayrollParsedSheet, PayrollParsedRow } from "./excelParser";
 import type { ParsedSkip } from "./excelParser";
 
-// ── Object-storage download ────────────────────────────────────────────────
+// ── Buffer download (object storage or /tmp local) ─────────────────────────
 
 async function downloadPdfBuffer(fileObjectPath: string): Promise<Buffer> {
   if (fileObjectPath.startsWith("/tmp/")) {
@@ -29,67 +39,17 @@ async function downloadPdfBuffer(fileObjectPath: string): Promise<Buffer> {
   return buf as Buffer;
 }
 
-// ── Text helpers ───────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Tokens that signal a totals / summary row — skip these. */
-const SKIP_WORDS = new Set([
-  "total", "grand", "sub-total", "subtotal", "sum", "nil", "none",
-]);
+const EMP_ID_RE = /^Emp-\d+$/;
 
-/** Words that look like grade levels / pay bands — not names. */
-const GRADE_PATTERN = /^(gl|ss|conhess|contiss|consolidated|band|level|grade|conmess|conpass|contediss)\b/i;
-const AMOUNT_PATTERN = /^[\d,]+(\.\d+)?$/;
-
-function isNameWord(token: string): boolean {
-  if (token.length < 2) return false;
-  if (AMOUNT_PATTERN.test(token)) return false;
-  if (GRADE_PATTERN.test(token)) return false;
-  if (/^\d/.test(token)) return false;
-  // Accept fully-capitalised words (Nigerian civil-service convention) or
-  // title-case words, allowing hyphens and trailing initials like "A."
-  return /^[A-Z][A-Z'-]{0,}\.?$/.test(token) || /^[A-Z][a-z]/.test(token);
+function parseAmount(raw: string): number {
+  return parseFloat(raw.replace(/,/g, "").trim()) || 0;
 }
 
-/**
- * Extract a person's full name from a token slice.
- * Collects consecutive name-like tokens (minimum 2).
- */
-function extractName(tokens: string[]): string {
-  const words: string[] = [];
-  for (const t of tokens) {
-    if (isNameWord(t)) {
-      words.push(t);
-    } else if (words.length > 0) {
-      break; // stop on first non-name token after we've started collecting
-    }
-  }
-  return words.length >= 2 ? words.join(" ") : "";
-}
-
-/** True when the line looks like a table header. */
-function isHeaderLine(line: string): boolean {
-  const u = line.toUpperCase();
-  const hasName = u.includes("NAME") || u.includes("STAFF");
-  const hasNum  = u.includes("STAFF NO") || u.includes("EMP NO") ||
-                  u.includes("EMPLOYEE") || u.includes("S/N") ||
-                  u.includes("NO.") || (u.includes(" NO") && hasName);
-  return hasName && hasNum;
-}
-
-/** True when the line looks like a data row (starts with serial number). */
-function isDataLine(line: string): boolean {
-  return /^\s*\d{1,4}\s+\S/.test(line);
-}
-
-/** Try to extract employee number from the token slice before the name. */
-function extractEmployeeNo(tokens: string[]): string {
-  for (const t of tokens) {
-    // Pure numeric like "00123" or alpha-numeric like "NAMA/001"
-    if (/^\d{3,}$/.test(t) || /^[A-Z]{0,6}[/\\-]?\d{2,}$/i.test(t)) {
-      return t;
-    }
-  }
-  return "";
+/** Canonical employee-number key for duplicate detection (strips "Emp-" prefix and leading zeros). */
+function canonEmpNo(empId: string): string {
+  return empId.replace(/[^0-9]/g, "").replace(/^0+/, "") || empId;
 }
 
 // ── Main parser ────────────────────────────────────────────────────────────
@@ -99,141 +59,80 @@ export async function parsePdfRoster(
 ): Promise<PayrollParsedSheet> {
   const buf = await downloadPdfBuffer(fileObjectPath);
 
-  // pdf-parse is a CJS module; use dynamic import to keep this file ESM-safe.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = (await import("pdf-parse")).default as (
-    buf: Buffer,
-  ) => Promise<{ text: string; numpages: number }>;
+  // pdf-parse v2 — use { data: Buffer } constructor option so we don't need
+  // a file:// URL or temp file.
+  const { PDFParse } = (await import("pdf-parse")) as unknown as {
+    PDFParse: new (opts: { data: Buffer }) => { getText(): Promise<{ text: string }> };
+  };
 
-  const { text } = await pdfParse(buf);
+  const { text } = await new PDFParse({ data: buf }).getText();
 
   const lines = text.split(/\r?\n/);
 
-  // ── Locate header ────────────────────────────────────────────────────────
-  let headerLineIdx = -1;
-  let nameColChar = -1;
-
-  for (let i = 0; i < lines.length; i++) {
-    if (isHeaderLine(lines[i])) {
-      headerLineIdx = i;
-      const upper = lines[i].toUpperCase();
-      // Find where "NAME" starts in the header for position-based extraction.
-      nameColChar = upper.indexOf("NAME");
-      if (nameColChar < 0) nameColChar = upper.indexOf("STAFF");
-      break;
-    }
-  }
-
-  // ── Parse data rows ──────────────────────────────────────────────────────
   const rows: PayrollParsedRow[] = [];
   const skipped: ParsedSkip[] = [];
-  const seenNos = new Map<string, number[]>();
+  const seenEmpIds = new Map<string, number[]>(); // canonEmpNo → rowNumbers
   let rowNumber = 0;
 
-  const startIdx = headerLineIdx >= 0 ? headerLineIdx + 1 : 0;
+  for (const line of lines) {
+    if (!line.includes("\t")) continue;           // skip non-tabular lines fast
+    if (!line.includes("Emp-")) continue;         // skip non-data lines fast
 
-  for (let i = startIdx; i < lines.length; i++) {
-    const line = lines[i];
-    if (!isDataLine(line)) continue;
+    const tabs = line.split("\t");
 
-    const tokens = line.trim().split(/\s+/);
-    if (tokens.length < 3) continue;
+    // Guard: must have at least 5 fields and field[4] must be an Emp-ID.
+    if (tabs.length < 5 || !EMP_ID_RE.test(tabs[4].trim())) continue;
 
     rowNumber++;
 
-    // tokens[0] = serial number — skip it.
-    const afterSerial = tokens.slice(1);
+    const amount     = parseAmount(tabs[0]);
+    const rawName    = tabs[1].trim().replace(/\s+/g, " ");
+    const employeeNo = tabs[4].trim(); // "Emp-03506"
 
-    // ── Employee number ────────────────────────────────────────────────────
-    let employeeNo = "";
-    let nameTokens = afterSerial;
-
-    // If the first token after serial looks like an employee number, consume it.
-    const firstToken = afterSerial[0] ?? "";
-    if (/^\d{3,}$/.test(firstToken) || /^[A-Z]{0,6}[/\\-]?\d{2,}$/i.test(firstToken)) {
-      employeeNo = firstToken;
-      nameTokens = afterSerial.slice(1);
-    } else {
-      // Fallback: try to find an emp-no anywhere in the remaining tokens.
-      employeeNo = extractEmployeeNo(afterSerial);
-    }
-
-    // ── Name extraction ────────────────────────────────────────────────────
-    // Prefer position-based (char offset from header) when available.
-    let rawName = "";
-    if (nameColChar >= 0 && line.length > nameColChar) {
-      const fromNameCol = line.slice(nameColChar).trim();
-      const nameTokensPos = fromNameCol.split(/\s+/);
-      rawName = extractName(nameTokensPos);
-    }
-    // Fall back to token-based extraction.
     if (!rawName) {
-      rawName = extractName(nameTokens);
-    }
-
-    // ── Skip / validate ────────────────────────────────────────────────────
-    if (!rawName) {
-      skipped.push({ row: rowNumber, name: "(blank)", reason: "Could not extract a name from row" });
-      continue;
-    }
-    const lowerName = rawName.toLowerCase();
-    if (
-      SKIP_WORDS.has(lowerName) ||
-      lowerName.includes("total") ||
-      lowerName.includes("grand")
-    ) {
+      skipped.push({ row: rowNumber, name: "(blank)", reason: "Empty name field" });
       continue;
     }
 
-    // Normalise the extracted name.
-    const cleanName = rawName
-      .replace(/^[=@+\-]+/, "")
-      .replace(/\s*,\s*/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    // Track duplicate employee numbers.
-    if (employeeNo) {
-      const canon = employeeNo.replace(/\D/g, "").replace(/^0+/, "") || employeeNo;
-      if (!seenNos.has(canon)) seenNos.set(canon, []);
-      seenNos.get(canon)!.push(rowNumber);
-    }
+    // Track duplicates.
+    const canon = canonEmpNo(employeeNo);
+    if (!seenEmpIds.has(canon)) seenEmpIds.set(canon, []);
+    seenEmpIds.get(canon)!.push(rowNumber);
 
     rows.push({
       rowNumber,
       employeeNo,
-      rawName: cleanName,
-      amount: 0, // Roster-only — amounts not in PDF; cooperative archive carries them.
-      warnings: employeeNo
-        ? []
-        : ["No employee number detected — will fall back to name-only matching"],
+      rawName,
+      amount,
+      warnings: [],
       errors: [],
     });
   }
 
-  // ── Flag duplicate employee numbers ─────────────────────────────────────
+  // Flag duplicate Employee IDs.
   for (const row of rows) {
-    if (!row.employeeNo) continue;
-    const canon = row.employeeNo.replace(/\D/g, "").replace(/^0+/, "") || row.employeeNo;
-    const dups = seenNos.get(canon) ?? [];
+    const dups = seenEmpIds.get(canonEmpNo(row.employeeNo)) ?? [];
     if (dups.length > 1) {
       row.errors.push(
-        `Duplicate employee number "${row.employeeNo}" in PDF (rows ${dups.join(", ")}).`,
+        `Duplicate Employee ID "${row.employeeNo}" appears in rows ${dups.join(", ")}.`,
       );
     }
   }
+
+  const totalAmount = rows.reduce((s, r) => s + r.amount, 0);
 
   return {
     format: "payroll",
     sheetName: "PDF Payroll",
     rows,
-    headerRowIndex: headerLineIdx,
+    headerRowIndex: -1,
     skipped,
-    totalAmount: 0,
+    totalAmount,
   };
 }
 
-/** Returns a single-item sheet summary array matching the Excel pipeline's shape. */
+// ── Sheet-summary for /uploads/excel/sheets ────────────────────────────────
+
 export async function summarizePdfRoster(
   fileObjectPath: string,
 ): Promise<Array<{ name: string; rowCount: number; looksValid: boolean }>> {
@@ -246,7 +145,7 @@ export async function summarizePdfRoster(
         looksValid: parsed.rows.length > 0,
       },
     ];
-  } catch (err: any) {
+  } catch {
     return [{ name: "PDF Payroll", rowCount: 0, looksValid: false }];
   }
 }
