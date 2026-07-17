@@ -37,6 +37,7 @@ import {
   Building2,
   Users,
   X,
+  FileText,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -205,6 +206,16 @@ export function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [showAllSheets, setShowAllSheets] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
+
+  // When a PDF is selected, lock to Payroll Roster — PDFs are roster-only.
+  useEffect(() => {
+    if (isPdf && uploadType !== "payroll_summary") {
+      setUploadType("payroll_summary");
+      setLinkedPayrollUploadId(null);
+    }
+  }, [isPdf]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -552,6 +563,12 @@ export function UploadPage() {
             {isDualUploadOrg && (
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Upload Type</label>
+                {isPdf && (
+                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-200">
+                    <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>PDF detected — automatically set to <strong>Payroll Roster</strong>. PDFs can only be used for roster uploads (Step 1 of 2).</span>
+                  </div>
+                )}
                 <div className="space-y-2 mt-2">
                   {([
                     { value: "standalone",         label: "Standalone Upload",    pill: "Direct",      pillClass: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",       icon: <Upload className="w-5 h-5" />,    desc: "Processes transactions immediately — no roster required." },
@@ -672,7 +689,7 @@ export function UploadPage() {
               <input
                 id="file-input-hidden"
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.pdf"
                 className="sr-only"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 data-testid="input-upload-file"
@@ -680,10 +697,17 @@ export function UploadPage() {
               {file ? (
                 <div className="mt-1.5 flex items-center gap-3 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <FileSpreadsheet className="w-5 h-5" />
+                    {isPdf ? <FileText className="w-5 h-5" /> : <FileSpreadsheet className="w-5 h-5" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 truncate">{file.name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 truncate">{file.name}</p>
+                      {isPdf && (
+                        <span className="text-[9px] font-bold uppercase bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 px-1.5 py-0.5 rounded-md shrink-0">
+                          PDF · Roster only
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500 mt-0.5">
                       {(file.size / 1024).toFixed(0)} KB · Ready to upload
                     </p>
@@ -722,11 +746,12 @@ export function UploadPage() {
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-semibold text-foreground">
-                      {dragOver ? "Drop it here" : "Drop your .xlsx file here"}
+                      {dragOver ? "Drop it here" : "Drop your file here"}
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       or <span className="text-primary font-semibold">browse your computer</span>
                     </p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">.xlsx · .xls · .pdf (roster only)</p>
                   </div>
                 </button>
               )}

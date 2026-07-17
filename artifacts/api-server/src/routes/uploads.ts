@@ -34,6 +34,11 @@ import {
   canonicalEmployeeNo,
   computeDeductionSplit,
 } from "../lib/excelParser";
+import { parsePdfRoster, summarizePdfRoster } from "../lib/pdfParser";
+
+function isPdfPath(p: string): boolean {
+  return p.toLowerCase().endsWith(".pdf");
+}
 import { NameMatcher, MatchResult } from "../lib/nameMatcher";
 
 const router: IRouter = Router();
@@ -309,10 +314,15 @@ router.post(
     const org = await loadOrgOrFail(parsed.data.organization, res);
     if (!org) return;
     try {
+      if (isPdfPath(parsed.data.fileObjectPath)) {
+        const sheets = await summarizePdfRoster(parsed.data.fileObjectPath);
+        res.json({ sheets });
+        return;
+      }
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
       res.json({ sheets: summarizeSheets(wb) });
     } catch (err: any) {
-      res.status(400).json({ error: `Failed to read Excel file: ${err.message}` });
+      res.status(400).json({ error: `Failed to read file: ${err.message}` });
     }
   },
 );
@@ -332,6 +342,13 @@ router.post(
     const orgRecord = await loadOrgOrFail(parsed.data.organization, res);
     if (!orgRecord) return;
     try {
+      // ── PDF roster preview ────────────────────────────────────────────────
+      if (isPdfPath(parsed.data.fileObjectPath)) {
+        const pdfPayroll = await parsePdfRoster(parsed.data.fileObjectPath);
+        await previewPayroll(res, parsed.data, orgRecord.code, pdfPayroll);
+        return;
+      }
+
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
       if (!wb.SheetNames.includes(sheetName)) {
@@ -534,6 +551,15 @@ router.post(
     const orgRecord = await loadOrgOrFail(parsed.data.organization, res);
     if (!orgRecord) return;
     try {
+      // ── PDF roster processing ─────────────────────────────────────────────
+      if (isPdfPath(parsed.data.fileObjectPath)) {
+        const pdfPayroll = await parsePdfRoster(parsed.data.fileObjectPath);
+        const processUploadType = (parsed.data.uploadType ?? "payroll_summary") as
+          "standalone" | "payroll_summary" | "category_breakdown";
+        await processPayroll(req, res, parsed.data, orgRecord.code, pdfPayroll, "PDF Payroll", processUploadType);
+        return;
+      }
+
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
       if (!wb.SheetNames.includes(sheetName)) {
