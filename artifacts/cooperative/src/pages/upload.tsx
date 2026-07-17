@@ -31,6 +31,12 @@ import {
   ListChecks,
   Link2,
   Ban,
+  CloudUpload,
+  Plane,
+  Radio,
+  Building2,
+  Users,
+  X,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -48,6 +54,18 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// Icon mapping for known org codes — falls back to Building2 for unknown codes.
+const ORG_ICONS: Record<string, React.ReactNode> = {
+  FAAN:   <Plane className="w-4 h-4" />,
+  NAMA:   <Radio className="w-4 h-4" />,
+  NIMET:  <Building2 className="w-4 h-4" />,
+  NCAA:   <Plane className="w-4 h-4" />,
+  COOPERATIVE_STAFF: <Users className="w-4 h-4" />,
+  INDEPENDENT_MEMBER: <Users className="w-4 h-4" />,
+  PENSIONERS: <Users className="w-4 h-4" />,
+};
 
 // Unified column list — same template for every organisation. Columns the
 // uploaded sheet does not carry are simply skipped (parser tolerates absent
@@ -186,6 +204,7 @@ export function UploadPage() {
   const [acknowledgeMismatch, setAcknowledgeMismatch] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showAllSheets, setShowAllSheets] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -453,25 +472,30 @@ export function UploadPage() {
           )}
         </div>
 
-        {/* Stepper */}
-        <div className="relative mt-5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider">
+        {/* Stepper — numbered circles with connecting lines */}
+        <div className="relative mt-5 flex items-center">
           {(["select", "pickSheet", "preview"] as Stage[]).map((s, i) => {
-            const labels = ["File", "Sheet", "Review"];
+            const labels = ["Select", "Sheet", "Review"];
             const isActive = stage === s;
             const idx = ["select", "pickSheet", "preview"].indexOf(stage);
             const isPast = i < idx;
             return (
-              <div
-                key={s}
-                className={`flex-1 rounded-full px-2 py-1.5 text-center backdrop-blur-sm border ${
-                  isActive
-                    ? "bg-white text-primary border-white"
-                    : isPast
-                    ? "bg-white/30 text-white border-white/40"
-                    : "bg-white/10 text-white/70 border-white/20"
-                }`}
-              >
-                {i + 1}. {labels[i]}
+              <div key={s} className="flex items-center flex-1 last:flex-none">
+                <div className={`flex items-center gap-2 ${isActive ? "opacity-100" : isPast ? "opacity-90" : "opacity-50"}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 ${
+                    isPast
+                      ? "bg-white border-white text-primary"
+                      : isActive
+                      ? "bg-white border-white text-primary"
+                      : "bg-transparent border-white/50 text-white/80"
+                  }`}>
+                    {isPast ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                  </div>
+                  <span className={`text-xs font-semibold hidden sm:block ${isActive ? "text-white" : isPast ? "text-white/90" : "text-white/60"}`}>
+                    {labels[i]}
+                  </span>
+                </div>
+                {i < 2 && <div className="flex-1 mx-2 h-px bg-white/30" />}
               </div>
             );
           })}
@@ -488,56 +512,85 @@ export function UploadPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organization</label>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {(orgList ?? []).map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => { setSelectedOrgCode(o.code); setOrganization(o.excelFormat); }}
-                    className={`border rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
-                      selectedOrgCode === o.code
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-background hover:bg-muted border-border/60"
-                    }`}
-                    data-testid={`org-${o.code.toLowerCase()}`}
-                  >
-                    {o.code}
-                  </button>
-                ))}
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organisation</label>
+              <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">Which employer does this sheet belong to?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(orgList ?? []).map((o) => {
+                  const isSelected = selectedOrgCode === o.code;
+                  const icon = ORG_ICONS[o.code] ?? <Building2 className="w-4 h-4" />;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => { setSelectedOrgCode(o.code); setOrganization(o.excelFormat); }}
+                      className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-left border-2 transition-all ${
+                        isSelected
+                          ? "border-primary bg-primary/5 dark:bg-primary/10"
+                          : "border-border/60 hover:border-border hover:bg-muted/40"
+                      }`}
+                      data-testid={`org-${o.code.toLowerCase()}`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {icon}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-bold leading-tight ${isSelected ? "text-primary" : "text-foreground"}`}>
+                          {o.code}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">{o.name}</p>
+                      </div>
+                      {isSelected && <CheckCircle className="w-4 h-4 text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5">
-                Pick the employer this spreadsheet is from.
-              </p>
             </div>
 
             {/* Upload type — only shown for orgs that have a payroll sheet */}
             {isDualUploadOrg && (
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Upload Type</label>
-                <div className="flex flex-col sm:flex-row gap-2 mt-1.5">
+                <div className="space-y-2 mt-2">
                   {([
-                    { value: "standalone", label: "Standalone", icon: <Upload className="w-3.5 h-3.5" />, desc: "Direct upload — processes transactions immediately." },
-                    { value: "payroll_summary", label: "Payroll Roster", icon: <ListChecks className="w-3.5 h-3.5" />, desc: "Head-office payroll sheet — saves active member list, no transactions." },
-                    { value: "category_breakdown", label: "Cooperative Archive", icon: <Link2 className="w-3.5 h-3.5" />, desc: "Cooperative deduction sheet — linked to a payroll roster; absent members are skipped." },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => { setUploadType(opt.value); setLinkedPayrollUploadId(null); }}
-                      className={`flex-1 text-left border rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                        uploadType === opt.value
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-background hover:bg-muted border-border/60"
-                      }`}
-                      data-testid={`upload-type-${opt.value}`}
-                    >
-                      <div className="flex items-center gap-1.5 font-semibold">{opt.icon}{opt.label}</div>
-                      <p className={`text-[11px] mt-0.5 leading-snug ${uploadType === opt.value ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                        {opt.desc}
-                      </p>
-                    </button>
-                  ))}
+                    { value: "standalone",         label: "Standalone Upload",    pill: "Direct",      pillClass: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",       icon: <Upload className="w-5 h-5" />,    desc: "Processes transactions immediately — no roster required." },
+                    { value: "payroll_summary",    label: "Payroll Roster",       pill: "Step 1 of 2", pillClass: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",           icon: <ListChecks className="w-5 h-5" />, desc: "Save the active member list from head-office payroll. No transactions created." },
+                    { value: "category_breakdown", label: "Cooperative Archive",  pill: "Step 2 of 2", pillClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300", icon: <Link2 className="w-5 h-5" />,     desc: "Deduction sheet linked to a payroll roster. Absent members are skipped." },
+                  ] as const).map((opt) => {
+                    const isSelected = uploadType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setUploadType(opt.value); setLinkedPayrollUploadId(null); }}
+                        className={`w-full flex items-start gap-4 rounded-xl px-4 py-3.5 text-left border-2 transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 dark:bg-primary/10"
+                            : "border-border/60 hover:border-border hover:bg-muted/40"
+                        }`}
+                        data-testid={`upload-type-${opt.value}`}
+                      >
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                          isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {opt.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md ${opt.pillClass}`}>{opt.pill}</span>
+                          </div>
+                          <p className={`text-[11px] mt-0.5 leading-relaxed ${isSelected ? "text-primary/80" : "text-muted-foreground"}`}>{opt.desc}</p>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 mt-1 shrink-0 flex items-center justify-center transition-colors ${
+                          isSelected ? "border-primary bg-primary" : "border-border"
+                        }`}>
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -574,39 +627,109 @@ export function UploadPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Month</label>
-                <select
-                  className="w-full mt-1.5 border border-input rounded-xl px-3 py-2 text-sm bg-background h-10"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  data-testid="select-upload-month"
-                >
-                  {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
+            <div>
+              <div className="flex items-end justify-between mb-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Deduction Period</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-muted-foreground">Year</span>
+                  <Input
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value))}
+                    className="w-20 h-7 rounded-lg text-xs text-center"
+                    data-testid="input-upload-year"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Year</label>
-                <Input
-                  type="number"
-                  value={year}
-                  onChange={(e) => setYear(parseInt(e.target.value))}
-                  className="mt-1.5 rounded-xl"
-                  data-testid="input-upload-year"
-                />
+              <div className="grid grid-cols-6 gap-1" data-testid="select-upload-month">
+                {MONTHS.map((m, i) => {
+                  const isSelected = month === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMonth(m)}
+                      className={`rounded-lg py-1.5 text-[11px] font-semibold transition-all ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-muted text-muted-foreground hover:bg-muted/70"
+                      }`}
+                    >
+                      {MONTHS_SHORT[i]}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-1.5 h-8 rounded-lg bg-primary/5 border border-primary/20 px-3">
+                <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-xs font-semibold text-primary">{month} {year}</span>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Excel File (.xlsx)</label>
-              <Input
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Excel File</label>
+              {/* Hidden real file input — triggered by click on the drop zone */}
+              <input
+                id="file-input-hidden"
                 type="file"
                 accept=".xlsx,.xls"
+                className="sr-only"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="mt-1.5 rounded-xl file:bg-primary/10 file:text-primary file:border-0 file:rounded-lg file:px-3 file:py-1.5 file:mr-3 file:font-semibold cursor-pointer"
                 data-testid="input-upload-file"
               />
+              {file ? (
+                <div className="mt-1.5 flex items-center gap-3 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 truncate">{file.name}</p>
+                    <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500 mt-0.5">
+                      {(file.size / 1024).toFixed(0)} KB · Ready to upload
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFile(null)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Remove file"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const dropped = e.dataTransfer.files?.[0];
+                    if (dropped) setFile(dropped);
+                  }}
+                  onClick={() => document.getElementById("file-input-hidden")?.click()}
+                  className={`w-full mt-1.5 rounded-xl border-2 border-dashed py-8 flex flex-col items-center gap-2.5 transition-all cursor-pointer ${
+                    dragOver
+                      ? "border-primary bg-primary/5"
+                      : "border-border/60 hover:border-primary/40 hover:bg-muted/30"
+                  }`}
+                >
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+                    dragOver ? "bg-primary/10" : "bg-muted"
+                  }`}>
+                    <CloudUpload className={`w-5 h-5 transition-colors ${dragOver ? "text-primary" : "text-muted-foreground"}`} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-foreground">
+                      {dragOver ? "Drop it here" : "Drop your .xlsx file here"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      or <span className="text-primary font-semibold">browse your computer</span>
+                    </p>
+                  </div>
+                </button>
+              )}
             </div>
 
             <Button
