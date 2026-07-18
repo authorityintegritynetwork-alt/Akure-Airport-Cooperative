@@ -1,3 +1,4 @@
+- [OB claim overwrite bug](ob-claim-overwrite.md) — OB claim must skip balance-column overwrite when member already has monthly transactions; always sync ob_* snapshot.
 - [Auth role guards](auth-role-guards.md) — `requireAdmin` includes auditor+treasurer; use `requireAdminOnly` for balance/membership mutations.
 - [Shares & Provident direction fix](shares-prov-fix.md) — PROV is debit (loan repayment); SHARES is credit opening-balance-only; both now wired end-to-end.
 - [Testing step-up flows](testing-step-up-flows.md) — pass OTP gate in tests by DB-overriding `otp_codes.code_hash`; 10-min grant means 2nd action won't re-prompt (not a bug).

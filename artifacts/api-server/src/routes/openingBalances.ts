@@ -221,18 +221,64 @@ router.post(
         return { error: "already_claimed" as const };
       }
 
-      // Set member balances directly from the opening row (these are starting
-      // balances, not deltas). Aggregates are copied verbatim.
-      const setClauses: Record<string, string> = {};
-      for (const { field } of OPENING_BALANCE_FIELDS) {
-        setClauses[field] = (opening as any)[field];
+      // Check whether monthly deduction uploads have already been processed for
+      // this member. If they have, the current balance columns already equal
+      // (ob_value + all monthly deltas) and must NOT be overwritten — doing so
+      // would erase every repayment and savings credit earned since the OB
+      // cutover. We only initialise balance columns from the OB row when the
+      // member has no monthly history yet (the safe, original path).
+      const [{ txCount }] = await tx
+        .select({ txCount: sql<number>`COUNT(*)::int` })
+        .from(transactionsTable)
+        .where(
+          and(
+            eq(transactionsTable.memberId, memberId),
+            sql`${transactionsTable.type} != 'opening_balance'`,
+          ),
+        );
+      const hasMonthlyTransactions = (txCount as unknown as number) > 0;
+
+      // Build SET clauses. Always sync the ob_* snapshot so the balance-timeline
+      // has a consistent origin point, regardless of whether the OB upload had
+      // already matched this member.
+      const setClauses: Record<string, any> = {
+        obSharesBalance:        opening.sharesBalance,
+        obSavingsBalance:       opening.savingsBalance,
+        obProvidentBalance:     opening.providentBalance,
+        obChristmasBalance:     opening.christmasBalance,
+        obRealLoanBalance:      opening.realLoanBalance,
+        obEmergencyLoanBalance: opening.emergencyLoanBalance,
+        obTotalLoanBalance:     opening.totalLoanBalance,
+        obElectronicsDebt:      opening.electronicsDebt,
+        obSElectronicsDebt:     opening.sElectronicsDebt,
+        obFurnitureDebt:        opening.furnitureDebt,
+        obCommodityDebt:        opening.commodityDebt,
+        obGhlFormDebt:          opening.ghlFormDebt,
+        obFireFundBalance:      opening.fireFundBalance,
+        obFuelVentureBalance:   opening.fuelVentureBalance,
+        obLandLoanBalance:      opening.landLoanBalance,
+        obTotalStoreDebt:       opening.totalStoreDebt,
+        // Preserve any timestamp already written by the OB upload; fall back to now
+        // for members who are being claimed without a prior OB upload match.
+        obUploadedAt: member.obUploadedAt ?? new Date(),
+        status: "active" as const,
+      };
+
+      if (!hasMonthlyTransactions) {
+        // No monthly uploads have run yet — safe to initialise current balance
+        // columns from the OB row exactly as before.
+        for (const { field } of OPENING_BALANCE_FIELDS) {
+          setClauses[field] = (opening as any)[field];
+        }
+        setClauses.totalLoanBalance = opening.totalLoanBalance;
+        setClauses.totalStoreDebt   = opening.totalStoreDebt;
       }
-      setClauses.totalLoanBalance = opening.totalLoanBalance;
-      setClauses.totalStoreDebt = opening.totalStoreDebt;
+      // If hasMonthlyTransactions is true, the current balance columns are left
+      // untouched. They already reflect ob_* + every monthly delta correctly.
 
       const [updated] = await tx
         .update(membersTable)
-        .set({ ...setClauses, status: "active" } as any)
+        .set(setClauses as any)
         .where(eq(membersTable.id, memberId))
         .returning();
 
@@ -327,7 +373,7 @@ function computeObValues(row: { amounts: Record<string, number> }) {
   const furnitureDebt = row.amounts.furniture ?? 0;
   const commodityDebt = row.amounts.commodity ?? 0;
   const ghlFormDebt = row.amounts.ghlForm ?? 0;
-  const totalStoreDebt = electronicsDebt + sElectronicsDebt + commodityDebt + ghlFormDebt;
+  const totalStoreDebt = electronicsDebt + sElectronicsDebt + furnitureDebt + commodityDebt + ghlFormDebt;
   const fireFundBalance = row.amounts.fire ?? 0;
   const fuelVentureBalance = row.amounts.fuelVenture ?? 0;
   const landLoanBalance = row.amounts.landLoan ?? 0;

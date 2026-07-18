@@ -293,9 +293,20 @@ async function applyDeductionAmounts(
         setClauses[field] = sql`GREATEST(0, ${col} - ${Math.abs(delta).toString()}::numeric)`;
       }
     }
-    // Recompute aggregates from the new column values in the same UPDATE.
-    setClauses.totalLoanBalance = sql`${membersTable.realLoanBalance} + ${membersTable.emergencyLoanBalance}`;
-    setClauses.totalStoreDebt = sql`${membersTable.electronicsDebt} + ${membersTable.sElectronicsDebt} + ${membersTable.commodityDebt} + ${membersTable.ghlFormDebt}`;
+    // Recompute aggregates using the SAME expressions already set for each
+    // component column. In a single PostgreSQL UPDATE statement every RHS
+    // expression reads the ORIGINAL row values, so referencing a column name
+    // directly (e.g. `realLoanBalance + emergencyLoanBalance`) would produce
+    // the pre-repayment total. By substituting the already-built GREATEST()
+    // expressions we get the correct post-update sum within the same statement.
+    // If a field wasn't touched this round its SET clause entry is absent and we
+    // fall back to the raw column reference (value is unchanged).
+    const exprFor = (field: string, col: ReturnType<typeof sql>) =>
+      (setClauses[field] as ReturnType<typeof sql> | undefined) ?? sql`${col}`;
+
+    setClauses.totalLoanBalance = sql`${exprFor("realLoanBalance", membersTable.realLoanBalance as any)} + ${exprFor("emergencyLoanBalance", membersTable.emergencyLoanBalance as any)}`;
+    // furnitureDebt is included in the store-debt total (fixes latent omission).
+    setClauses.totalStoreDebt = sql`${exprFor("electronicsDebt", membersTable.electronicsDebt as any)} + ${exprFor("sElectronicsDebt", membersTable.sElectronicsDebt as any)} + ${exprFor("furnitureDebt", membersTable.furnitureDebt as any)} + ${exprFor("commodityDebt", membersTable.commodityDebt as any)} + ${exprFor("ghlFormDebt", membersTable.ghlFormDebt as any)}`;
 
     await tx
       .update(membersTable)
