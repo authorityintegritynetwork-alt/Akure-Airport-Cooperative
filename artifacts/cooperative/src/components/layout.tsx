@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, BookOpen, Upload, Archive, History } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, BookOpen, Upload, Archive, History, FileText } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -103,6 +103,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {navItem("/members", <Users className="w-4 h-4" />, "Members")}
+                      {navItem("/statements", <FileText className="w-4 h-4" />, "Account Statements")}
                       {navItem("/opening-balances", <BookOpen className="w-4 h-4" />, "Opening Balances")}
                       {navItem("/loans", <CreditCard className="w-4 h-4" />, "Loans")}
                     </SidebarMenu>

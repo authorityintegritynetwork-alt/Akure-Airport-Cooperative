@@ -745,12 +745,47 @@ export interface BalanceTimelinePeriod {
   items: BalanceTimelinePeriodItem[];
 }
 
+export interface BalanceTimelineDetail {
+  savings: number;
+  shares: number;
+  christmas: number;
+  fire: number;
+  realLoan: number;
+  emergencyLoan: number;
+  provident: number;
+  fuelVenture: number;
+  landLoan: number;
+  electronics: number;
+  sElectronics: number;
+  furniture: number;
+  commodity: number;
+  ghlForm: number;
+}
+
+export interface TimelineLoanEvent {
+  id: number;
+  loanType: string;
+  amount: number;
+  totalRepayable: number;
+  outstandingBalance: number;
+  monthlyRepayment: number;
+  tenureMonths: number;
+  disbursedAt: string | null;
+  purpose: string | null;
+  productName: string | null;
+}
+
 export interface MemberBalanceTimeline {
   memberId: number;
   fullName: string;
+  memberStatus: string;
+  hasOb: boolean;
   opening: BalanceTimelineSnapshot;
+  openingDetail: BalanceTimelineDetail;
   periods: BalanceTimelinePeriod[];
   current: BalanceTimelineSnapshot;
+  currentDetail: BalanceTimelineDetail;
+  loanEvents: TimelineLoanEvent[];
 }
 
 export type LoanStatus = (typeof LoanStatus)[keyof typeof LoanStatus];

@@ -1023,6 +1023,8 @@ router.get(
     const num = (v: string | null | undefined): number =>
       v == null ? 0 : parseFloat(v) || 0;
 
+    const hasOb = member.obUploadedAt !== null;
+
     const opening = {
       // Provident is a loan (repaid monthly), not savings — exclude from
       // savings total and add to loans so the timeline stays accurate.
@@ -1034,6 +1036,23 @@ router.get(
       store: num(member.obTotalStoreDebt),
     };
 
+    const openingDetail = {
+      savings:     num(member.obSavingsBalance),
+      shares:      num(member.obSharesBalance),
+      christmas:   num(member.obChristmasBalance),
+      fire:        num(member.obFireFundBalance),
+      realLoan:    num(member.obRealLoanBalance),
+      emergencyLoan: num(member.obEmergencyLoanBalance),
+      provident:   num(member.obProvidentBalance),
+      fuelVenture: num(member.obFuelVentureBalance),
+      landLoan:    num(member.obLandLoanBalance),
+      electronics: num(member.obElectronicsDebt),
+      sElectronics: num(member.obSElectronicsDebt),
+      furniture:   num(member.obFurnitureDebt),
+      commodity:   num(member.obCommodityDebt),
+      ghlForm:     num(member.obGhlFormDebt),
+    };
+
     const current = {
       savings:
         num(member.savingsBalance) +
@@ -1043,15 +1062,69 @@ router.get(
       store: num(member.totalStoreDebt),
     };
 
-    const txns = await db
-      .select({
-        type: transactionsTable.type,
-        amount: transactionsTable.amount,
-        month: transactionsTable.month,
-        year: transactionsTable.year,
-      })
-      .from(transactionsTable)
-      .where(eq(transactionsTable.memberId, id));
+    const currentDetail = {
+      savings:      num(member.savingsBalance),
+      shares:       num(member.sharesBalance),
+      christmas:    num(member.christmasBalance),
+      fire:         num(member.fireFundBalance),
+      realLoan:     num(member.realLoanBalance),
+      emergencyLoan: num(member.emergencyLoanBalance),
+      provident:    num(member.providentBalance),
+      fuelVenture:  num(member.fuelVentureBalance),
+      landLoan:     num(member.landLoanBalance),
+      electronics:  num(member.electronicsDebt),
+      sElectronics: num(member.sElectronicsDebt),
+      furniture:    num(member.furnitureDebt),
+      commodity:    num(member.commodityDebt),
+      ghlForm:      num(member.ghlFormDebt),
+    };
+
+    // Fetch transactions and disbursed loans in parallel.
+    const [txns, loanRows] = await Promise.all([
+      db
+        .select({
+          type: transactionsTable.type,
+          amount: transactionsTable.amount,
+          month: transactionsTable.month,
+          year: transactionsTable.year,
+        })
+        .from(transactionsTable)
+        .where(eq(transactionsTable.memberId, id)),
+      db
+        .select({
+          id: loansTable.id,
+          loanType: loansTable.loanType,
+          amount: loansTable.amount,
+          totalRepayable: loansTable.totalRepayable,
+          outstandingBalance: loansTable.outstandingBalance,
+          monthlyRepayment: loansTable.monthlyRepayment,
+          tenureMonths: loansTable.tenureMonths,
+          disbursedAt: loansTable.disbursedAt,
+          purpose: loansTable.purpose,
+          loanProductId: loansTable.loanProductId,
+        })
+        .from(loansTable)
+        .where(
+          and(
+            eq(loansTable.memberId, id),
+            eq(loansTable.status, "disbursed"),
+          ),
+        )
+        .orderBy(loansTable.disbursedAt),
+    ]);
+
+    const loanEvents = loanRows.map((l) => ({
+      id: l.id,
+      loanType: l.loanType ?? "real",
+      amount: num(l.amount as unknown as string),
+      totalRepayable: num(l.totalRepayable as unknown as string),
+      outstandingBalance: num(l.outstandingBalance as unknown as string),
+      monthlyRepayment: num(l.monthlyRepayment as unknown as string),
+      tenureMonths: l.tenureMonths ?? 0,
+      disbursedAt: l.disbursedAt ? new Date(l.disbursedAt).toISOString() : null,
+      purpose: l.purpose ?? null,
+      productName: null, // product name lookup omitted (join not needed for timeline)
+    }));
 
     type PeriodAgg = {
       year: number;
@@ -1132,9 +1205,14 @@ router.get(
     res.json({
       memberId: member.id,
       fullName: member.fullName,
+      memberStatus: member.status,
+      hasOb,
       opening,
+      openingDetail,
       periods,
       current,
+      currentDetail,
+      loanEvents,
     });
   },
 );

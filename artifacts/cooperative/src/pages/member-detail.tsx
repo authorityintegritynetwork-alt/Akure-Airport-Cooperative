@@ -12,7 +12,6 @@ import {
   getListTransactionsQueryKey,
   getListLoansQueryKey,
   getListStorePurchasesQueryKey,
-  type MemberBalanceTimeline,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +26,8 @@ import {
   Phone,
   IdCard,
   TrendingUp,
-  Flag,
-  CircleDot,
 } from "lucide-react";
+import { BalanceTimeline } from "@/components/balance-timeline";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -208,7 +206,22 @@ export function MemberDetailPage() {
         />
       </div>
 
-      {timeline && <BalanceTimeline timeline={timeline} />}
+      {timeline && (
+        <Card className="rounded-2xl shadow-sm border-border/70">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Balance Timeline
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              From opening balance through each uploaded month to the current balance.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <BalanceTimeline timeline={timeline} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="rounded-2xl shadow-sm border-border/70">
         <CardHeader className="pb-2">
@@ -329,144 +342,7 @@ export function MemberDetailPage() {
   );
 }
 
-function TimelineSnapshot({
-  savings,
-  loan,
-  store,
-}: {
-  savings: number;
-  loan: number;
-  store: number;
-}) {
-  return (
-    <div className="grid grid-cols-3 gap-2 mt-2">
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Savings
-        </p>
-        <p className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-          {formatCurrency(savings)}
-        </p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Loan
-        </p>
-        <p className="text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400">
-          {formatCurrency(loan)}
-        </p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Store
-        </p>
-        <p className="text-sm font-semibold tabular-nums text-sky-600 dark:text-sky-400">
-          {formatCurrency(store)}
-        </p>
-      </div>
-    </div>
-  );
-}
 
-function BalanceTimeline({ timeline }: { timeline: MemberBalanceTimeline }) {
-  return (
-    <Card className="rounded-2xl shadow-sm border-border/70">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          Balance Timeline
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          From opening balance through each uploaded month to the current
-          balance.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="relative pl-6">
-          {/* vertical line */}
-          <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
-
-          {/* Opening */}
-          <div className="relative mb-5" data-testid="timeline-opening">
-            <div className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-primary/15 border-2 border-primary flex items-center justify-center">
-              <Flag className="w-2 h-2 text-primary" />
-            </div>
-            <p className="text-sm font-semibold">Opening Balance</p>
-            <TimelineSnapshot
-              savings={timeline.opening.savings}
-              loan={timeline.opening.loan}
-              store={timeline.opening.store}
-            />
-          </div>
-
-          {/* Monthly periods */}
-          {timeline.periods.length === 0 ? (
-            <div className="relative mb-5 text-xs text-muted-foreground">
-              No monthly deduction uploads recorded yet.
-            </div>
-          ) : (
-            timeline.periods.map((p) => (
-              <div
-                key={p.label}
-                className="relative mb-5"
-                data-testid={`timeline-period-${p.year}-${p.month}`}
-              >
-                <div className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-muted border-2 border-muted-foreground/40" />
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-sm font-semibold">{p.label}</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {p.savingsAdded > 0 && (
-                      <Badge
-                        variant="outline"
-                        className="rounded-full text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-                      >
-                        +{formatCurrency(p.savingsAdded)} saved
-                      </Badge>
-                    )}
-                    {p.loanRepaid > 0 && (
-                      <Badge
-                        variant="outline"
-                        className="rounded-full text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
-                      >
-                        −{formatCurrency(p.loanRepaid)} loan
-                      </Badge>
-                    )}
-                    {p.storeRepaid > 0 && (
-                      <Badge
-                        variant="outline"
-                        className="rounded-full text-[10px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20"
-                      >
-                        −{formatCurrency(p.storeRepaid)} store
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <TimelineSnapshot
-                  savings={p.running.savings}
-                  loan={p.running.loan}
-                  store={p.running.store}
-                />
-              </div>
-            ))
-          )}
-
-          {/* Current */}
-          <div className="relative" data-testid="timeline-current">
-            <div className="absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500/15 border-2 border-emerald-500 flex items-center justify-center">
-              <CircleDot className="w-2 h-2 text-emerald-600" />
-            </div>
-            <p className="text-sm font-semibold">Current Balance</p>
-            <TimelineSnapshot
-              savings={timeline.current.savings}
-              loan={timeline.current.loan}
-              store={timeline.current.store}
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function BalanceTile({
   icon,

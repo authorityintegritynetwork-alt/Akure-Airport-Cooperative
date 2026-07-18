@@ -35,6 +35,7 @@ import { CooperativeRecordsPage } from "./pages/cooperative-records";
 import { AnnouncementsPage } from "./pages/announcements";
 import { SupportPage } from "./pages/support";
 import { SupportAdminPage } from "./pages/support-admin";
+import { StatementsPage } from "./pages/statements";
 import { useGetProfile } from "@workspace/api-client-react";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -289,6 +290,9 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/support-admin">
             <ProtectedRoute component={SupportAdminPage} />
+          </Route>
+          <Route path="/statements">
+            <ProtectedRoute component={StatementsPage} />
           </Route>
           <Route path="/upload">
             <ProtectedRoute component={UploadPage} />
