@@ -4,3 +4,4 @@
 - [Excel parser skip diagnostics](excel-parser-skip-diagnostics.md) — parseSheet drops rows pre-consumer; collect skip reasons in the parser, not the insert loop.
 - [Opening-balance claiming](opening-balance-claiming.md) — OB only claimed at approval; never auto-claim on deduction upload. Invariant: no claimed OB linked to a pending member.
 - [Dev workflow port conflict](dev-workflow-port-conflict.md) — new routes 404→Vite HTML despite being in dist? Stale api-server holds the port; restart `artifacts/api-server: API Server`.
+- [Simple roster formats](simple-roster-formats.md) — CTAKU (FAAN sub-group) and Pension Excel files: single Amount column, headers on row 3, treated as payroll_summary Step 1.

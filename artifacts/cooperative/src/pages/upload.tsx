@@ -197,7 +197,7 @@ export function UploadPage() {
   const [linkedPayrollUploadId, setLinkedPayrollUploadId] = useState<number | null>(null);
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
-  const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean; detectedMonth?: string; detectedYear?: number }[]>([]);
+  const [sheets, setSheets] = useState<{ name: string; rowCount: number; looksValid: boolean; detectedMonth?: string; detectedYear?: number; simpleRosterFormat?: string }[]>([]);
   const [chosenSheet, setChosenSheet] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [manualMatches, setManualMatches] = useState<Record<number, number>>({});
@@ -209,6 +209,11 @@ export function UploadPage() {
 
   const isPdf = file?.name.toLowerCase().endsWith(".pdf") ?? false;
 
+  // Derived from sheets response — set after upload when the server detects CTAKU/Pension format.
+  const isSimpleRoster = sheets.some((s) => s.simpleRosterFormat != null);
+  const simpleRosterFormatValue = sheets.find((s) => s.simpleRosterFormat != null)?.simpleRosterFormat;
+  const simpleRosterLabel = simpleRosterFormatValue === "pension" ? "Pension Deductions" : "CTAKU Payroll";
+
   // When a PDF is selected, lock to Payroll Roster — PDFs are roster-only.
   useEffect(() => {
     if (isPdf && uploadType !== "payroll_summary") {
@@ -216,6 +221,14 @@ export function UploadPage() {
       setLinkedPayrollUploadId(null);
     }
   }, [isPdf]);
+
+  // When a simple-roster Excel (CTAKU / Pension) is detected, lock to Payroll Roster.
+  useEffect(() => {
+    if (isSimpleRoster && uploadType !== "payroll_summary") {
+      setUploadType("payroll_summary");
+      setLinkedPayrollUploadId(null);
+    }
+  }, [isSimpleRoster]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -569,6 +582,12 @@ export function UploadPage() {
                     <span>PDF detected — automatically set to <strong>Payroll Roster</strong>. PDFs can only be used for roster uploads (Step 1 of 2).</span>
                   </div>
                 )}
+                {isSimpleRoster && (
+                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-200">
+                    <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span><strong>{simpleRosterLabel}</strong> format detected — automatically set to <strong>Payroll Roster</strong> (Step 1 of 2). The category breakdown comes from the regular cooperative sheet.</span>
+                  </div>
+                )}
                 <div className="space-y-2 mt-2">
                   {([
                     { value: "standalone",         label: "Standalone Upload",    pill: "Direct",      pillClass: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",       icon: <Upload className="w-5 h-5" />,    desc: "Processes transactions immediately — no roster required." },
@@ -705,6 +724,11 @@ export function UploadPage() {
                       {isPdf && (
                         <span className="text-[9px] font-bold uppercase bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 px-1.5 py-0.5 rounded-md shrink-0">
                           PDF · Roster only
+                        </span>
+                      )}
+                      {isSimpleRoster && (
+                        <span className="text-[9px] font-bold uppercase bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 px-1.5 py-0.5 rounded-md shrink-0">
+                          {simpleRosterLabel} · Roster only
                         </span>
                       )}
                     </div>

@@ -35,6 +35,11 @@ import {
   computeDeductionSplit,
 } from "../lib/excelParser";
 import { parsePdfRoster, summarizePdfRoster } from "../lib/pdfParser";
+import {
+  detectSimpleRosterFormat,
+  parseSimpleRosterSheet,
+  summarizeSimpleRosterSheet,
+} from "../lib/simpleRosterParser";
 
 function isPdfPath(p: string): boolean {
   return p.toLowerCase().endsWith(".pdf");
@@ -320,6 +325,13 @@ router.post(
         return;
       }
       const wb = await downloadWorkbook(parsed.data.fileObjectPath);
+      // ── Simple roster detection (CTAKU / Pension) ────────────────────────
+      const firstSheet = wb.SheetNames[0];
+      const simpleFormat = firstSheet ? detectSimpleRosterFormat(wb, firstSheet) : null;
+      if (simpleFormat) {
+        res.json({ sheets: summarizeSimpleRosterSheet(wb, firstSheet, simpleFormat) });
+        return;
+      }
       res.json({ sheets: summarizeSheets(wb) });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to read file: ${err.message}` });
@@ -353,6 +365,14 @@ router.post(
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
       if (!wb.SheetNames.includes(sheetName)) {
         res.status(400).json({ error: `Sheet "${sheetName}" not found in workbook` });
+        return;
+      }
+
+      // ── Simple roster preview (CTAKU / Pension) ───────────────────────────
+      const simpleFormatPreview = detectSimpleRosterFormat(wb, sheetName);
+      if (simpleFormatPreview) {
+        const simplePayroll = parseSimpleRosterSheet(wb, sheetName, simpleFormatPreview);
+        await previewPayroll(res, parsed.data, orgRecord.code, simplePayroll);
         return;
       }
 
@@ -564,6 +584,16 @@ router.post(
       const sheetName = parsed.data.sheetName || wb.SheetNames[0];
       if (!wb.SheetNames.includes(sheetName)) {
         res.status(400).json({ error: `Sheet "${sheetName}" not found in workbook` });
+        return;
+      }
+
+      // ── Simple roster processing (CTAKU / Pension) ────────────────────────
+      const simpleFormatProcess = detectSimpleRosterFormat(wb, sheetName);
+      if (simpleFormatProcess) {
+        const simplePayroll = parseSimpleRosterSheet(wb, sheetName, simpleFormatProcess);
+        const processUploadType = (parsed.data.uploadType ?? "payroll_summary") as
+          "standalone" | "payroll_summary" | "category_breakdown";
+        await processPayroll(req, res, parsed.data, orgRecord.code, simplePayroll, simplePayroll.sheetName, processUploadType);
         return;
       }
 
