@@ -39,6 +39,8 @@ export const transactionsTable = pgTable(
         "land_loan_repayment",
         "store_repayment",
         "opening_balance",
+        "christmas_payout",
+        "shares_credit",
       ],
     }).notNull(),
     category: text("category"),

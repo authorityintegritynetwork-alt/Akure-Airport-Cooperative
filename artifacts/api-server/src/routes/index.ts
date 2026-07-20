@@ -18,6 +18,7 @@ import openingBalancesRouter from "./openingBalances";
 import storageRouter from "./storage";
 import broadcastsRouter from "./broadcasts";
 import supportRouter from "./support";
+import adminActionsRouter from "./admin-actions";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(openingBalancesRouter);
 router.use(storageRouter);
 router.use(broadcastsRouter);
 router.use(supportRouter);
+router.use(adminActionsRouter);
 
 export default router;

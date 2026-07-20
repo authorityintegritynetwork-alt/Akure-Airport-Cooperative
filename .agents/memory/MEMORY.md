@@ -7,3 +7,4 @@
 - [Dev workflow port conflict](dev-workflow-port-conflict.md) — new routes 404→Vite HTML despite being in dist? Stale api-server holds the port; restart `artifacts/api-server: API Server`.
 - [Simple roster formats](simple-roster-formats.md) — CTAKU (FAAN sub-group) and Pension Excel files: single Amount column, headers on row 3, treated as payroll_summary Step 1.
 - [API client dist types](api-client-dist-types.md) — Adding types to api.schemas.ts requires mirroring changes in dist/generated/api.schemas.d.ts; TypeScript resolves from dist in some contexts.
+- [Balance column model](balance-column-model.md) — 14 spreadsheet columns tracked separately; loan cards show total repaid (not outstanding); TX_TO_COL maps all type strings; two admin actions for christmas payout + shares credit.

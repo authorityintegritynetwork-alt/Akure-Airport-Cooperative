@@ -1,21 +1,19 @@
-import React, { useState } from "react";
+import React from "react";
 import type {
   MemberBalanceTimeline,
-  BalanceTimelineDetail,
+  MemberBalanceColumns,
+  ColumnHistory,
   TimelineLoanEvent,
-  BalanceTimelinePeriod,
 } from "@workspace/api-client-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 import {
-  Flag,
-  CircleDot,
-  CreditCard,
   ChevronDown,
   ChevronUp,
   Printer,
   AlertTriangle,
+  CreditCard,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,176 +23,147 @@ function fmt(v: number) {
   return formatCurrency(v);
 }
 
-function DetailRow({
-  label,
-  value,
-  tone = "neutral",
+type ColKey = keyof MemberBalanceColumns;
+
+const SAVINGS_COLS: ColKey[] = ["savings", "christmas", "shares"];
+
+const LOAN_COLS: ColKey[] = [
+  "realLoan",
+  "provident",
+  "emergencyLoan",
+  "electronics",
+  "sElectronics",
+  "furniture",
+  "fuelVenture",
+  "commodity",
+  "fire",
+  "ghlForm",
+  "landLoan",
+];
+
+const COL_LABELS: Record<ColKey, string> = {
+  savings:      "Savings",
+  christmas:    "Christmas Savings",
+  shares:       "Share Capital",
+  realLoan:     "Real Loan",
+  provident:    "Provident Loan",
+  emergencyLoan:"Emergency Loan",
+  electronics:  "Electronics Loan",
+  sElectronics: "Land / Electronics",
+  furniture:    "Furniture Loan",
+  fuelVenture:  "Fuel & Venture",
+  commodity:    "Commodity Loan",
+  fire:         "Fire Fund",
+  ghlForm:      "GHL Form",
+  landLoan:     "Land Loan",
+};
+
+// ── ColumnCard ─────────────────────────────────────────────────────────────
+
+function ColumnCard({
+  colKey,
+  history,
+  isSavings,
+  forceExpand,
 }: {
-  label: string;
-  value: number;
-  tone?: "credit" | "debit" | "neutral";
+  colKey: ColKey;
+  history: ColumnHistory;
+  isSavings: boolean;
+  forceExpand: boolean;
 }) {
-  if (value === 0) return null;
+  const [expanded, setExpanded] = React.useState(false);
+  const show = expanded || forceExpand;
+
+  const totalRepaid = history.months.reduce((s, m) => s + m.amount, 0);
+  // For savings: show live balance from members table.
+  // For loans: show cumulative total repaid from monthly uploads.
+  const displayBalance = isSavings ? history.current : totalRepaid;
+
+  const hasData = history.ob > 0 || history.months.length > 0;
+  if (!hasData) return null;
+
   return (
-    <div className="flex justify-between text-xs py-[3px]">
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          "font-mono tabular-nums",
-          tone === "credit" && "text-emerald-700 dark:text-emerald-400",
-          tone === "debit" && "text-amber-700 dark:text-amber-400",
+    <div className="border border-border rounded-xl p-4 flex flex-col gap-2 print:break-inside-avoid">
+      {/* header row */}
+      <div className="flex items-start justify-between gap-1">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide leading-tight">
+          {COL_LABELS[colKey]}
+        </p>
+        <button
+          className="print:hidden text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={show}
+          aria-label={show ? "Hide history" : "Show history"}
+        >
+          {show ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+
+      {/* main figure */}
+      <div>
+        <p
+          className={cn(
+            "text-xl font-bold font-mono tabular-nums",
+            isSavings
+              ? "text-emerald-700 dark:text-emerald-400"
+              : "text-amber-700 dark:text-amber-400",
+          )}
+        >
+          {fmt(displayBalance)}
+        </p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          {isSavings ? "Current Balance" : "Total Repaid"}
+        </p>
+      </div>
+
+      {/* history — controlled on screen, always shown when printing */}
+      <div className={cn("mt-0.5 print:block", show ? "block" : "hidden")}>
+        {history.ob > 0 && (
+          <div className="flex justify-between items-baseline text-xs py-1 border-t border-border/40">
+            <span className="text-muted-foreground">
+              {isSavings ? "Opening Balance" : "Opening (owed)"}
+            </span>
+            <span className="font-mono text-muted-foreground">{fmt(history.ob)}</span>
+          </div>
         )}
-      >
-        {fmt(value)}
-      </span>
+
+        {history.months.map((m) => (
+          <div
+            key={`${m.year}-${m.month}`}
+            className="flex justify-between items-baseline text-xs py-1 border-t border-border/30"
+          >
+            <span className="text-muted-foreground">{m.label}</span>
+            <span
+              className={cn(
+                "font-mono tabular-nums",
+                isSavings
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-amber-700 dark:text-amber-400",
+              )}
+            >
+              {isSavings ? "+" : "−"}
+              {fmt(m.amount)}
+            </span>
+          </div>
+        ))}
+
+        {history.months.length === 0 && (
+          <p className="text-[11px] text-muted-foreground pt-1.5">
+            No monthly uploads recorded yet.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 pt-2 pb-0.5">
-      {children}
-    </p>
-  );
-}
+// ── Loan disbursement card ─────────────────────────────────────────────────
 
-function DetailBreakdown({ detail }: { detail: BalanceTimelineDetail }) {
-  const hasLoans =
-    detail.realLoan > 0 ||
-    detail.emergencyLoan > 0 ||
-    detail.provident > 0 ||
-    detail.fuelVenture > 0 ||
-    detail.landLoan > 0;
-  const hasStore =
-    detail.electronics > 0 ||
-    detail.sElectronics > 0 ||
-    detail.furniture > 0 ||
-    detail.commodity > 0 ||
-    detail.ghlForm > 0;
-
-  return (
-    <div className="mt-1.5 border-t border-border/50 pt-1">
-      <SectionLabel>Savings &amp; Contributions</SectionLabel>
-      <DetailRow label="Savings" value={detail.savings} tone="credit" />
-      <DetailRow label="Share Capital" value={detail.shares} tone="credit" />
-      <DetailRow label="Christmas Savings" value={detail.christmas} tone="credit" />
-      <DetailRow label="Fire Fund" value={detail.fire} tone="credit" />
-
-      {hasLoans && (
-        <>
-          <SectionLabel>Outstanding Loans</SectionLabel>
-          <DetailRow label="Real Loan" value={detail.realLoan} tone="debit" />
-          <DetailRow label="Emergency Loan" value={detail.emergencyLoan} tone="debit" />
-          <DetailRow label="Provident Loan" value={detail.provident} tone="debit" />
-          <DetailRow label="Fuel Venture" value={detail.fuelVenture} tone="debit" />
-          <DetailRow label="Land Loan" value={detail.landLoan} tone="debit" />
-        </>
-      )}
-
-      {hasStore && (
-        <>
-          <SectionLabel>Store Debt</SectionLabel>
-          <DetailRow label="Electronics" value={detail.electronics} tone="debit" />
-          <DetailRow label="Staff Electronics" value={detail.sElectronics} tone="debit" />
-          <DetailRow label="Furniture" value={detail.furniture} tone="debit" />
-          <DetailRow label="Commodity" value={detail.commodity} tone="debit" />
-          <DetailRow label="GHL Form" value={detail.ghlForm} tone="debit" />
-        </>
-      )}
-    </div>
-  );
-}
-
-function SnapshotSummary({
-  savings,
-  loan,
-  store,
-}: {
-  savings: number;
-  loan: number;
-  store: number;
-}) {
-  return (
-    <div className="flex gap-4 flex-wrap mt-1.5 text-xs">
-      <span>
-        <span className="text-muted-foreground">Savings: </span>
-        <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-          {fmt(savings)}
-        </span>
-      </span>
-      {loan > 0 && (
-        <span>
-          <span className="text-muted-foreground">Loans: </span>
-          <span className="font-mono font-semibold text-amber-700 dark:text-amber-400">
-            {fmt(loan)}
-          </span>
-        </span>
-      )}
-      {store > 0 && (
-        <span>
-          <span className="text-muted-foreground">Store: </span>
-          <span className="font-mono font-semibold text-sky-700 dark:text-sky-400">
-            {fmt(store)}
-          </span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ── timeline dot ──────────────────────────────────────────────────────────────
-
-function TimelineDot({
-  icon,
-  color,
-}: {
-  icon: React.ReactNode;
-  color: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "absolute -left-6 top-0.5 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center",
-        color,
-      )}
-    >
-      {icon}
-    </div>
-  );
-}
-
-// ── node components ───────────────────────────────────────────────────────────
-
-function OpeningNode({
-  opening,
-  openingDetail,
-  hasOb,
-}: {
-  opening: { savings: number; loan: number; store: number };
-  openingDetail: BalanceTimelineDetail;
-  hasOb: boolean;
-}) {
-  return (
-    <div className="relative mb-6" data-testid="timeline-opening">
-      <TimelineDot
-        icon={<Flag className="w-2 h-2 text-primary" />}
-        color="bg-primary/15 border-primary"
-      />
-      <p className="text-sm font-semibold">Opening Balance</p>
-      {!hasOb && (
-        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="w-3 h-3 shrink-0" />
-          No opening balance on file — values below are ₦0
-        </div>
-      )}
-      <SnapshotSummary {...opening} />
-      <DetailBreakdown detail={openingDetail} />
-    </div>
-  );
-}
-
-function LoanEventNode({ event }: { event: TimelineLoanEvent }) {
+function LoanEventCard({ event }: { event: TimelineLoanEvent }) {
   const dateStr = event.disbursedAt
     ? new Date(event.disbursedAt).toLocaleDateString("en-GB", {
         day: "numeric",
@@ -208,21 +177,23 @@ function LoanEventNode({ event }: { event: TimelineLoanEvent }) {
       ? "Emergency Loan"
       : event.loanType === "provident"
         ? "Provident Loan"
-        : event.productName ?? "Real Loan";
+        : "Real Loan";
 
   return (
-    <div className="relative mb-6" data-testid={`timeline-loan-${event.id}`}>
-      <TimelineDot
-        icon={<CreditCard className="w-2 h-2 text-violet-600" />}
-        color="bg-violet-500/15 border-violet-500"
-      />
-      <div className="flex items-center gap-2 flex-wrap">
-        <p className="text-sm font-semibold">{typeLabel} Disbursed</p>
-        {dateStr && (
-          <span className="text-xs text-muted-foreground">{dateStr}</span>
-        )}
+    <div className="border border-violet-200 dark:border-violet-800 rounded-xl p-4 bg-violet-500/5 print:break-inside-avoid">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wide">
+            {typeLabel} Disbursed
+          </p>
+          {dateStr && (
+            <p className="text-xs text-muted-foreground mt-0.5">{dateStr}</p>
+          )}
+        </div>
+        <CreditCard className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
       </div>
-      <div className="mt-2 border border-border/50 rounded-xl p-3 bg-violet-500/5 text-xs space-y-1.5">
+
+      <div className="space-y-1.5 text-xs">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Principal</span>
           <span className="font-mono font-semibold">{fmt(event.amount)}</span>
@@ -249,8 +220,8 @@ function LoanEventNode({ event }: { event: TimelineLoanEvent }) {
             <span className="text-right">{event.purpose}</span>
           </div>
         )}
-        <div className="flex justify-between border-t border-border/40 pt-1.5 mt-1">
-          <span className="text-muted-foreground">Outstanding Balance</span>
+        <div className="flex justify-between border-t border-violet-200/50 dark:border-violet-800/50 pt-1.5 mt-0.5">
+          <span className="text-muted-foreground">Outstanding</span>
           <span className="font-mono font-semibold text-amber-700 dark:text-amber-400">
             {fmt(event.outstandingBalance)}
           </span>
@@ -260,141 +231,25 @@ function LoanEventNode({ event }: { event: TimelineLoanEvent }) {
   );
 }
 
-function PeriodNode({
-  period,
-  expanded,
-  onToggle,
+// ── Section header ─────────────────────────────────────────────────────────
+
+function SectionHeader({
+  children,
+  icon,
 }: {
-  period: BalanceTimelinePeriod;
-  expanded: boolean;
-  onToggle: () => void;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
 }) {
   return (
-    <div
-      className="relative mb-5"
-      data-testid={`timeline-period-${period.year}-${period.month}`}
-    >
-      <TimelineDot icon={null} color="bg-muted border-muted-foreground/40" />
-
-      <button
-        className="w-full text-left"
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold">{period.label}</p>
-          <span className="text-muted-foreground mt-0.5 print:hidden shrink-0">
-            {expanded ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </span>
-        </div>
-
-        <div className="flex gap-1.5 flex-wrap mt-1">
-          {period.savingsAdded > 0 && (
-            <Badge
-              variant="outline"
-              className="rounded-full text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-            >
-              +{fmt(period.savingsAdded)} saved
-            </Badge>
-          )}
-          {period.loanRepaid > 0 && (
-            <Badge
-              variant="outline"
-              className="rounded-full text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
-            >
-              −{fmt(period.loanRepaid)} loan
-            </Badge>
-          )}
-          {period.storeRepaid > 0 && (
-            <Badge
-              variant="outline"
-              className="rounded-full text-[10px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20"
-            >
-              −{fmt(period.storeRepaid)} store
-            </Badge>
-          )}
-        </div>
-      </button>
-
-      {/* Detail — visible when expanded on screen; always visible when printing */}
-      <div className={cn("mt-2 print:block", expanded ? "block" : "hidden")}>
-        <div className="border border-border/50 rounded-xl overflow-hidden">
-          {period.items.map((item) => (
-            <div
-              key={item.label}
-              className="flex justify-between text-xs px-3 py-1.5 odd:bg-muted/30"
-            >
-              <span className="text-muted-foreground">{item.label}</span>
-              <span
-                className={cn(
-                  "font-mono tabular-nums",
-                  item.direction === "credit"
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-amber-700 dark:text-amber-400",
-                )}
-              >
-                {item.direction === "credit" ? "+" : "−"}
-                {fmt(item.amount)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-2 text-xs text-muted-foreground">
-          After this month:{" "}
-          <span className="text-emerald-700 dark:text-emerald-400 font-mono">
-            {fmt(period.running.savings)}
-          </span>{" "}
-          savings
-          {period.running.loan > 0 && (
-            <>
-              {" · "}
-              <span className="text-amber-700 dark:text-amber-400 font-mono">
-                {fmt(period.running.loan)}
-              </span>{" "}
-              loans
-            </>
-          )}
-          {period.running.store > 0 && (
-            <>
-              {" · "}
-              <span className="text-sky-700 dark:text-sky-400 font-mono">
-                {fmt(period.running.store)}
-              </span>{" "}
-              store
-            </>
-          )}
-        </p>
-      </div>
+    <div className="flex items-center gap-2 mt-6 mb-3 first:mt-0">
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <h3 className="text-sm font-semibold text-foreground shrink-0">{children}</h3>
+      <div className="flex-1 h-px bg-border" />
     </div>
   );
 }
 
-function CurrentNode({
-  current,
-  currentDetail,
-}: {
-  current: { savings: number; loan: number; store: number };
-  currentDetail: BalanceTimelineDetail;
-}) {
-  return (
-    <div className="relative" data-testid="timeline-current">
-      <TimelineDot
-        icon={<CircleDot className="w-2 h-2 text-emerald-600" />}
-        color="bg-emerald-500/15 border-emerald-500"
-      />
-      <p className="text-sm font-semibold">Current Balance</p>
-      <SnapshotSummary {...current} />
-      <DetailBreakdown detail={currentDetail} />
-    </div>
-  );
-}
-
-// ── main exported component ───────────────────────────────────────────────────
+// ── Main export ────────────────────────────────────────────────────────────
 
 interface BalanceTimelineProps {
   timeline: MemberBalanceTimeline;
@@ -402,22 +257,20 @@ interface BalanceTimelineProps {
 }
 
 export function BalanceTimeline({ timeline, className }: BalanceTimelineProps) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [forceExpand, setForceExpand] = React.useState(false);
 
-  const toggle = (label: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(label) ? next.delete(label) : next.add(label);
-      return next;
-    });
+  const activeSavings = SAVINGS_COLS.filter(
+    (k) => timeline.columns[k].ob > 0 || timeline.columns[k].months.length > 0,
+  );
+  const activeLoans = LOAN_COLS.filter(
+    (k) => timeline.columns[k].ob > 0 || timeline.columns[k].months.length > 0,
+  );
+  const isEmpty = activeSavings.length === 0 && activeLoans.length === 0;
 
-  const allExpanded =
-    timeline.periods.length > 0 &&
-    timeline.periods.every((p) => expanded.has(p.label));
-
-  const expandAll = () =>
-    setExpanded(new Set(timeline.periods.map((p) => p.label)));
-  const collapseAll = () => setExpanded(new Set());
+  const handlePrint = () => {
+    setForceExpand(true);
+    setTimeout(() => window.print(), 150);
+  };
 
   return (
     <div className={className}>
@@ -438,72 +291,103 @@ export function BalanceTimeline({ timeline, className }: BalanceTimelineProps) {
         </p>
       </div>
 
-      {/* Controls (hidden when printing) */}
-      {timeline.periods.length > 0 && (
-        <div className="flex items-center justify-between gap-2 mb-4 print:hidden">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs h-7 px-2 gap-1"
-            onClick={allExpanded ? collapseAll : expandAll}
-          >
-            {allExpanded ? (
-              <><ChevronUp className="w-3 h-3" /> Collapse all months</>
-            ) : (
-              <><ChevronDown className="w-3 h-3" /> Expand all months</>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs h-7 gap-1.5"
-            onClick={() => {
-              expandAll();
-              // small delay so React re-renders before the print dialog opens
-              setTimeout(() => window.print(), 120);
-            }}
-          >
-            <Printer className="w-3 h-3" />
-            Print / Save PDF
-          </Button>
+      {/* Controls */}
+      <div className="flex items-center justify-between gap-2 mb-5 print:hidden">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs h-7 px-2 gap-1"
+          onClick={() => setForceExpand((v) => !v)}
+        >
+          {forceExpand ? (
+            <>
+              <ChevronUp className="w-3 h-3" /> Collapse all
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3 h-3" /> Expand all
+            </>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs h-7 gap-1.5"
+          onClick={handlePrint}
+        >
+          <Printer className="w-3 h-3" />
+          Print / Save PDF
+        </Button>
+      </div>
+
+      {/* No OB warning */}
+      {!timeline.hasOb && (
+        <div className="flex items-center gap-2 mb-4 text-sm text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 bg-amber-500/5">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          No opening balance on file — historical values start from ₦0.
         </div>
       )}
 
-      {/* Timeline track */}
-      <div className="relative pl-6">
-        {/* vertical connector line */}
-        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+      {/* Empty state */}
+      {isEmpty && (
+        <div className="text-sm text-muted-foreground text-center py-10">
+          No balance data on record for this member yet.
+        </div>
+      )}
 
-        <OpeningNode
-          opening={timeline.opening}
-          openingDetail={timeline.openingDetail}
-          hasOb={timeline.hasOb}
-        />
-
-        {timeline.loanEvents.map((event) => (
-          <LoanEventNode key={event.id} event={event} />
-        ))}
-
-        {timeline.periods.length === 0 ? (
-          <div className="relative mb-5 text-xs text-muted-foreground">
-            No monthly deduction uploads recorded yet.
+      {/* Loan disbursement events */}
+      {timeline.loanEvents.length > 0 && (
+        <>
+          <SectionHeader icon={<CreditCard className="w-4 h-4" />}>
+            Loan Disbursements
+          </SectionHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+            {timeline.loanEvents.map((e) => (
+              <LoanEventCard key={e.id} event={e} />
+            ))}
           </div>
-        ) : (
-          timeline.periods.map((p) => (
-            <PeriodNode
-              key={p.label}
-              period={p}
-              expanded={expanded.has(p.label)}
-              onToggle={() => toggle(p.label)}
-            />
-          ))
-        )}
+        </>
+      )}
 
-        <CurrentNode
-          current={timeline.current}
-          currentDetail={timeline.currentDetail}
-        />
-      </div>
+      {/* Savings accounts */}
+      {activeSavings.length > 0 && (
+        <>
+          <SectionHeader icon={<TrendingUp className="w-4 h-4" />}>
+            Savings Accounts
+          </SectionHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {activeSavings.map((k) => (
+              <ColumnCard
+                key={k}
+                colKey={k}
+                history={timeline.columns[k]}
+                isSavings={true}
+                forceExpand={forceExpand}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Loan repayments */}
+      {activeLoans.length > 0 && (
+        <>
+          <SectionHeader icon={<CreditCard className="w-4 h-4" />}>
+            Loan Repayments
+          </SectionHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {activeLoans.map((k) => (
+              <ColumnCard
+                key={k}
+                colKey={k}
+                history={timeline.columns[k]}
+                isSavings={false}
+                forceExpand={forceExpand}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

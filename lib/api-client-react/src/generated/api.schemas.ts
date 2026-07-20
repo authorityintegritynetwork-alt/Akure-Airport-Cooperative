@@ -714,52 +714,37 @@ export interface OpeningBalanceImport {
   createdAt: string;
 }
 
-export interface BalanceTimelineSnapshot {
-  savings: number;
-  loan: number;
-  store: number;
-}
-
-export type BalanceTimelinePeriodItemDirection =
-  (typeof BalanceTimelinePeriodItemDirection)[keyof typeof BalanceTimelinePeriodItemDirection];
-
-export const BalanceTimelinePeriodItemDirection = {
-  credit: "credit",
-  debit: "debit",
-} as const;
-
-export interface BalanceTimelinePeriodItem {
-  label: string;
-  amount: number;
-  direction: BalanceTimelinePeriodItemDirection;
-}
-
-export interface BalanceTimelinePeriod {
+export interface ColumnMonthEntry {
   year: number;
   month: string;
   label: string;
-  savingsAdded: number;
-  loanRepaid: number;
-  storeRepaid: number;
-  running: BalanceTimelineSnapshot;
-  items: BalanceTimelinePeriodItem[];
+  amount: number;
 }
 
-export interface BalanceTimelineDetail {
-  savings: number;
-  shares: number;
-  christmas: number;
-  fire: number;
-  realLoan: number;
-  emergencyLoan: number;
-  provident: number;
-  fuelVenture: number;
-  landLoan: number;
-  electronics: number;
-  sElectronics: number;
-  furniture: number;
-  commodity: number;
-  ghlForm: number;
+export interface ColumnHistory {
+  /** Opening Balance value for this column (from OB upload). */
+  ob: number;
+  /** Current live balance from the members table. */
+  current: number;
+  /** Monthly deduction/credit entries, sorted chronologically. */
+  months: ColumnMonthEntry[];
+}
+
+export interface MemberBalanceColumns {
+  savings: ColumnHistory;
+  christmas: ColumnHistory;
+  shares: ColumnHistory;
+  provident: ColumnHistory;
+  realLoan: ColumnHistory;
+  emergencyLoan: ColumnHistory;
+  electronics: ColumnHistory;
+  sElectronics: ColumnHistory;
+  furniture: ColumnHistory;
+  fuelVenture: ColumnHistory;
+  commodity: ColumnHistory;
+  fire: ColumnHistory;
+  ghlForm: ColumnHistory;
+  landLoan: ColumnHistory;
 }
 
 export interface TimelineLoanEvent {
@@ -780,11 +765,7 @@ export interface MemberBalanceTimeline {
   fullName: string;
   memberStatus: string;
   hasOb: boolean;
-  opening: BalanceTimelineSnapshot;
-  openingDetail: BalanceTimelineDetail;
-  periods: BalanceTimelinePeriod[];
-  current: BalanceTimelineSnapshot;
-  currentDetail: BalanceTimelineDetail;
+  columns: MemberBalanceColumns;
   loanEvents: TimelineLoanEvent[];
 }
 

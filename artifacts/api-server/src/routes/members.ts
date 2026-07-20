@@ -957,46 +957,35 @@ router.get("/members/:id/summary", requireAuth, async (req: AuthRequest, res): P
 });
 
 // ── BALANCE TIMELINE ────────────────────────────────────────────────────────
-// Per-member journey: opening balance snapshot → each uploaded month → current
-// live balance, with savings/loan/store running totals.
+// Per-column per-member history: opening balance values + monthly uploads +
+// current live balance from the members table.  Each spreadsheet column is
+// tracked independently — savings columns accumulate upward, loan columns
+// show total repaid from monthly deductions.
+
 const MONTH_ORDER: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
 };
 
-const SAVINGS_CREDIT_TYPES = new Set([
-  "savings", "christmas", "fire", "shares",
-]);
-const LOAN_DEBIT_TYPES = new Set([
-  "real_loan_repayment", "emergency_loan_repayment", "loan_repayment",
-  "fuel_venture_repayment", "land_loan_repayment",
-  // Provident is a loan repayment — deducted monthly to reduce an outstanding
-  // provident loan balance, not a savings contribution.
-  "provident_loan_repayment",
-]);
-const STORE_DEBIT_TYPES = new Set([
-  "electronics_repayment", "s_electronics_repayment", "furniture_repayment",
-  "commodity_repayment", "ghl_form_repayment", "store_repayment",
-]);
-
-const TX_LABELS: Record<string, string> = {
-  shares: "Share Capital",
-  savings: "Savings", christmas: "Christmas",
-  fire: "Fire Fund",
-  provident_loan_repayment: "Provision Loan Repayment",
-  // Legacy txType kept for any historical rows recorded before the direction fix
-  provident: "Provision Loan Repayment",
-  real_loan_repayment: "Real Loan Repayment",
-  emergency_loan_repayment: "Emergency Loan Repayment",
-  loan_repayment: "Loan Repayment",
-  fuel_venture_repayment: "Fuel Venture Repayment",
-  land_loan_repayment: "Land Loan Repayment",
-  electronics_repayment: "Electronics Repayment",
-  s_electronics_repayment: "Staff Electronics Repayment",
-  furniture_repayment: "Furniture Repayment",
-  commodity_repayment: "Commodity Repayment",
-  ghl_form_repayment: "GHL Form Repayment",
-  store_repayment: "Store Repayment",
+/** Maps every known transaction type to its spreadsheet column key. */
+const TX_TO_COL: Record<string, string> = {
+  savings:                  "savings",
+  christmas:                "christmas",
+  christmas_payout:         "christmas",  // payout credited back out
+  fire:                     "fire",
+  shares_credit:            "shares",
+  provident:                "provident",
+  provident_loan_repayment: "provident",  // legacy alias
+  real_loan_repayment:      "realLoan",
+  emergency_loan_repayment: "emergencyLoan",
+  loan_repayment:           "realLoan",   // legacy alias
+  electronics_repayment:    "electronics",
+  s_electronics_repayment:  "sElectronics",
+  furniture_repayment:      "furniture",
+  commodity_repayment:      "commodity",
+  ghl_form_repayment:       "ghlForm",
+  fuel_venture_repayment:   "fuelVenture",
+  land_loan_repayment:      "landLoan",
 };
 
 router.get(
@@ -1025,60 +1014,6 @@ router.get(
 
     const hasOb = member.obUploadedAt !== null;
 
-    const opening = {
-      // Provident is a loan (repaid monthly), not savings — exclude from
-      // savings total and add to loans so the timeline stays accurate.
-      savings:
-        num(member.obSavingsBalance) +
-        num(member.obChristmasBalance) +
-        num(member.obFireFundBalance),
-      loan: num(member.obTotalLoanBalance) + num(member.obProvidentBalance),
-      store: num(member.obTotalStoreDebt),
-    };
-
-    const openingDetail = {
-      savings:     num(member.obSavingsBalance),
-      shares:      num(member.obSharesBalance),
-      christmas:   num(member.obChristmasBalance),
-      fire:        num(member.obFireFundBalance),
-      realLoan:    num(member.obRealLoanBalance),
-      emergencyLoan: num(member.obEmergencyLoanBalance),
-      provident:   num(member.obProvidentBalance),
-      fuelVenture: num(member.obFuelVentureBalance),
-      landLoan:    num(member.obLandLoanBalance),
-      electronics: num(member.obElectronicsDebt),
-      sElectronics: num(member.obSElectronicsDebt),
-      furniture:   num(member.obFurnitureDebt),
-      commodity:   num(member.obCommodityDebt),
-      ghlForm:     num(member.obGhlFormDebt),
-    };
-
-    const current = {
-      savings:
-        num(member.savingsBalance) +
-        num(member.christmasBalance) +
-        num(member.fireFundBalance),
-      loan: num(member.totalLoanBalance) + num(member.providentBalance),
-      store: num(member.totalStoreDebt),
-    };
-
-    const currentDetail = {
-      savings:      num(member.savingsBalance),
-      shares:       num(member.sharesBalance),
-      christmas:    num(member.christmasBalance),
-      fire:         num(member.fireFundBalance),
-      realLoan:     num(member.realLoanBalance),
-      emergencyLoan: num(member.emergencyLoanBalance),
-      provident:    num(member.providentBalance),
-      fuelVenture:  num(member.fuelVentureBalance),
-      landLoan:     num(member.landLoanBalance),
-      electronics:  num(member.electronicsDebt),
-      sElectronics: num(member.sElectronicsDebt),
-      furniture:    num(member.furnitureDebt),
-      commodity:    num(member.commodityDebt),
-      ghlForm:      num(member.ghlFormDebt),
-    };
-
     // Fetch transactions and disbursed loans in parallel.
     const [txns, loanRows] = await Promise.all([
       db
@@ -1101,7 +1036,6 @@ router.get(
           tenureMonths: loansTable.tenureMonths,
           disbursedAt: loansTable.disbursedAt,
           purpose: loansTable.purpose,
-          loanProductId: loansTable.loanProductId,
         })
         .from(loansTable)
         .where(
@@ -1113,6 +1047,71 @@ router.get(
         .orderBy(loansTable.disbursedAt),
     ]);
 
+    // Build per-column, per-period accumulator.
+    // periodKey (`${year}-${month}`) → colKey → total amount for that column/month.
+    const periodColMap = new Map<string, Map<string, number>>();
+    const periodMeta = new Map<string, { year: number; month: string }>();
+
+    for (const t of txns) {
+      if (t.type === "opening_balance" || t.type === "store_repayment") continue;
+      if (!t.month || t.year == null) continue;
+      const colKey = TX_TO_COL[t.type];
+      if (!colKey) continue;
+
+      const pk = `${t.year}-${t.month}`;
+      if (!periodColMap.has(pk)) {
+        periodColMap.set(pk, new Map());
+        periodMeta.set(pk, { year: t.year, month: t.month });
+      }
+      const colMap = periodColMap.get(pk)!;
+      colMap.set(colKey, (colMap.get(colKey) ?? 0) + num(t.amount));
+    }
+
+    // Sort period keys chronologically.
+    const sortedPeriodKeys = Array.from(periodMeta.entries())
+      .sort(([, a], [, b]) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return (
+          (MONTH_ORDER[a.month.toLowerCase()] ?? 0) -
+          (MONTH_ORDER[b.month.toLowerCase()] ?? 0)
+        );
+      })
+      .map(([k]) => k);
+
+    // Build a ColumnHistory object for one column key.
+    const buildHistory = (ob: number, current: number, colKey: string) => {
+      const months: { year: number; month: string; label: string; amount: number }[] = [];
+      for (const pk of sortedPeriodKeys) {
+        const amt = periodColMap.get(pk)?.get(colKey) ?? 0;
+        if (amt === 0) continue;
+        const meta = periodMeta.get(pk)!;
+        months.push({
+          year: meta.year,
+          month: meta.month,
+          label: `${meta.month} ${meta.year}`,
+          amount: amt,
+        });
+      }
+      return { ob, current, months };
+    };
+
+    const columns = {
+      savings:      buildHistory(num(member.obSavingsBalance),       num(member.savingsBalance),       "savings"),
+      christmas:    buildHistory(num(member.obChristmasBalance),     num(member.christmasBalance),     "christmas"),
+      shares:       buildHistory(num(member.obSharesBalance),        num(member.sharesBalance),        "shares"),
+      provident:    buildHistory(num(member.obProvidentBalance),     num(member.providentBalance),     "provident"),
+      realLoan:     buildHistory(num(member.obRealLoanBalance),      num(member.realLoanBalance),      "realLoan"),
+      emergencyLoan:buildHistory(num(member.obEmergencyLoanBalance), num(member.emergencyLoanBalance), "emergencyLoan"),
+      electronics:  buildHistory(num(member.obElectronicsDebt),      num(member.electronicsDebt),      "electronics"),
+      sElectronics: buildHistory(num(member.obSElectronicsDebt),     num(member.sElectronicsDebt),     "sElectronics"),
+      furniture:    buildHistory(num(member.obFurnitureDebt),        num(member.furnitureDebt),        "furniture"),
+      fuelVenture:  buildHistory(num(member.obFuelVentureBalance),   num(member.fuelVentureBalance),   "fuelVenture"),
+      commodity:    buildHistory(num(member.obCommodityDebt),        num(member.commodityDebt),        "commodity"),
+      fire:         buildHistory(num(member.obFireFundBalance),      num(member.fireFundBalance),      "fire"),
+      ghlForm:      buildHistory(num(member.obGhlFormDebt),          num(member.ghlFormDebt),          "ghlForm"),
+      landLoan:     buildHistory(num(member.obLandLoanBalance),      num(member.landLoanBalance),      "landLoan"),
+    };
+
     const loanEvents = loanRows.map((l) => ({
       id: l.id,
       loanType: l.loanType ?? "real",
@@ -1123,95 +1122,15 @@ router.get(
       tenureMonths: l.tenureMonths ?? 0,
       disbursedAt: l.disbursedAt ? new Date(l.disbursedAt).toISOString() : null,
       purpose: l.purpose ?? null,
-      productName: null, // product name lookup omitted (join not needed for timeline)
+      productName: null,
     }));
-
-    type PeriodAgg = {
-      year: number;
-      month: string;
-      savingsAdded: number;
-      loanRepaid: number;
-      storeRepaid: number;
-      items: Map<string, { amount: number; direction: "credit" | "debit" }>;
-    };
-    const periodMap = new Map<string, PeriodAgg>();
-
-    for (const t of txns) {
-      if (t.type === "opening_balance") continue;
-      if (!t.month || t.year == null) continue;
-      const key = `${t.year}-${t.month}`;
-      let p = periodMap.get(key);
-      if (!p) {
-        p = {
-          year: t.year,
-          month: t.month,
-          savingsAdded: 0,
-          loanRepaid: 0,
-          storeRepaid: 0,
-          items: new Map(),
-        };
-        periodMap.set(key, p);
-      }
-      const amt = num(t.amount);
-      let direction: "credit" | "debit" = "credit";
-      if (SAVINGS_CREDIT_TYPES.has(t.type)) {
-        p.savingsAdded += amt;
-        direction = "credit";
-      } else if (LOAN_DEBIT_TYPES.has(t.type)) {
-        p.loanRepaid += amt;
-        direction = "debit";
-      } else if (STORE_DEBIT_TYPES.has(t.type)) {
-        p.storeRepaid += amt;
-        direction = "debit";
-      } else {
-        continue;
-      }
-      const existing = p.items.get(t.type);
-      if (existing) existing.amount += amt;
-      else p.items.set(t.type, { amount: amt, direction });
-    }
-
-    const sorted = Array.from(periodMap.values()).sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return (
-        (MONTH_ORDER[a.month.toLowerCase()] || 0) -
-        (MONTH_ORDER[b.month.toLowerCase()] || 0)
-      );
-    });
-
-    let runSavings = opening.savings;
-    let runLoan = opening.loan;
-    let runStore = opening.store;
-    const periods = sorted.map((p) => {
-      runSavings += p.savingsAdded;
-      runLoan = Math.max(0, runLoan - p.loanRepaid);
-      runStore = Math.max(0, runStore - p.storeRepaid);
-      return {
-        year: p.year,
-        month: p.month,
-        label: `${p.month} ${p.year}`,
-        savingsAdded: p.savingsAdded,
-        loanRepaid: p.loanRepaid,
-        storeRepaid: p.storeRepaid,
-        running: { savings: runSavings, loan: runLoan, store: runStore },
-        items: Array.from(p.items.entries()).map(([type, v]) => ({
-          label: TX_LABELS[type] || type,
-          amount: v.amount,
-          direction: v.direction,
-        })),
-      };
-    });
 
     res.json({
       memberId: member.id,
       fullName: member.fullName,
       memberStatus: member.status,
       hasOb,
-      opening,
-      openingDetail,
-      periods,
-      current,
-      currentDetail,
+      columns,
       loanEvents,
     });
   },
