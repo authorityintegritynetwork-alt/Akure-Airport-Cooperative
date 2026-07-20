@@ -367,7 +367,11 @@ function computeObValues(row: { amounts: Record<string, number> }) {
   const christmasBalance = row.amounts.christmas ?? 0;
   const realLoanBalance = row.amounts.realLoan ?? 0;
   const emergencyLoanBalance = row.amounts.emergencyLoan ?? 0;
-  const totalLoanBalance = realLoanBalance + emergencyLoanBalance;
+  const fuelVentureBalance = row.amounts.fuelVenture ?? 0;
+  const landLoanBalance = row.amounts.landLoan ?? 0;
+  // Include all loan columns (provident, fuelVenture, landLoan were previously missing).
+  const totalLoanBalance =
+    realLoanBalance + emergencyLoanBalance + providentBalance + fuelVentureBalance + landLoanBalance;
   const electronicsDebt = row.amounts.electronics ?? 0;
   const sElectronicsDebt = row.amounts.sElectronics ?? 0;
   const furnitureDebt = row.amounts.furniture ?? 0;
@@ -375,8 +379,6 @@ function computeObValues(row: { amounts: Record<string, number> }) {
   const ghlFormDebt = row.amounts.ghlForm ?? 0;
   const totalStoreDebt = electronicsDebt + sElectronicsDebt + furnitureDebt + commodityDebt + ghlFormDebt;
   const fireFundBalance = row.amounts.fire ?? 0;
-  const fuelVentureBalance = row.amounts.fuelVenture ?? 0;
-  const landLoanBalance = row.amounts.landLoan ?? 0;
   return {
     sharesBalance,
     savingsBalance, providentBalance, christmasBalance,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from "@/lib/format";
-import { Gift, BarChart3, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Gift, BarChart3, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const MONTHS = [
@@ -41,6 +41,15 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(err.error ?? "Request failed");
+  }
+  return res.json();
+}
+
+async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(path, { credentials: "include" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(err.error ?? "Request failed");
@@ -74,6 +83,17 @@ function ChristmasPayoutSection() {
   const [year, setYear] = useState<string>(String(currentYear));
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lastResult, setLastResult] = useState<PayoutResult | null>(null);
+
+  // Dry-run preview — fetches once the confirmation dialog opens.
+  const preview = useQuery({
+    queryKey: ["admin", "christmas-payout", "preview"],
+    queryFn: () =>
+      apiGet<{ count: number; totalWouldPayout: number }>(
+        "/api/admin/christmas-payout/preview",
+      ),
+    enabled: confirmOpen,
+    staleTime: 15_000,
+  });
 
   const mutation = useMutation({
     mutationFn: (data: { month: string; year: number }) =>
@@ -114,7 +134,6 @@ function ChristmasPayoutSection() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Last result */}
         {lastResult && lastResult.count > 0 && (
           <div className="flex items-start gap-2 text-sm text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 bg-emerald-500/5">
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
@@ -156,8 +175,8 @@ function ChristmasPayoutSection() {
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 bg-amber-500/5">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-          All active members with a Christmas Savings balance &gt; ₦0 will be paid out and their
-          balance reset to ₦0. Confirm carefully before proceeding.
+          All active members with a Christmas Savings balance &gt; ₦0 will be paid out and
+          their balance reset to ₦0. Confirm carefully before proceeding.
         </div>
 
         <Button
@@ -175,19 +194,39 @@ function ChristmasPayoutSection() {
             <AlertDialogTitle>Confirm Christmas Savings Payout</AlertDialogTitle>
             <AlertDialogDescription>
               This will pay out all active members' Christmas Savings balances for{" "}
-              <strong>{month} {year}</strong> and reset their balance to ₦0. This action
+              <strong>{month} {year}</strong> and reset each balance to ₦0. This action
               cannot be undone.
             </AlertDialogDescription>
+
+            {/* Dry-run preview */}
+            <div className="mt-2">
+              {preview.isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Calculating preview…
+                </div>
+              ) : preview.data ? (
+                <div className="rounded-lg bg-muted px-3 py-2.5 text-sm">
+                  <span className="font-semibold">
+                    {preview.data.count} eligible member{preview.data.count === 1 ? "" : "s"}
+                  </span>
+                  {" · "}
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    {formatCurrency(preview.data.totalWouldPayout)} total
+                  </span>
+                  {" would be paid out."}
+                </div>
+              ) : null}
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() =>
-                mutation.mutate({ month, year: parseInt(year) })
-              }
+              onClick={() => mutation.mutate({ month, year: parseInt(year) })}
               className="bg-red-600 hover:bg-red-700"
+              disabled={mutation.isPending}
             >
-              Confirm Payout
+              {mutation.isPending ? "Processing…" : "Confirm Payout"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -204,6 +243,20 @@ function SharesCreditSection() {
   const [year, setYear] = useState<string>(String(currentYear));
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [lastResult, setLastResult] = useState<CreditResult | null>(null);
+
+  const parsedAmount = parseFloat(amount);
+  const canSubmit = !isNaN(parsedAmount) && parsedAmount > 0 && parseInt(year) >= 2020;
+
+  // Dry-run preview — fetches when dialog opens and amount is valid.
+  const preview = useQuery({
+    queryKey: ["admin", "shares-credit", "preview", parsedAmount],
+    queryFn: () =>
+      apiGet<{ count: number; totalWouldCredit: number }>(
+        `/api/admin/shares-credit/preview?amount=${parsedAmount}`,
+      ),
+    enabled: confirmOpen && canSubmit,
+    staleTime: 15_000,
+  });
 
   const mutation = useMutation({
     mutationFn: (data: { amount: number; year: number }) =>
@@ -224,9 +277,6 @@ function SharesCreditSection() {
     },
   });
 
-  const parsedAmount = parseFloat(amount);
-  const canSubmit = !isNaN(parsedAmount) && parsedAmount > 0 && parseInt(year) >= 2020;
-
   return (
     <Card>
       <CardHeader>
@@ -245,7 +295,6 @@ function SharesCreditSection() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Last result */}
         {lastResult && lastResult.count > 0 && (
           <div className="flex items-start gap-2 text-sm text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 bg-emerald-500/5">
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
@@ -305,19 +354,36 @@ function SharesCreditSection() {
             <AlertDialogTitle>Confirm Share Capital Credit</AlertDialogTitle>
             <AlertDialogDescription>
               This will credit{" "}
-              <strong>{formatCurrency(parsedAmount)}</strong> to every active member's
-              Share Capital balance for <strong>{year}</strong>. This action cannot be
-              undone.
+              <strong>{formatCurrency(parsedAmount)}</strong> to every active member's Share
+              Capital balance for <strong>{year}</strong>. This action cannot be undone.
             </AlertDialogDescription>
+
+            {/* Dry-run preview */}
+            <div className="mt-2">
+              {preview.isLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Calculating preview…
+                </div>
+              ) : preview.data ? (
+                <div className="rounded-lg bg-muted px-3 py-2.5 text-sm">
+                  <span className="font-semibold">{preview.data.count} active members</span>
+                  {" · "}
+                  <span className="font-semibold text-blue-700 dark:text-blue-400">
+                    {formatCurrency(preview.data.totalWouldCredit)} total
+                  </span>
+                  {" would be credited."}
+                </div>
+              ) : null}
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() =>
-                mutation.mutate({ amount: parsedAmount, year: parseInt(year) })
-              }
+              onClick={() => mutation.mutate({ amount: parsedAmount, year: parseInt(year) })}
+              disabled={mutation.isPending}
             >
-              Confirm Credit
+              {mutation.isPending ? "Processing…" : "Confirm Credit"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -334,7 +400,7 @@ export function AdminActionsPage() {
       <div>
         <h1 className="text-2xl font-bold">Admin Actions</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Balance events that are set by the admin rather than uploaded from payroll files.
+          Balance events set by the admin rather than uploaded from payroll files.
           Only treasurers and super admins can perform these actions.
         </p>
       </div>

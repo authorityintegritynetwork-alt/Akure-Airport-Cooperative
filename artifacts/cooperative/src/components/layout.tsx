@@ -90,6 +90,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {isMember && navItem("/my-loans", <CreditCard className="w-4 h-4" />, "My Loans")}
                   {isMember && navItem("/store", <ShoppingCart className="w-4 h-4" />, "Store")}
                   {isMember && navItem("/my-purchases", <ShoppingBag className="w-4 h-4" />, "My Purchases")}
+                  {isMember && navItem("/my-statement", <FileText className="w-4 h-4" />, "My Statement")}
                   {navItem("/my-notifications", <Bell className="w-4 h-4" />, "Notifications")}
                   {isMember && navItem("/support", <Headphones className="w-4 h-4" />, "Support")}
                 </SidebarMenu>

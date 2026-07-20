@@ -8,3 +8,6 @@
 - [Simple roster formats](simple-roster-formats.md) — CTAKU (FAAN sub-group) and Pension Excel files: single Amount column, headers on row 3, treated as payroll_summary Step 1.
 - [API client dist types](api-client-dist-types.md) — Adding types to api.schemas.ts requires mirroring changes in dist/generated/api.schemas.d.ts; TypeScript resolves from dist in some contexts.
 - [Balance column model](balance-column-model.md) — 14 spreadsheet columns tracked separately; loan cards show total repaid (not outstanding); TX_TO_COL maps all type strings; two admin actions for christmas payout + shares credit.
+- [openingBalances computeObValues ordering](ob-variable-order.md) — fuelVentureBalance and landLoanBalance must be declared BEFORE totalLoanBalance in computeObValues; violating this causes a temporal dead zone ReferenceError.
+- [Member self-access timeline](member-self-access.md) — balance-timeline route is open to the member's own ID (self-check) and any admin role; members access it via My Statement page at /my-statement.
+- [Admin action dry-run preview](admin-action-preview.md) — christmas-payout and shares-credit have GET preview endpoints; frontend fetches them with enabled: confirmOpen so the dialog shows count + total before the POST fires.

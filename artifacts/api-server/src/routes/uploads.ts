@@ -304,7 +304,15 @@ async function applyDeductionAmounts(
     const exprFor = (field: string, col: ReturnType<typeof sql>) =>
       (setClauses[field] as ReturnType<typeof sql> | undefined) ?? sql`${col}`;
 
-    setClauses.totalLoanBalance = sql`${exprFor("realLoanBalance", membersTable.realLoanBalance as any)} + ${exprFor("emergencyLoanBalance", membersTable.emergencyLoanBalance as any)}`;
+    // Include ALL loan repayment columns in the aggregate (provident, fuelVenture,
+    // landLoan were previously omitted — fixed here).
+    setClauses.totalLoanBalance = sql`
+      ${exprFor("realLoanBalance",     membersTable.realLoanBalance     as any)} +
+      ${exprFor("emergencyLoanBalance",membersTable.emergencyLoanBalance as any)} +
+      ${exprFor("providentBalance",    membersTable.providentBalance    as any)} +
+      ${exprFor("fuelVentureBalance",  membersTable.fuelVentureBalance  as any)} +
+      ${exprFor("landLoanBalance",     membersTable.landLoanBalance     as any)}
+    `;
     // furnitureDebt is included in the store-debt total (fixes latent omission).
     setClauses.totalStoreDebt = sql`${exprFor("electronicsDebt", membersTable.electronicsDebt as any)} + ${exprFor("sElectronicsDebt", membersTable.sElectronicsDebt as any)} + ${exprFor("furnitureDebt", membersTable.furnitureDebt as any)} + ${exprFor("commodityDebt", membersTable.commodityDebt as any)} + ${exprFor("ghlFormDebt", membersTable.ghlFormDebt as any)}`;
 
@@ -1512,6 +1520,64 @@ async function processPayroll(
     openingBalancesFlagged: openingFlagged,
   });
 }
+
+// ── GET /uploads/:id/column-summary ─────────────────────────────────────────
+// Returns per-transaction-type totals for a single upload record, so auditors
+// can see exactly how much went into each column without re-opening the file.
+
+router.get(
+  "/uploads/:id/column-summary",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const uploadId = parseInt(String(req.params.id), 10);
+    if (isNaN(uploadId)) {
+      res.status(400).json({ error: "Invalid upload ID" });
+      return;
+    }
+
+    const [upload] = await db
+      .select({
+        id: uploadRecordsTable.id,
+        month: uploadRecordsTable.month,
+        year: uploadRecordsTable.year,
+        organization: uploadRecordsTable.organization,
+        uploadType: uploadRecordsTable.uploadType,
+      })
+      .from(uploadRecordsTable)
+      .where(eq(uploadRecordsTable.id, uploadId));
+
+    if (!upload) {
+      res.status(404).json({ error: "Upload not found" });
+      return;
+    }
+
+    const rows = await db
+      .select({
+        type: transactionsTable.type,
+        total: sql<number>`SUM(${transactionsTable.amount}::numeric)`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(transactionsTable)
+      .where(eq(transactionsTable.uploadRecordId, uploadId))
+      .groupBy(transactionsTable.type)
+      .orderBy(transactionsTable.type);
+
+    res.json({
+      uploadId: upload.id,
+      month: upload.month,
+      year: upload.year,
+      organization: upload.organization,
+      uploadType: upload.uploadType,
+      columns: rows.map((r) => ({
+        type: r.type,
+        total: Number(r.total),
+        count: Number(r.count),
+      })),
+      grandTotal: rows.reduce((s, r) => s + Number(r.total), 0),
+    });
+  },
+);
 
 // NOTE: A one-time batch-process script lives at scripts/batch-process.ts.
 // It was used to apply Jan 2026 and Apr 2026 FAAN/NAMA deductions from

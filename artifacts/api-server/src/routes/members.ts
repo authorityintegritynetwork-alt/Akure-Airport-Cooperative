@@ -14,11 +14,13 @@ import {
   requireAuth,
   requireAdmin,
   requireSuperAdmin,
+  requireTreasurer,
   requireReverification,
   requireReverificationIf,
   AuthRequest,
 } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
+import { z } from "zod/v4";
 import { createClerkInvitation } from "../lib/clerk";
 import {
   ListMembersQueryParams,
@@ -604,6 +606,7 @@ router.post("/members/:id/activate", requireAuth, requireAdmin, requireReverific
 router.post("/members/:id/deactivate", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
 
   const [member] = await db
     .update(membersTable)
@@ -621,11 +624,109 @@ router.post("/members/:id/deactivate", requireAuth, requireAdmin, requireReverif
     action: "DEACTIVATE_MEMBER",
     entity: "member",
     entityId: id,
-    details: `Deactivated member: ${member.fullName}`,
+    details: reason
+      ? `Deactivated member: ${member.fullName}. Reason: ${reason}`
+      : `Deactivated member: ${member.fullName}`,
   });
 
   res.json(formatMember(member));
 });
+
+// ── Manual balance adjustment ─────────────────────────────────────────────────
+
+const COL_TO_FIELD: Record<string, string> = {
+  savings: "savingsBalance", christmas: "christmasBalance", shares: "sharesBalance",
+  fire: "fireFundBalance", provident: "providentBalance", realLoan: "realLoanBalance",
+  emergencyLoan: "emergencyLoanBalance", fuelVenture: "fuelVentureBalance",
+  landLoan: "landLoanBalance", electronics: "electronicsDebt",
+  sElectronics: "sElectronicsDebt", furniture: "furnitureDebt",
+  commodity: "commodityDebt", ghlForm: "ghlFormDebt",
+};
+const ADJ_COL_LABELS: Record<string, string> = {
+  savings: "Savings", christmas: "Christmas Savings", shares: "Share Capital",
+  fire: "Fire Fund", provident: "Provident Loan", realLoan: "Real Loan",
+  emergencyLoan: "Emergency Loan", fuelVenture: "Fuel & Venture", landLoan: "Land Loan",
+  electronics: "Electronics", sElectronics: "Land/Electronics",
+  furniture: "Furniture", commodity: "Commodity", ghlForm: "GHL Form",
+};
+const LOAN_ADJ_COLS = new Set(["provident","realLoan","emergencyLoan","fuelVenture","landLoan"]);
+const STORE_ADJ_COLS = new Set(["electronics","sElectronics","furniture","commodity","ghlForm"]);
+
+const AdjustmentBodySchema = z.object({
+  column: z.enum(Object.keys(COL_TO_FIELD) as [string, ...string[]]),
+  amount: z.number().positive(),
+  direction: z.enum(["credit", "debit"]),
+  reason: z.string().min(5, "Please provide a reason of at least 5 characters"),
+});
+
+router.post(
+  "/members/:id/adjustments",
+  requireAuth,
+  requireTreasurer,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
+
+    const parsed = AdjustmentBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+      return;
+    }
+    const { column, amount, direction, reason } = parsed.data;
+
+    const [member] = await db.select().from(membersTable).where(eq(membersTable.id, id));
+    if (!member) { res.status(404).json({ error: "Member not found" }); return; }
+
+    const fieldKey = COL_TO_FIELD[column]!;
+    const col = (membersTable as any)[fieldKey];
+    const updateSet: Record<string, any> = {};
+    if (direction === "credit") {
+      updateSet[fieldKey] = sql`${col} + ${amount.toString()}::numeric`;
+    } else {
+      updateSet[fieldKey] = sql`GREATEST(0, ${col} - ${amount.toString()}::numeric)`;
+    }
+
+    const adjExpr = updateSet[fieldKey];
+    if (LOAN_ADJ_COLS.has(column)) {
+      updateSet.totalLoanBalance = sql`
+        ${column === "realLoan"      ? adjExpr : membersTable.realLoanBalance} +
+        ${column === "emergencyLoan" ? adjExpr : membersTable.emergencyLoanBalance} +
+        ${column === "provident"     ? adjExpr : membersTable.providentBalance} +
+        ${column === "fuelVenture"   ? adjExpr : membersTable.fuelVentureBalance} +
+        ${column === "landLoan"      ? adjExpr : membersTable.landLoanBalance}`;
+    }
+    if (STORE_ADJ_COLS.has(column)) {
+      updateSet.totalStoreDebt = sql`
+        ${column === "electronics"  ? adjExpr : membersTable.electronicsDebt} +
+        ${column === "sElectronics" ? adjExpr : membersTable.sElectronicsDebt} +
+        ${column === "furniture"    ? adjExpr : membersTable.furnitureDebt} +
+        ${column === "commodity"    ? adjExpr : membersTable.commodityDebt} +
+        ${column === "ghlForm"      ? adjExpr : membersTable.ghlFormDebt}`;
+    }
+
+    const [updated] = await db
+      .update(membersTable).set(updateSet).where(eq(membersTable.id, id)).returning();
+
+    await db.insert(transactionsTable).values({
+      memberId: id,
+      type: "manual_adjustment" as any,
+      amount: amount.toFixed(2),
+      description: `[${ADJ_COL_LABELS[column]}] ${direction === "credit" ? "+" : "−"}₦${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} — ${reason}`,
+    });
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "MANUAL_BALANCE_ADJUSTMENT",
+      entity: "member",
+      entityId: id,
+      details: `${ADJ_COL_LABELS[column]} ${direction} ₦${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} for ${member.fullName}. Reason: ${reason}`,
+    });
+
+    res.json({ member: formatMember(updated), column, direction, amount, reason });
+  },
+);
 
 router.post(
   "/members/:id/approve-match",
@@ -991,12 +1092,19 @@ const TX_TO_COL: Record<string, string> = {
 router.get(
   "/members/:id/balance-timeline",
   requireAuth,
-  requireAdmin,
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
     if (Number.isNaN(id)) {
       res.status(400).json({ error: "Invalid member id" });
+      return;
+    }
+
+    // A member may view their own timeline; any admin role can view any member's.
+    const isSelf = req.memberId === id;
+    const isAdminRole = ["admin", "auditor", "treasurer", "super_admin"].includes(req.memberRole ?? "");
+    if (!isSelf && !isAdminRole) {
+      res.status(403).json({ error: "You can only view your own balance timeline." });
       return;
     }
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useRoute } from "wouter";
 import {
   useGetMember,
@@ -6,6 +7,7 @@ import {
   useListTransactions,
   useListLoans,
   useListStorePurchases,
+  useGetProfile,
   getGetMemberQueryKey,
   getGetMemberSummaryQueryKey,
   getGetMemberBalanceTimelineQueryKey,
@@ -13,6 +15,7 @@ import {
   getListLoansQueryKey,
   getListStorePurchasesQueryKey,
 } from "@workspace/api-client-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,10 +29,32 @@ import {
   Phone,
   IdCard,
   TrendingUp,
+  Wrench,
+  Landmark,
+  Store,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { BalanceTimeline } from "@/components/balance-timeline";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 export function MemberDetailPage() {
   const [, params] = useRoute("/members/:id");
@@ -53,6 +78,9 @@ export function MemberDetailPage() {
   const { data: timeline } = useGetMemberBalanceTimeline(memberId, {
     query: { enabled: !!memberId, queryKey: getGetMemberBalanceTimelineQueryKey(memberId) },
   });
+  const { data: currentUser } = useGetProfile();
+  const canAdjust =
+    currentUser?.role === "treasurer" || currentUser?.role === "super_admin";
 
   if (!memberId) {
     return (
@@ -181,30 +209,8 @@ export function MemberDetailPage() {
         </div>
       </div>
 
-      {/* Balance grid */}
-      <div className="grid gap-3 grid-cols-3">
-        <BalanceTile
-          icon={<Wallet className="w-5 h-5" />}
-          label="Savings"
-          value={formatCurrency(member.savingsBalance)}
-          bookValue={member.obSavingsBalance != null ? formatCurrency(member.obSavingsBalance) : null}
-          tone="success"
-        />
-        <BalanceTile
-          icon={<CreditCard className="w-5 h-5" />}
-          label="Loan Bal."
-          value={formatCurrency(member.totalLoanBalance)}
-          bookValue={member.obTotalLoanBalance != null ? formatCurrency(member.obTotalLoanBalance) : null}
-          tone="warning"
-        />
-        <BalanceTile
-          icon={<ShoppingBag className="w-5 h-5" />}
-          label="Store Debt"
-          value={formatCurrency(member.totalStoreDebt)}
-          bookValue={member.obTotalStoreDebt != null ? formatCurrency(member.obTotalStoreDebt) : null}
-          tone="info"
-        />
-      </div>
+      {/* Per-product balance breakdown */}
+      <PerProductBalances member={member} memberId={memberId} canAdjust={canAdjust} />
 
       {timeline && (
         <Card className="rounded-2xl shadow-sm border-border/70">
@@ -383,5 +389,330 @@ function BalanceTile({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Adjustment column options ─────────────────────────────────────────────────
+
+const ADJ_COLUMN_OPTIONS = [
+  { value: "savings",       label: "Savings" },
+  { value: "christmas",     label: "Christmas Savings" },
+  { value: "shares",        label: "Share Capital" },
+  { value: "fire",          label: "Fire Fund" },
+  { value: "provident",     label: "Provident Loan" },
+  { value: "realLoan",      label: "Real Loan" },
+  { value: "emergencyLoan", label: "Emergency Loan" },
+  { value: "fuelVenture",   label: "Fuel & Venture" },
+  { value: "landLoan",      label: "Land Loan" },
+  { value: "electronics",   label: "Electronics" },
+  { value: "sElectronics",  label: "Land/Electronics" },
+  { value: "furniture",     label: "Furniture" },
+  { value: "commodity",     label: "Commodity" },
+  { value: "ghlForm",       label: "GHL Form" },
+];
+
+// ── Mini product tile ─────────────────────────────────────────────────────────
+
+function MiniProductTile({
+  label,
+  value,
+  ob,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  ob?: string | number | null;
+  tone: "success" | "warning" | "info";
+}) {
+  const borderClass = {
+    success: "border-emerald-200/70 dark:border-emerald-800/60",
+    warning: "border-amber-200/70 dark:border-amber-800/60",
+    info: "border-sky-200/70 dark:border-sky-800/60",
+  }[tone];
+
+  return (
+    <div className={`rounded-xl border bg-card px-3 py-2.5 ${borderClass}`}>
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide truncate">
+        {label}
+      </p>
+      <p className="text-sm font-bold tabular-nums mt-0.5 truncate">
+        {formatCurrency(value)}
+      </p>
+      {ob != null && parseFloat(String(ob)) > 0 && (
+        <p className="text-[9px] text-muted-foreground mt-0.5 tabular-nums">
+          OB: {formatCurrency(ob)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Per-product balance overview ──────────────────────────────────────────────
+
+function PerProductBalances({
+  member,
+  memberId,
+  canAdjust,
+}: {
+  member: any;
+  memberId: number;
+  canAdjust: boolean;
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const savingsItems = [
+    { label: "Savings",          value: member.savingsBalance,    ob: member.obSavingsBalance },
+    { label: "Christmas Savings",value: member.christmasBalance,  ob: member.obChristmasBalance },
+    { label: "Share Capital",    value: member.sharesBalance,     ob: member.obSharesBalance },
+    { label: "Fire Fund",        value: member.fireFundBalance,   ob: member.obFireFundBalance },
+  ].filter((i) => parseFloat(String(i.value ?? "0")) > 0 || parseFloat(String(i.ob ?? "0")) > 0);
+
+  const loanItems = [
+    { label: "Real Loan",      value: member.realLoanBalance,      ob: member.obRealLoanBalance },
+    { label: "Provident",      value: member.providentBalance,     ob: member.obProvidentBalance },
+    { label: "Emergency Loan", value: member.emergencyLoanBalance, ob: member.obEmergencyLoanBalance },
+    { label: "Fuel & Venture", value: member.fuelVentureBalance,   ob: member.obFuelVentureBalance },
+    { label: "Land Loan",      value: member.landLoanBalance,      ob: member.obLandLoanBalance },
+  ].filter((i) => parseFloat(String(i.value ?? "0")) > 0 || parseFloat(String(i.ob ?? "0")) > 0);
+
+  const storeItems = [
+    { label: "Electronics",    value: member.electronicsDebt,   ob: member.obElectronicsDebt },
+    { label: "L/Electronics",  value: member.sElectronicsDebt,  ob: member.obSElectronicsDebt },
+    { label: "Furniture",      value: member.furnitureDebt,     ob: member.obFurnitureDebt },
+    { label: "Commodity",      value: member.commodityDebt,     ob: member.obCommodityDebt },
+    { label: "GHL Form",       value: member.ghlFormDebt,       ob: member.obGhlFormDebt },
+  ].filter((i) => parseFloat(String(i.value ?? "0")) > 0 || parseFloat(String(i.ob ?? "0")) > 0);
+
+  const hasAny = savingsItems.length > 0 || loanItems.length > 0 || storeItems.length > 0;
+
+  return (
+    <Card className="rounded-2xl shadow-sm border-border/70">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Wallet className="w-4 h-4" />
+            Balance Overview
+          </CardTitle>
+          {canAdjust && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-full text-xs gap-1"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Wrench className="w-3 h-3" />
+              Adjust
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        {!hasAny && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No balance data recorded yet.
+          </p>
+        )}
+
+        {savingsItems.length > 0 && (
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Landmark className="w-3 h-3" /> Savings & Capital
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {savingsItems.map((i) => (
+                <MiniProductTile key={i.label} {...i} tone="success" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {loanItems.length > 0 && (
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <CreditCard className="w-3 h-3" /> Loan Balances
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+              {loanItems.map((i) => (
+                <MiniProductTile key={i.label} {...i} tone="warning" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {storeItems.length > 0 && (
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Store className="w-3 h-3" /> Store Debts
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+              {storeItems.map((i) => (
+                <MiniProductTile key={i.label} {...i} tone="info" />
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+
+      {canAdjust && (
+        <AdjustmentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          memberId={memberId}
+          memberName={member.fullName}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: getGetMemberQueryKey(memberId) });
+            void queryClient.invalidateQueries({
+              queryKey: getGetMemberBalanceTimelineQueryKey(memberId),
+            });
+            toast({
+              title: "Balance adjusted",
+              description: "The correction has been saved and the timeline refreshed.",
+            });
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+// ── Adjustment dialog ─────────────────────────────────────────────────────────
+
+function AdjustmentDialog({
+  open,
+  onOpenChange,
+  memberId,
+  memberName,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  memberId: number;
+  memberName: string;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [column, setColumn] = useState("");
+  const [amount, setAmount] = useState("");
+  const [direction, setDirection] = useState<"credit" | "debit">("credit");
+  const [reason, setReason] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/members/${memberId}/adjustments`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ column, amount: parseFloat(amount), direction, reason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        if (res.status === 428) {
+          throw new Error("Identity verification required — please re-authenticate and try again.");
+        }
+        throw new Error(err.error ?? "Request failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      onOpenChange(false);
+      setColumn(""); setAmount(""); setDirection("credit"); setReason("");
+      onSuccess();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Adjustment failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const parsedAmount = parseFloat(amount);
+  const canSubmit =
+    column && !isNaN(parsedAmount) && parsedAmount > 0 && reason.trim().length >= 5;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Adjust Balance</DialogTitle>
+          <DialogDescription>
+            Manual correction for <strong>{memberName}</strong>. Requires treasurer OTP
+            step-up. The adjustment is recorded as a transaction for full audit trail.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label>Balance Column</Label>
+            <Select value={column} onValueChange={setColumn}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select column…" />
+              </SelectTrigger>
+              <SelectContent>
+                {ADJ_COLUMN_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Amount (₦)</Label>
+              <Input
+                type="number"
+                min={0.01}
+                step={0.01}
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Direction</Label>
+              <Select
+                value={direction}
+                onValueChange={(v) => setDirection(v as "credit" | "debit")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="credit">Credit (add +)</SelectItem>
+                  <SelectItem value="debit">Debit (subtract −)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>
+              Reason{" "}
+              <span className="text-muted-foreground font-normal">(min 5 characters)</span>
+            </Label>
+            <Textarea
+              placeholder="e.g. Correcting data-entry error from August upload"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending ? "Saving…" : "Apply Adjustment"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

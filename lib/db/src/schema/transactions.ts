@@ -41,6 +41,7 @@ export const transactionsTable = pgTable(
         "opening_balance",
         "christmas_payout",
         "shares_credit",
+        "manual_adjustment",
       ],
     }).notNull(),
     category: text("category"),
