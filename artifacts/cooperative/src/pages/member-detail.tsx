@@ -422,7 +422,8 @@ function MonthlyDeductionTable({ timeline }: { timeline: any }) {
         </p>
       </CardHeader>
       <CardContent className="p-0 pb-1">
-        <div className="overflow-x-auto">
+        <div className="relative">
+          <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="border-b border-border bg-muted/50">
@@ -484,7 +485,13 @@ function MonthlyDeductionTable({ timeline }: { timeline: any }) {
               </tr>
             </tbody>
           </table>
+          </div>
+          {/* Right-edge fade — hints at horizontal scroll without obscuring data */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-card to-transparent rounded-r-xl" />
         </div>
+        <p className="text-center text-[11px] text-muted-foreground py-1.5 sm:hidden select-none">
+          ← Swipe to see all columns →
+        </p>
       </CardContent>
     </Card>
   );

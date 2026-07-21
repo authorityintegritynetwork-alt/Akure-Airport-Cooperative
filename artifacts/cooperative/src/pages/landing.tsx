@@ -14,8 +14,11 @@ export function LandingPage() {
       <header className="px-6 lg:px-12 py-5 flex items-center justify-between border-b border-border/60 backdrop-blur-sm sticky top-0 bg-background/80 z-10">
         <div className="flex items-center gap-2.5">
           <img src={logoUrl} alt="AASCMS Logo" className="w-10 h-10 object-contain" />
-          <span className="font-semibold text-sm md:text-base tracking-tight text-foreground leading-tight max-w-[14rem] md:max-w-none">
+          <span className="hidden sm:block font-semibold text-sm md:text-base tracking-tight text-foreground leading-tight">
             Akure Airport Staff Co-operative Multipurpose Society Limited
+          </span>
+          <span className="sm:hidden font-semibold text-sm tracking-tight text-foreground">
+            AASCMS
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -106,6 +109,41 @@ export function LandingPage() {
                 </p>
               </CardContent>
             </Card>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section className="px-6 lg:px-12 pb-24 max-w-6xl mx-auto w-full">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold tracking-tight">How it works</h2>
+            <p className="text-muted-foreground mt-2">Up and running in three steps.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: "1",
+                title: "Register your account",
+                body: "Sign up with your staff details. An admin verifies your identity and activates your account — usually within one working day.",
+              },
+              {
+                step: "2",
+                title: "Deductions are uploaded monthly",
+                body: "Your payroll deductions are reconciled each month by the cooperative admin team. Your savings and loan repayments update automatically.",
+              },
+              {
+                step: "3",
+                title: "Track everything in real time",
+                body: "Log in anytime to see your savings balance, loan status, store purchases, and a full monthly breakdown — all in one place.",
+              },
+            ].map(({ step, title, body }) => (
+              <div key={step} className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold mb-4 shadow-md shadow-primary/25">
+                  {step}
+                </div>
+                <h3 className="font-semibold text-base mb-2 tracking-tight">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+              </div>
+            ))}
           </div>
         </section>
 

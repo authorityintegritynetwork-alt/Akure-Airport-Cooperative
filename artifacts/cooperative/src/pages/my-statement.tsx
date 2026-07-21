@@ -5,7 +5,8 @@ import {
 } from "@workspace/api-client-react";
 import { BalanceTimeline } from "@/components/balance-timeline";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FileText, Printer } from "lucide-react";
 
 export function MyStatementPage() {
   const { data: profile, isLoading: profileLoading } = useGetProfile();
@@ -25,15 +26,30 @@ export function MyStatementPage() {
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <FileText className="w-5 h-5 text-primary" />
-          <h1 className="text-2xl font-bold">My Statement</h1>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="w-5 h-5 text-primary" />
+            <h1 className="text-2xl font-bold">My Statement</h1>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Your per-product balance breakdown — savings accounts, loan repayments, and
+            monthly deductions.
+          </p>
         </div>
-        <p className="text-muted-foreground text-sm">
-          Your per-product balance breakdown — savings accounts, loan repayments, and
-          monthly deductions.
-        </p>
+        {timeline && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full gap-1.5 shrink-0 print:hidden"
+            onClick={() => window.print()}
+            data-testid="button-print-statement"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Print / PDF</span>
+            <span className="sm:hidden">Print</span>
+          </Button>
+        )}
       </div>
 
       {isLoading ? (

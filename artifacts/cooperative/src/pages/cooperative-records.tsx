@@ -37,27 +37,17 @@ export function CooperativeRecordsPage() {
 
   return (
     <div className="space-y-5">
-      {/* Hero */}
-      <div
-        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
-        style={{
-          background:
-            "linear-gradient(135deg, hsl(220 80% 35%) 0%, hsl(200 85% 40%) 50%, hsl(170 70% 40%) 100%)",
-        }}
-        data-testid="coop-records-hero-card"
-      >
-        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
-        <div className="relative">
-          <p className="text-xs sm:text-sm text-white/80 font-medium uppercase tracking-wider">
-            Cooperative Records
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-bold mt-0.5 tabular-nums">{totalCount}</h1>
-          <p className="text-xs text-white/80 mt-1 max-w-md">
-            People with balances or deductions on file who have not yet created an app account.
-            They appear in Members once they sign up and are approved.
-          </p>
+      {/* Page header */}
+      <div data-testid="coop-records-hero-card">
+        <div className="flex items-center gap-2 mb-1">
+          <FileSpreadsheet className="w-5 h-5 text-primary" />
+          <h1 className="text-2xl font-bold">Cooperative Records</h1>
         </div>
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold tabular-nums">{totalCount}</span>{" "}
+          {totalCount === 1 ? "person" : "people"} with balances on file who haven't created an app account yet.
+          They appear in Members once they sign up and are approved.
+        </p>
       </div>
 
       {/* Toolbar */}

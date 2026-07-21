@@ -22,7 +22,7 @@ import { ShieldCheck, LogOut } from "lucide-react";
 type ResolveFn = (verified: boolean) => void;
 
 type Ctx = {
-  prompt: () => Promise<boolean>;
+  prompt: (label?: string) => Promise<boolean>;
 };
 
 const StepUpContext = createContext<Ctx | null>(null);
@@ -32,6 +32,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const resolverRef = useRef<ResolveFn | null>(null);
 
   const requestCode = useRequestStepUpCode();
@@ -48,9 +49,10 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
     }
   }, [requestCode]);
 
-  const prompt = useCallback(async () => {
+  const prompt = useCallback(async (label?: string) => {
     setCode("");
     setError(null);
+    setPendingLabel(label ?? null);
     setOpen(true);
     void sendCode();
     return new Promise<boolean>((resolve) => {
@@ -63,6 +65,7 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
     setCode("");
     setError(null);
     setSentTo(null);
+    setPendingLabel(null);
     resolverRef.current?.(verified);
     resolverRef.current = null;
   };
@@ -99,6 +102,12 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
                 : "Sending a 6-digit code to your email…"}
             </DialogDescription>
           </DialogHeader>
+          {pendingLabel && (
+            <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2.5 text-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Authorising</p>
+              <p className="font-medium text-foreground">{pendingLabel}</p>
+            </div>
+          )}
           <div className="space-y-3">
             <Input
               autoFocus
@@ -274,6 +283,7 @@ function useStepUpContext(): Ctx {
  */
 export function useStepUpAction<TArgs extends any[], TResult>(
   fn: (...args: TArgs) => Promise<TResult>,
+  label?: string,
 ): (...args: TArgs) => Promise<TResult> {
   const { prompt } = useStepUpContext();
   return async (...args: TArgs): Promise<TResult> => {
@@ -283,7 +293,7 @@ export function useStepUpAction<TArgs extends any[], TResult>(
       const data = err?.response?.data;
       const status = err?.response?.status;
       if (status === 403 && data?.step_up_required) {
-        const ok = await prompt();
+        const ok = await prompt(label);
         if (!ok) {
           const cancel: any = new Error("Verification cancelled");
           cancel.cancelled = true;

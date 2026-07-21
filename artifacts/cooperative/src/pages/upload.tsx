@@ -610,71 +610,68 @@ export function UploadPage() {
 
   return (
     <div className="space-y-5 max-w-7xl">
-      {/* Hero gradient card */}
-      <div
-        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-primary/20"
-        style={{
-          background:
-            "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(220 80% 35%) 45%, hsl(200 85% 45%) 100%)",
-        }}
-        data-testid="upload-hero-card"
-      >
-        <div className="absolute -top-12 -right-10 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-16 -left-8 w-56 h-56 rounded-full bg-white/5 blur-3xl" />
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs sm:text-sm text-white/80 font-medium uppercase tracking-wider">
-              Monthly Deductions
-            </p>
-            <h1 className="text-xl sm:text-2xl font-bold mt-0.5 leading-tight">
-              Upload {selectedOrgCode || "—"} sheet
-            </h1>
-            <p className="text-xs text-white/80 mt-1">
-              Members are matched by full name and tagged automatically.
-            </p>
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-3" data-testid="upload-hero-card">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <CloudUpload className="w-5 h-5 text-primary" />
+            <h1 className="text-2xl font-bold">Monthly Upload</h1>
           </div>
-          {stage !== "select" && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full bg-white/15 border-white/30 text-white hover:bg-white/25 backdrop-blur-sm shrink-0"
-              onClick={reset}
-              data-testid="button-cancel-upload"
-            >
-              Start Over
-            </Button>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Upload the{" "}
+            <span className="font-semibold text-foreground">{selectedOrgCode || "—"}</span>{" "}
+            deduction sheet — members are matched by name automatically.
+          </p>
         </div>
-
-        {/* Stepper — numbered circles with connecting lines */}
-        <div className="relative mt-5 flex items-center">
-          {(["select", "pickSheet", "preview"] as Stage[]).map((s, i) => {
-            const labels = ["Select", "Sheet", "Review"];
-            const isActive = stage === s;
-            const idx = ["select", "pickSheet", "preview"].indexOf(stage);
-            const isPast = i < idx;
-            return (
-              <div key={s} className="flex items-center flex-1 last:flex-none">
-                <div className={`flex items-center gap-2 ${isActive ? "opacity-100" : isPast ? "opacity-90" : "opacity-50"}`}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 ${
-                    isPast
-                      ? "bg-white border-white text-primary"
-                      : isActive
-                      ? "bg-white border-white text-primary"
-                      : "bg-transparent border-white/50 text-white/80"
-                  }`}>
-                    {isPast ? <Check className="w-3.5 h-3.5" /> : i + 1}
-                  </div>
-                  <span className={`text-xs font-semibold hidden sm:block ${isActive ? "text-white" : isPast ? "text-white/90" : "text-white/60"}`}>
-                    {labels[i]}
-                  </span>
-                </div>
-                {i < 2 && <div className="flex-1 mx-2 h-px bg-white/30" />}
-              </div>
-            );
-          })}
-        </div>
+        {stage !== "select" && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full shrink-0"
+            onClick={reset}
+            data-testid="button-cancel-upload"
+          >
+            Start Over
+          </Button>
+        )}
       </div>
+
+      {/* Stepper */}
+      <Card className="rounded-2xl border-border/70 shadow-sm" data-testid="upload-stepper">
+        <CardContent className="p-4">
+          <div className="flex items-center">
+            {(["select", "pickSheet", "preview"] as Stage[]).map((s, i) => {
+              const labels = ["Select & Upload", "Pick Sheet", "Review & Process"];
+              const isActive = stage === s;
+              const stageIdx = (["select", "pickSheet", "preview"] as Stage[]).indexOf(stage);
+              const isPast = i < stageIdx;
+              return (
+                <div key={s} className="flex items-center flex-1 last:flex-none">
+                  <div className={`flex items-center gap-2 ${isActive || isPast ? "opacity-100" : "opacity-40"}`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 ${
+                      isPast
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : isActive
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "bg-muted border-border text-muted-foreground"
+                    }`}>
+                      {isPast ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                    </div>
+                    <span className={`text-xs font-semibold hidden sm:block ${
+                      isPast ? "text-primary" : isActive ? "text-foreground" : "text-muted-foreground"
+                    }`}>
+                      {labels[i]}
+                    </span>
+                  </div>
+                  {i < 2 && (
+                    <div className={`flex-1 mx-2 h-px ${isPast ? "bg-primary/40" : "bg-border"}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {stage === "select" && (
         <Card className="rounded-2xl shadow-sm border-border/70">

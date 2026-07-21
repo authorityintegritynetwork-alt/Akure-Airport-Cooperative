@@ -5,6 +5,7 @@ import {
   useListMembers,
   useActivateMember,
   useGetRecentActivity,
+  useListNotifications,
   getListMembersQueryKey,
   getGetAdminDashboardSummaryQueryKey,
   getGetRecentActivityQueryKey,
@@ -275,6 +276,40 @@ function LoanPipelinePanel({ summary }: { summary: any }) {
   );
 }
 
+const ACTION_LABEL_MAP: Record<string, string> = {
+  CHRISTMAS_PAYOUT: "Christmas payout applied",
+  SHARES_CREDIT: "Share capital credited",
+  RESET_ALL_DATA: "All data reset by administrator",
+  member_activated: "Member account activated",
+  member_deactivated: "Member account deactivated",
+  member_registered: "New member registered",
+  opening_balance_claimed: "Opening balance claimed",
+  opening_balance_reset: "Opening balance reset",
+  upload_processed: "Monthly deductions uploaded",
+  upload_reversed: "Upload reversed",
+  loan_applied: "Loan application submitted",
+  loan_approved: "Loan approved",
+  loan_disbursed: "Loan disbursed",
+  loan_rejected: "Loan application rejected",
+  adjustment_made: "Balance adjusted",
+  christmas_payout: "Christmas payout applied",
+  shares_credit: "Share capital credited",
+  reset_all_data: "All data reset by administrator",
+};
+
+function formatActivityDescription(raw: string): string {
+  if (!raw) return "Activity recorded";
+  // If it looks like a raw action code (all-caps or snake_case with no spaces), translate it.
+  const isRawCode = /^[A-Z_]+$/.test(raw) || (/^[a-z_]+$/.test(raw) && !raw.includes(" "));
+  if (isRawCode) {
+    return (
+      ACTION_LABEL_MAP[raw] ??
+      raw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+  }
+  return raw;
+}
+
 function RecentActivityPanel() {
   const { data: activity, isLoading } = useGetRecentActivity(
     { limit: 8 },
@@ -299,14 +334,22 @@ function RecentActivityPanel() {
         ) : !activity || activity.length === 0 ? (
           <div className="text-sm text-muted-foreground py-4">No activity yet.</div>
         ) : (
-          <div className="space-y-3 max-h-[360px] overflow-auto pr-1">
+          <div className="space-y-1 max-h-[360px] overflow-auto pr-1">
             {activity.map((e: any) => (
-              <div key={e.id} className="flex gap-3 text-sm" data-testid={`activity-${e.id}`}>
+              <div key={e.id} className="flex gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/40 transition-colors" data-testid={`activity-${e.id}`}>
                 <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="leading-snug">{e.description}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {e.actorName ?? "System"} · {new Date(e.createdAt).toLocaleString()}
+                  <p className="text-sm leading-snug font-medium">{formatActivityDescription(e.description)}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <span className="font-medium text-foreground/70">{e.actorName ?? "System"}</span>
+                    {" · "}
+                    {new Date(e.createdAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </p>
                 </div>
               </div>
@@ -448,6 +491,7 @@ function AdminDashboard() {
           value={formatCurrency(summary.totalSavings)}
           icon={<Wallet className="w-5 h-5" />}
           tone="success"
+          href="/statements"
         />
         <KpiCard
           label="Real Loan Paid"
@@ -461,6 +505,7 @@ function AdminDashboard() {
           value={formatCurrency(summary.totalStoreDebt)}
           icon={<ShoppingBag className="w-5 h-5" />}
           tone="info"
+          href="/store-admin"
         />
       </div>
 
@@ -477,6 +522,11 @@ function AdminDashboard() {
 function MemberDashboard({ profile }: { profile: any }) {
   const { data: summary, isLoading } = useGetMemberDashboardSummary();
   const hidden = useBalancesHidden();
+  const { data: unreadNotifs } = useListNotifications(
+    { unread: true } as any,
+    { query: { staleTime: 60_000 } },
+  );
+  const alertBadge = (unreadNotifs as any)?.length ?? 0;
 
   if (isLoading) {
     return (
@@ -607,6 +657,7 @@ function MemberDashboard({ profile }: { profile: any }) {
           icon={<Bell className="w-5 h-5" />}
           label="Alerts"
           tone="sky"
+          badge={alertBadge}
         />
       </div>
 
@@ -640,7 +691,7 @@ function MemberDashboard({ profile }: { profile: any }) {
                       ? "bg-muted/30 border-border/50"
                       : isCredit
                       ? "bg-gradient-to-br from-emerald-50 to-emerald-50/40 border-emerald-200/70 dark:from-emerald-500/10 dark:to-emerald-500/5 dark:border-emerald-500/20"
-                      : "bg-gradient-to-br from-rose-50 to-rose-50/40 border-rose-200/70 dark:from-rose-500/10 dark:to-rose-500/5 dark:border-rose-500/20"
+                      : "bg-gradient-to-br from-amber-50 to-amber-50/40 border-amber-200/70 dark:from-amber-500/10 dark:to-amber-500/5 dark:border-amber-500/20"
                   }`}
                   data-testid={`balance-${b.key}`}
                 >
@@ -654,7 +705,7 @@ function MemberDashboard({ profile }: { profile: any }) {
                           ? "bg-muted text-muted-foreground"
                           : isCredit
                           ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                          : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                       }`}
                     >
                       {isCredit ? (
@@ -670,7 +721,7 @@ function MemberDashboard({ profile }: { profile: any }) {
                         ? "text-muted-foreground"
                         : isCredit
                         ? "text-emerald-700 dark:text-emerald-300"
-                        : "text-rose-700 dark:text-rose-300"
+                        : "text-amber-700 dark:text-amber-300"
                     }`}
                   >
                     {hidden ? "—" : formatCurrency(value)}
@@ -733,8 +784,14 @@ function MemberDashboard({ profile }: { profile: any }) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              No transactions yet — your monthly deduction will appear here.
+            <div className="rounded-xl bg-primary/5 border border-primary/15 p-5 text-center space-y-2.5">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <p className="font-semibold text-sm">Welcome to the cooperative!</p>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                Your savings and deductions will appear here after your first monthly upload is processed by the admin team.
+              </p>
             </div>
           )}
         </CardContent>
@@ -748,11 +805,13 @@ function QuickAction({
   icon,
   label,
   tone,
+  badge,
 }: {
   href: string;
   icon: React.ReactNode;
   label: string;
   tone: "emerald" | "violet" | "amber" | "sky";
+  badge?: number;
 }) {
   const tones: Record<string, string> = {
     emerald:
@@ -766,10 +825,17 @@ function QuickAction({
   return (
     <Link href={href} data-testid={`quick-action-${label.toLowerCase()}`}>
       <div className="group rounded-2xl bg-card border border-border/60 p-3 flex flex-col items-center gap-2 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer active:scale-95">
-        <div
-          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${tones[tone]}`}
-        >
-          {icon}
+        <div className="relative">
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${tones[tone]}`}
+          >
+            {icon}
+          </div>
+          {badge != null && badge > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-background">
+              {badge > 9 ? "9+" : badge}
+            </span>
+          )}
         </div>
         <span className="text-[11px] sm:text-xs font-semibold text-foreground">
           {label}
