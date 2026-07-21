@@ -7,6 +7,7 @@ import {
   verifyStepUpCode,
   hasActiveStepUpGrant,
   StepUpLockedError,
+  StepUpNoEmailError,
 } from "../lib/stepUp";
 
 const router: IRouter = Router();
@@ -55,6 +56,10 @@ router.post(
           error: err.message,
           retryAfterSeconds: err.retryAfterSeconds,
         });
+        return;
+      }
+      if (err instanceof StepUpNoEmailError) {
+        res.status(422).json({ error: err.message });
         return;
       }
       req.log?.error({ err }, "step-up request failed");

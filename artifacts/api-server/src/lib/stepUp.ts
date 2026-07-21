@@ -30,6 +30,13 @@ export class StepUpLockedError extends Error {
   }
 }
 
+export class StepUpNoEmailError extends Error {
+  constructor() {
+    super("No email address is on file for your account. Please contact an administrator to add one before performing sensitive actions.");
+    this.name = "StepUpNoEmailError";
+  }
+}
+
 async function assertNotLockedOut(memberId: number): Promise<void> {
   const [member] = await db
     .select({ stepUpLockedUntil: membersTable.stepUpLockedUntil })
@@ -57,7 +64,7 @@ export async function requestStepUpCode(memberId: number): Promise<{ sentTo: str
     .where(eq(membersTable.id, memberId))
     .limit(1);
   if (!member) throw new Error("Member not found");
-  if (!member.email) throw new Error("Member has no email on file");
+  if (!member.email) throw new StepUpNoEmailError();
 
   const code = generateCode();
   const expiresAt = new Date(Date.now() + CODE_TTL_MIN * 60_000);
