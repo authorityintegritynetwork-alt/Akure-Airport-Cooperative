@@ -25,7 +25,7 @@ function fmt(v: number) {
 
 type ColKey = keyof MemberBalanceColumns;
 
-const SAVINGS_COLS: ColKey[] = ["savings", "christmas", "shares", "fire"];
+const SAVINGS_COLS: ColKey[] = ["savings", "christmas", "shares"];
 
 const LOAN_COLS: ColKey[] = [
   "realLoan",
@@ -36,6 +36,7 @@ const LOAN_COLS: ColKey[] = [
   "furniture",
   "fuelVenture",
   "commodity",
+  "fire",
   "ghlForm",
   "landLoan",
 ];

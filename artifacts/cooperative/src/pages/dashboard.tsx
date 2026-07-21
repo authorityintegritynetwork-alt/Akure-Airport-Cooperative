@@ -81,7 +81,6 @@ const BALANCE_CARDS: BalanceCardCfg[] = [
   { key: "landLoanBalance", label: "Land Loan", direction: "debit", hideWhenZeroFor: ["faan"] },
   { key: "electronicsDebt", label: "Electronics", direction: "debit" },
   { key: "sElectronicsDebt", label: "S/Electronics", direction: "debit", hideWhenZeroFor: ["nama"] },
-  { key: "furnitureDebt", label: "Furniture", direction: "debit" },
   { key: "commodityDebt", label: "Commodity", direction: "debit" },
   { key: "ghlFormDebt", label: "Loan Form Cost", direction: "debit" },
 ];
@@ -708,35 +707,32 @@ function MemberDashboard({ profile }: { profile: any }) {
         <CardContent>
           {summary.recentTransactions.length > 0 ? (
             <div className="divide-y divide-border/50">
-              {summary.recentTransactions.map((tx) => {
-                const isCredit = ["savings", "christmas", "fire", "shares", "christmas_payout", "shares_credit", "opening_balance"].includes(tx.type);
-                return (
-                  <div
-                    key={tx.id}
-                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                    data-testid={`recent-tx-${tx.id}`}
-                  >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isCredit ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
-                      {isCredit ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium capitalize text-sm truncate">
-                        {tx.type.replaceAll("_", " ")}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(tx.createdAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <span className={`font-semibold tabular-nums text-sm ${isCredit ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-400"}`}>
-                      {isCredit ? "+" : "−"}{formatCurrency(tx.amount)}
-                    </span>
+              {summary.recentTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                  data-testid={`recent-tx-${tx.id}`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-4 h-4" />
                   </div>
-                );
-              })}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium capitalize text-sm truncate">
+                      {tx.type.replace("_", " ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(tx.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <span className="font-semibold tabular-nums text-sm text-emerald-700 dark:text-emerald-300">
+                    +{formatCurrency(tx.amount)}
+                  </span>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="text-center py-8 text-sm text-muted-foreground">
