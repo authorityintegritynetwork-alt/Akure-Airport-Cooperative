@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
 import { Search, FileSpreadsheet } from "lucide-react";
+import { Link } from "wouter";
 
 export function CooperativeRecordsPage() {
   const [search, setSearch] = useState("");
@@ -106,41 +107,42 @@ export function CooperativeRecordsPage() {
       ) : (
         <div className="space-y-2.5">
           {records.map((r: any) => (
-            <div
-              key={r.id}
-              className="rounded-2xl border border-border/70 bg-card p-3 sm:p-4 shadow-sm"
-              data-testid={`coop-record-${r.id}`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-400 to-slate-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
-                  {r.fullName.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm truncate">{r.fullName}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <Badge variant="outline" className="text-[10px] uppercase rounded-full px-2">
-                      {r.organization || "—"}
-                    </Badge>
-                    {r.staffId && (
-                      <Badge variant="outline" className="text-[10px] rounded-full px-2">
-                        ID {r.staffId}
+            <Link key={r.id} href={`/members/${r.id}`}>
+              <div
+                className="rounded-2xl border border-border/70 bg-card p-3 sm:p-4 shadow-sm hover:border-primary/40 hover:shadow-md transition-all cursor-pointer"
+                data-testid={`coop-record-${r.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-400 to-slate-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+                    {r.fullName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm truncate hover:text-primary transition-colors">{r.fullName}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <Badge variant="outline" className="text-[10px] uppercase rounded-full px-2">
+                        {r.organization || "—"}
                       </Badge>
-                    )}
-                    <Badge variant="secondary" className="text-[10px] rounded-full px-2">
-                      No app account
-                    </Badge>
+                      {r.staffId && (
+                        <Badge variant="outline" className="text-[10px] rounded-full px-2">
+                          ID {r.staffId}
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-[10px] rounded-full px-2">
+                        No app account
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                      Savings
+                    </p>
+                    <p className="text-sm font-bold tabular-nums">
+                      {formatCurrency(r.savingsBalance)}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                    Savings
-                  </p>
-                  <p className="text-sm font-bold tabular-nums">
-                    {formatCurrency(r.savingsBalance)}
-                  </p>
-                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

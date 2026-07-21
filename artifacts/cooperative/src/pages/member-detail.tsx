@@ -31,7 +31,7 @@ import {
   TrendingUp,
   Wrench,
   Landmark,
-  Store,
+  Table2,
 } from "lucide-react";
 import {
   Dialog,
@@ -212,6 +212,9 @@ export function MemberDetailPage() {
       {/* Per-product balance breakdown */}
       <PerProductBalances member={member} memberId={memberId} canAdjust={canAdjust} />
 
+      {/* Month-by-month pivot table */}
+      {timeline && <MonthlyDeductionTable timeline={timeline} />}
+
       {timeline && (
         <Card className="rounded-2xl shadow-sm border-border/70">
           <CardHeader className="pb-2">
@@ -350,6 +353,143 @@ export function MemberDetailPage() {
 
 
 
+// ── Monthly Deduction Pivot Table ────────────────────────────────────────────
+
+const TABLE_COLS = [
+  { key: "savings",       label: "Savings" },
+  { key: "christmas",     label: "Christmas" },
+  { key: "shares",        label: "Shares" },
+  { key: "realLoan",      label: "Real Loan" },
+  { key: "provident",     label: "Provision Loan" },
+  { key: "emergencyLoan", label: "Emergency Loan" },
+  { key: "fuelVenture",   label: "Fuel & Venture" },
+  { key: "landLoan",      label: "Land Loan" },
+  { key: "fire",          label: "Fire Fund" },
+  { key: "electronics",   label: "Electronics" },
+  { key: "sElectronics",  label: "S/Electronics" },
+  { key: "furniture",     label: "Furniture" },
+  { key: "commodity",     label: "Commodity" },
+  { key: "ghlForm",       label: "GHL Form" },
+] as const;
+
+function MonthlyDeductionTable({ timeline }: { timeline: any }) {
+  // Only show columns that have any data
+  const activeCols = TABLE_COLS.filter(({ key }) => {
+    const col = timeline.columns?.[key];
+    return col && (col.ob > 0 || (col.months?.length ?? 0) > 0);
+  });
+
+  if (activeCols.length === 0) return null;
+
+  // Collect all unique months sorted chronologically
+  const monthMap = new Map<string, { label: string }>();
+  for (const { key } of activeCols) {
+    for (const m of (timeline.columns[key].months ?? [])) {
+      const mk = `${m.year}-${String(m.month).padStart(2, "0")}`;
+      if (!monthMap.has(mk)) monthMap.set(mk, { label: m.label });
+    }
+  }
+  const sortedMonths = [...monthMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  // Build month → col → amount lookup
+  const lookup: Record<string, Record<string, number>> = {};
+  for (const { key } of activeCols) {
+    for (const m of (timeline.columns[key].months ?? [])) {
+      const mk = `${m.year}-${String(m.month).padStart(2, "0")}`;
+      if (!lookup[mk]) lookup[mk] = {};
+      lookup[mk][key] = m.amount;
+    }
+  }
+
+  // Total per column = opening balance + sum of all monthly amounts
+  const totals: Record<string, number> = {};
+  for (const { key } of activeCols) {
+    const col = timeline.columns[key];
+    totals[key] = (col.ob ?? 0) + (col.months ?? []).reduce((s: number, m: any) => s + m.amount, 0);
+  }
+
+  const hasOb = activeCols.some(({ key }) => (timeline.columns[key].ob ?? 0) > 0);
+
+  return (
+    <Card className="rounded-2xl shadow-sm border-border/70">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Table2 className="w-4 h-4" />
+          Monthly Deduction Breakdown
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Each upload month's deductions across all product types, with cumulative totals.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0 pb-1">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap sticky left-0 z-10 bg-muted/50 min-w-[130px]">
+                  Month
+                </th>
+                {activeCols.map(({ key, label }) => (
+                  <th key={key} className="text-right px-3 py-2.5 font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap min-w-[110px]">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Opening Balance row */}
+              {hasOb && (
+                <tr className="border-b border-border/40 bg-sky-500/5">
+                  <td className="px-4 py-2 font-semibold text-sky-700 dark:text-sky-400 whitespace-nowrap sticky left-0 z-10 bg-sky-500/5">
+                    Opening Balance
+                  </td>
+                  {activeCols.map(({ key }) => {
+                    const ob = timeline.columns[key].ob ?? 0;
+                    return (
+                      <td key={key} className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${ob > 0 ? "text-sky-700 dark:text-sky-400 font-medium" : "text-muted-foreground/30"}`}>
+                        {ob > 0 ? formatCurrency(ob) : "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
+
+              {/* One row per upload month */}
+              {sortedMonths.map(([mk, meta], idx) => (
+                <tr key={mk} className={`border-b border-border/30 transition-colors hover:bg-muted/30 ${idx % 2 === 0 ? "" : "bg-muted/10"}`}>
+                  <td className="px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 bg-card">
+                    {meta.label}
+                  </td>
+                  {activeCols.map(({ key }) => {
+                    const amt = lookup[mk]?.[key] ?? 0;
+                    return (
+                      <td key={key} className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${amt > 0 ? "text-foreground" : "text-muted-foreground/30"}`}>
+                        {amt > 0 ? formatCurrency(amt) : "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+
+              {/* Total row */}
+              <tr className="border-t-2 border-border font-bold bg-muted/50">
+                <td className="px-4 py-2.5 text-foreground whitespace-nowrap sticky left-0 z-10 bg-muted/50">
+                  Total
+                </td>
+                {activeCols.map(({ key }) => (
+                  <td key={key} className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap text-foreground">
+                    {formatCurrency(totals[key])}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function BalanceTile({
   icon,
   label,
@@ -466,26 +606,28 @@ function PerProductBalances({
     { label: "Savings",          value: member.savingsBalance,    ob: member.obSavingsBalance },
     { label: "Christmas Savings",value: member.christmasBalance,  ob: member.obChristmasBalance },
     { label: "Share Capital",    value: member.sharesBalance,     ob: member.obSharesBalance },
-    { label: "Fire Fund",        value: member.fireFundBalance,   ob: member.obFireFundBalance },
   ].filter((i) => parseFloat(String(i.value ?? "0")) > 0 || parseFloat(String(i.ob ?? "0")) > 0);
 
+  // Fire fund is a loan repayment, not savings — kept in the loan section.
+  // Electronics, S/Electronics, Furniture, Commodity and GHL Form are also
+  // loan repayments recorded via monthly uploads; they are NOT store debts.
+  // Actual store debt (items purchased from the cooperative store on credit)
+  // is tracked separately in the Store Purchases card below.
   const loanItems = [
-    { label: "Real Loan",      value: member.realLoanBalance,      ob: member.obRealLoanBalance },
-    { label: "Provident",      value: member.providentBalance,     ob: member.obProvidentBalance },
-    { label: "Emergency Loan", value: member.emergencyLoanBalance, ob: member.obEmergencyLoanBalance },
-    { label: "Fuel & Venture", value: member.fuelVentureBalance,   ob: member.obFuelVentureBalance },
-    { label: "Land Loan",      value: member.landLoanBalance,      ob: member.obLandLoanBalance },
+    { label: "Real Loan",          value: member.realLoanBalance,      ob: member.obRealLoanBalance },
+    { label: "Provision Loan",     value: member.providentBalance,     ob: member.obProvidentBalance },
+    { label: "Emergency Loan",     value: member.emergencyLoanBalance, ob: member.obEmergencyLoanBalance },
+    { label: "Fuel & Venture",     value: member.fuelVentureBalance,   ob: member.obFuelVentureBalance },
+    { label: "Land Loan",          value: member.landLoanBalance,      ob: member.obLandLoanBalance },
+    { label: "Fire Fund Loan",     value: member.fireFundBalance,      ob: member.obFireFundBalance },
+    { label: "Electronics",        value: member.electronicsDebt,      ob: member.obElectronicsDebt },
+    { label: "S/Electronics",      value: member.sElectronicsDebt,     ob: member.obSElectronicsDebt },
+    { label: "Furniture",          value: member.furnitureDebt,        ob: member.obFurnitureDebt },
+    { label: "Commodity",          value: member.commodityDebt,        ob: member.obCommodityDebt },
+    { label: "GHL Form",           value: member.ghlFormDebt,          ob: member.obGhlFormDebt },
   ].filter((i) => parseFloat(String(i.value ?? "0")) > 0 || parseFloat(String(i.ob ?? "0")) > 0);
 
-  const storeItems = [
-    { label: "Electronics",    value: member.electronicsDebt,   ob: member.obElectronicsDebt },
-    { label: "L/Electronics",  value: member.sElectronicsDebt,  ob: member.obSElectronicsDebt },
-    { label: "Furniture",      value: member.furnitureDebt,     ob: member.obFurnitureDebt },
-    { label: "Commodity",      value: member.commodityDebt,     ob: member.obCommodityDebt },
-    { label: "GHL Form",       value: member.ghlFormDebt,       ob: member.obGhlFormDebt },
-  ].filter((i) => parseFloat(String(i.value ?? "0")) > 0 || parseFloat(String(i.ob ?? "0")) > 0);
-
-  const hasAny = savingsItems.length > 0 || loanItems.length > 0 || storeItems.length > 0;
+  const hasAny = savingsItems.length > 0 || loanItems.length > 0;
 
   return (
     <Card className="rounded-2xl shadow-sm border-border/70">
@@ -532,24 +674,11 @@ function PerProductBalances({
         {loanItems.length > 0 && (
           <div>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <CreditCard className="w-3 h-3" /> Loan Balances
+              <CreditCard className="w-3 h-3" /> Loan Repayments
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
               {loanItems.map((i) => (
                 <MiniProductTile key={i.label} {...i} tone="warning" />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {storeItems.length > 0 && (
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Store className="w-3 h-3" /> Store Debts
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              {storeItems.map((i) => (
-                <MiniProductTile key={i.label} {...i} tone="info" />
               ))}
             </div>
           </div>

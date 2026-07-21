@@ -73,7 +73,7 @@ const BALANCE_CARDS: BalanceCardCfg[] = [
   { key: "sharesBalance", label: "Share Capital", direction: "credit" },
   { key: "savingsBalance", label: "Savings", direction: "credit" },
   { key: "christmasBalance", label: "Christmas", direction: "credit", hideWhenZeroFor: ["nama"] },
-  { key: "fireFundBalance", label: "Fire Fund", direction: "credit", hideWhenZeroFor: ["nama"] },
+  { key: "fireFundBalance", label: "Fire Fund Loan", direction: "debit", hideWhenZeroFor: ["nama"] },
   { key: "providentBalance", label: "Provision Loan", direction: "debit" },
   { key: "realLoanBalance", label: "Real Loan", direction: "debit" },
   { key: "emergencyLoanBalance", label: "Emergency Loan", direction: "debit" },
@@ -450,8 +450,8 @@ function AdminDashboard() {
           tone="success"
         />
         <KpiCard
-          label="Loans out"
-          value={formatCurrency(summary.totalLoansOutstanding)}
+          label="Real Loan Paid"
+          value={formatCurrency(summary.totalRealLoanPaid)}
           icon={<CreditCard className="w-5 h-5" />}
           tone="warning"
           href="/loans"
@@ -504,12 +504,10 @@ function MemberDashboard({ profile }: { profile: any }) {
     return !c.hideWhenZeroFor?.includes(org);
   });
 
-  // Total Savings = Savings + Christmas. Provision is a loan (debit), not
-  // savings. Christmas is always included; for orgs that don't run a Christmas
-  // pool (e.g. NAMA today) the balance is just zero so the math is unchanged.
-  // Share capital is shown separately in the breakdown cards, not here.
-  const totalSavings =
-    (summary.savingsBalance ?? 0) + (summary.christmasBalance ?? 0);
+  // Total Savings = Savings balance only. Christmas savings is a separate
+  // product shown in the breakdown cards — it is not included in this figure.
+  // Share capital is also shown separately in the breakdown cards.
+  const totalSavings = summary.savingsBalance ?? 0;
 
   const firstName = (profile.fullName || "").split(" ")[0] || "there";
   const hour = new Date().getHours();
@@ -557,20 +555,20 @@ function MemberDashboard({ profile }: { profile: any }) {
             {hidden ? "—" : formatCurrency(totalSavings)}
           </p>
           <p className="text-xs text-white/70 mt-1">
-            {(summary.christmasBalance ?? 0) > 0 ? "Savings + Christmas" : "Savings"}
+            Savings balance
           </p>
         </div>
 
         <div className="relative mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3">
             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/70 font-semibold">
-              <CreditCard className="w-3 h-3" /> Loan due
+              <CreditCard className="w-3 h-3" /> Active Loans
             </div>
             <p className="text-lg font-bold mt-1 tabular-nums">
-              {hidden ? "—" : formatCurrency(summary.outstandingLoanBalance)}
+              {summary.activeLoanCount}
             </p>
             <p className="text-[10px] text-white/60 mt-0.5">
-              {summary.activeLoanCount} active
+              platform loans disbursed
             </p>
           </div>
           <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 p-3">

@@ -6,28 +6,39 @@ import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/dashboard/admin-summary", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const allMembers = await db.select().from(membersTable);
+  const [allMembers, allLoans, allPurchases, storeItems] = await Promise.all([
+    db.select().from(membersTable),
+    db.select().from(loansTable),
+    db.select().from(storePurchasesTable),
+    db.select().from(storeItemsTable),
+  ]);
+
   const totalMembers = allMembers.length;
   const activeMembers = allMembers.filter((m) => m.status === "active").length;
   const pendingMembers = allMembers.filter((m) => m.status === "pending").length;
-  const totalSavings = allMembers.reduce((sum, m) => sum + parseFloat(m.savingsBalance), 0);
-  const totalLoansOutstanding = allMembers.reduce((sum, m) => sum + parseFloat(m.totalLoanBalance), 0);
-  const totalStoreDebt = allMembers.reduce((sum, m) => sum + parseFloat(m.totalStoreDebt), 0);
 
-  const allLoans = await db.select().from(loansTable);
+  // Savings balance only (christmas is tracked separately, not included here)
+  const totalSavings = allMembers.reduce((sum, m) => sum + parseFloat(m.savingsBalance), 0);
+
+  // Real loan paid = cumulative real loan repayments recorded against all members
+  const totalRealLoanPaid = allMembers.reduce((sum, m) => sum + parseFloat(m.realLoanBalance), 0);
+
+  // Store debt = outstanding balance on actual store purchases only (not loan columns)
+  const totalStoreDebt = allPurchases
+    .filter((p) => p.status !== "settled")
+    .reduce((sum, p) => sum + parseFloat(p.outstandingBalance), 0);
+
   const loansAwaitingAdminApproval = allLoans.filter((l) => l.status === "pending").length;
   const loansAwaitingAuditorApproval = allLoans.filter((l) => l.status === "admin_approved").length;
   const loansAwaitingSuperAdminApproval = allLoans.filter((l) => l.status === "auditor_approved").length;
   const loansAwaitingDisbursement = allLoans.filter((l) => l.status === "super_admin_approved").length;
-
-  const storeItems = await db.select().from(storeItemsTable);
 
   res.json({
     totalMembers,
     activeMembers,
     pendingMembers,
     totalSavings,
-    totalLoansOutstanding,
+    totalRealLoanPaid,
     totalStoreDebt,
     loansAwaitingAdminApproval,
     loansAwaitingAuditorApproval,
@@ -57,17 +68,22 @@ router.get("/dashboard/member-summary", requireAuth, async (req: AuthRequest, re
       providentBalance: 0,
       fuelVentureBalance: 0,
       activeLoanCount: 0,
-      outstandingLoanBalance: 0,
       storeDebt: 0,
       recentTransactions: [],
     });
     return;
   }
 
-  const [activeLoans, recentTx] = await Promise.all([
+  const [activeLoans, recentTx, memberPurchases] = await Promise.all([
     db.select().from(loansTable).where(and(eq(loansTable.memberId, req.memberId!), eq(loansTable.status, "disbursed"))),
     db.select().from(transactionsTable).where(eq(transactionsTable.memberId, req.memberId!)).orderBy(transactionsTable.createdAt).limit(5),
+    db.select().from(storePurchasesTable).where(eq(storePurchasesTable.memberId, req.memberId!)),
   ]);
+
+  // Store debt = outstanding balance on actual store purchases only
+  const storeDebt = memberPurchases
+    .filter((p) => p.status !== "settled")
+    .reduce((sum, p) => sum + parseFloat(p.outstandingBalance), 0);
 
   res.json({
     savingsBalance: parseFloat(member.savingsBalance),
@@ -75,8 +91,7 @@ router.get("/dashboard/member-summary", requireAuth, async (req: AuthRequest, re
     providentBalance: parseFloat(member.providentBalance),
     fuelVentureBalance: parseFloat(member.fuelVentureBalance),
     activeLoanCount: activeLoans.length,
-    outstandingLoanBalance: parseFloat(member.totalLoanBalance),
-    storeDebt: parseFloat(member.totalStoreDebt),
+    storeDebt,
     recentTransactions: recentTx.map((t) => ({
       ...t,
       amount: parseFloat(t.amount),
