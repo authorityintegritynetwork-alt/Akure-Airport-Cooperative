@@ -49,7 +49,7 @@ export const uploadRecordsTable = pgTable(
      *                        only roster members are processed.
      */
     uploadType: text("upload_type", {
-      enum: ["standalone", "payroll_summary", "category_breakdown"],
+      enum: ["standalone", "payroll_summary", "category_breakdown", "balance_snapshot"],
     })
       .notNull()
       .default("standalone"),

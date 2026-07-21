@@ -10,8 +10,8 @@ import {
   openingBalancesTable,
   type RosterMember,
 } from "@workspace/db";
-import { eq, and, asc, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin, requireReverification, AuthRequest } from "../middlewares/auth";
+import { eq, and, asc, sql, inArray } from "drizzle-orm";
+import { requireAuth, requireAdmin, requireTreasurer, requireReverification, AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
 import { sendNotification } from "../lib/notifications";
 import {
@@ -45,11 +45,133 @@ function isPdfPath(p: string): boolean {
   return p.toLowerCase().endsWith(".pdf");
 }
 import { NameMatcher, MatchResult } from "../lib/nameMatcher";
+import { z } from "zod/v4";
 
 const router: IRouter = Router();
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+// ── Reversal helpers ─────────────────────────────────────────────────────────
+
+/** Maps transaction.type → { member balance field, original direction }. */
+const TX_REVERSAL: Record<string, { field: string; direction: "credit" | "debit" }> = {
+  shares:                   { field: "sharesBalance",        direction: "credit" },
+  savings:                  { field: "savingsBalance",        direction: "credit" },
+  provident:                { field: "providentBalance",      direction: "debit"  },
+  provident_loan_repayment: { field: "providentBalance",      direction: "debit"  },
+  christmas:                { field: "christmasBalance",      direction: "credit" },
+  real_loan_repayment:      { field: "realLoanBalance",       direction: "debit"  },
+  loan_repayment:           { field: "realLoanBalance",       direction: "debit"  },
+  emergency_loan_repayment: { field: "emergencyLoanBalance",  direction: "debit"  },
+  electronics_repayment:    { field: "electronicsDebt",       direction: "debit"  },
+  s_electronics_repayment:  { field: "sElectronicsDebt",      direction: "debit"  },
+  furniture_repayment:      { field: "furnitureDebt",         direction: "debit"  },
+  commodity_repayment:      { field: "commodityDebt",         direction: "debit"  },
+  ghl_form_repayment:       { field: "ghlFormDebt",           direction: "debit"  },
+  fire:                     { field: "fireFundBalance",        direction: "credit" },
+  fuel_venture_repayment:   { field: "fuelVentureBalance",    direction: "debit"  },
+  land_loan_repayment:      { field: "landLoanBalance",       direction: "debit"  },
+};
+
+/**
+ * Reverse the balance effects of a set of upload records and delete them.
+ * Called before re-processing the same period so re-uploads replace rather
+ * than stack on top of the previous data.
+ */
+async function reverseAndDeleteUploadRecords(tx: Tx, uploadIds: number[]): Promise<void> {
+  if (uploadIds.length === 0) return;
+
+  const txns = await tx
+    .select({
+      memberId: transactionsTable.memberId,
+      type:     transactionsTable.type,
+      amount:   transactionsTable.amount,
+    })
+    .from(transactionsTable)
+    .where(inArray(transactionsTable.uploadRecordId, uploadIds));
+
+  // Accumulate per-member field deltas (reversed sign vs. original).
+  const memberDeltas = new Map<number, Map<string, number>>();
+  for (const t of txns) {
+    const info = TX_REVERSAL[t.type];
+    if (!info) continue;
+    const amt = parseFloat(String(t.amount));
+    if (!amt || isNaN(amt)) continue;
+    // To reverse: credits subtract, debits add back.
+    const delta = info.direction === "credit" ? -amt : +amt;
+    if (!memberDeltas.has(t.memberId)) memberDeltas.set(t.memberId, new Map());
+    const fields = memberDeltas.get(t.memberId)!;
+    fields.set(info.field, (fields.get(info.field) ?? 0) + delta);
+  }
+
+  // Apply reversed deltas and recompute aggregates.
+  for (const [memberId, fields] of memberDeltas) {
+    const setClauses: Record<string, ReturnType<typeof sql>> = {};
+    for (const [field, delta] of fields) {
+      const col = (membersTable as any)[field];
+      if (!col) continue;
+      setClauses[field] =
+        delta >= 0
+          ? sql`${col} + ${delta.toString()}::numeric`
+          : sql`GREATEST(0, ${col} + ${delta.toString()}::numeric)`;
+    }
+    if (Object.keys(setClauses).length === 0) continue;
+
+    const exprFor = (f: string, col: any): ReturnType<typeof sql> =>
+      (setClauses[f] as any) ?? sql`${col}`;
+
+    setClauses.totalLoanBalance = sql`
+      ${exprFor("realLoanBalance",      membersTable.realLoanBalance     as any)} +
+      ${exprFor("emergencyLoanBalance", membersTable.emergencyLoanBalance as any)} +
+      ${exprFor("providentBalance",     membersTable.providentBalance     as any)} +
+      ${exprFor("fuelVentureBalance",   membersTable.fuelVentureBalance   as any)} +
+      ${exprFor("landLoanBalance",      membersTable.landLoanBalance      as any)}
+    `;
+    setClauses.totalStoreDebt = sql`
+      ${exprFor("electronicsDebt",  membersTable.electronicsDebt  as any)} +
+      ${exprFor("sElectronicsDebt", membersTable.sElectronicsDebt as any)} +
+      ${exprFor("furnitureDebt",    membersTable.furnitureDebt    as any)} +
+      ${exprFor("commodityDebt",    membersTable.commodityDebt    as any)} +
+      ${exprFor("ghlFormDebt",      membersTable.ghlFormDebt      as any)}
+    `;
+
+    await tx
+      .update(membersTable)
+      .set(setClauses as any)
+      .where(eq(membersTable.id, memberId));
+  }
+
+  // Delete transactions first (FK), then the records.
+  await tx.delete(transactionsTable).where(inArray(transactionsTable.uploadRecordId, uploadIds));
+  await tx.delete(uploadRecordsTable).where(inArray(uploadRecordsTable.id, uploadIds));
+}
+
+/** Compute all 16 balance values from a parsed row's amounts map. */
+function computeObValues(row: { amounts: Record<string, number> }) {
+  const sharesBalance        = row.amounts.shares        ?? 0;
+  const savingsBalance       = row.amounts.savings       ?? 0;
+  const providentBalance     = row.amounts.provident     ?? 0;
+  const christmasBalance     = row.amounts.christmas     ?? 0;
+  const realLoanBalance      = row.amounts.realLoan      ?? 0;
+  const emergencyLoanBalance = row.amounts.emergencyLoan ?? 0;
+  const fuelVentureBalance   = row.amounts.fuelVenture   ?? 0;
+  const landLoanBalance      = row.amounts.landLoan      ?? 0;
+  const totalLoanBalance     =
+    realLoanBalance + emergencyLoanBalance + providentBalance + fuelVentureBalance + landLoanBalance;
+  const electronicsDebt  = row.amounts.electronics  ?? 0;
+  const sElectronicsDebt = row.amounts.sElectronics ?? 0;
+  const furnitureDebt    = row.amounts.furniture    ?? 0;
+  const commodityDebt    = row.amounts.commodity    ?? 0;
+  const ghlFormDebt      = row.amounts.ghlForm      ?? 0;
+  const totalStoreDebt   = electronicsDebt + sElectronicsDebt + furnitureDebt + commodityDebt + ghlFormDebt;
+  const fireFundBalance  = row.amounts.fire         ?? 0;
+  return {
+    sharesBalance, savingsBalance, providentBalance, christmasBalance,
+    realLoanBalance, emergencyLoanBalance, fuelVentureBalance, landLoanBalance,
+    totalLoanBalance, electronicsDebt, sElectronicsDebt, furnitureDebt,
+    commodityDebt, ghlFormDebt, totalStoreDebt, fireFundBalance,
+  };
+}
 
 async function loadOrgOrFail(
   code: string,
@@ -727,21 +849,29 @@ router.post(
       const result = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${periodKey}))`);
 
-        // For category_breakdown: check no other breakdown is already linked.
-        // For standalone: check no processed upload exists for period/org.
-        if (uploadType === "category_breakdown" && linkedPayrollUploadId != null) {
-          const existingBreakdown = await tx
-            .select({ id: uploadRecordsTable.id })
-            .from(uploadRecordsTable)
-            .where(
-              and(
+        // Replace existing upload for this period rather than blocking with 409.
+        // category_breakdown: reverse any prior breakdown linked to this roster or period.
+        // standalone: reverse any prior standalone upload for this period/org.
+        if (uploadType === "category_breakdown") {
+          const conditions = linkedPayrollUploadId != null
+            ? and(
                 eq(uploadRecordsTable.linkedUploadId, linkedPayrollUploadId),
                 eq(uploadRecordsTable.uploadType, "category_breakdown"),
                 eq(uploadRecordsTable.status, "processed"),
-              ),
-            );
-          if (existingBreakdown.length > 0) {
-            return { __duplicate: true as const, existingUploadId: existingBreakdown[0].id };
+              )
+            : and(
+                eq(uploadRecordsTable.month, parsed.data.month),
+                eq(uploadRecordsTable.year, parsed.data.year),
+                eq(uploadRecordsTable.organization, uploadOrg),
+                eq(uploadRecordsTable.uploadType, "category_breakdown"),
+                eq(uploadRecordsTable.status, "processed"),
+              );
+          const existing = await tx
+            .select({ id: uploadRecordsTable.id })
+            .from(uploadRecordsTable)
+            .where(conditions!);
+          if (existing.length > 0) {
+            await reverseAndDeleteUploadRecords(tx, existing.map((r) => r.id));
           }
         } else if (uploadType === "standalone") {
           const dupInTx = await tx
@@ -757,7 +887,7 @@ router.post(
               ),
             );
           if (dupInTx.length > 0) {
-            return { __duplicate: true as const, existingUploadId: dupInTx[0].id };
+            await reverseAndDeleteUploadRecords(tx, dupInTx.map((r) => r.id));
           }
         }
 
@@ -896,14 +1026,6 @@ router.post(
 
         return { uploadRecord, processed, skipped, rosterSkipped, autoCreated, errors, notifications, openingFlagged };
       });
-
-      if ("__duplicate" in result && result.__duplicate) {
-        res.status(409).json({
-          error: `A ${uploadType} upload for ${parsed.data.month} ${parsed.data.year} has already been processed (record #${result.existingUploadId}). Void it first if you need to re-run.`,
-          existingUploadId: result.existingUploadId,
-        });
-        return;
-      }
 
       const { uploadRecord, processed, skipped, rosterSkipped, autoCreated, errors, notifications, openingFlagged } = result;
 
@@ -1237,7 +1359,7 @@ async function processPayroll(
         ),
       );
     if (dupInTx.length > 0) {
-      return { __duplicate: true as const, existingUploadId: dupInTx[0].id };
+      await reverseAndDeleteUploadRecords(tx, dupInTx.map((r) => r.id));
     }
 
     const [uploadRecord] = await tx
@@ -1460,14 +1582,6 @@ async function processPayroll(
     return { uploadRecord, processed, skipped, autoCreated, errors, notifications, openingFlagged };
   });
 
-  if ("__duplicate" in result && result.__duplicate) {
-    res.status(409).json({
-      error: `An upload for ${body.month} ${body.year} has already been processed (record #${result.existingUploadId}). Void it first if you need to re-run.`,
-      existingUploadId: result.existingUploadId,
-    });
-    return;
-  }
-
   // ── payroll_summary (roster-only) result ──────────────────────────────────
   if ("__rosterOnly" in result && result.__rosterOnly) {
     await logAudit({
@@ -1520,6 +1634,212 @@ async function processPayroll(
     openingBalancesFlagged: openingFlagged,
   });
 }
+
+// ── POST /uploads/balance-snapshot/preview ───────────────────────────────────
+// Parses a multi-column Excel sheet (same format as opening balances) and
+// returns per-member balance values without making any DB changes.
+
+router.post(
+  "/uploads/balance-snapshot/preview",
+  requireAuth,
+  requireAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const schema = z.object({
+      fileObjectPath: z.string(),
+      sheetName:      z.string().optional(),
+      organization:   z.string(),
+      month:          z.string(),
+      year:           z.number().int(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+    const { fileObjectPath, sheetName: sheetNameParam, organization, month, year } = parsed.data;
+
+    const org = await loadOrgOrFail(organization, res);
+    if (!org) return;
+
+    try {
+      const wb = await downloadWorkbook(fileObjectPath);
+      const sheetName = sheetNameParam ?? wb.SheetNames[0];
+      if (!wb.SheetNames.includes(sheetName)) {
+        res.status(400).json({ error: `Sheet "${sheetName}" not found` }); return;
+      }
+      const sheet = parseSheet(wb, sheetName);
+
+      const allMembers = await db.select({
+        id: membersTable.id, fullName: membersTable.fullName,
+        organization: membersTable.organization, employeeNo: membersTable.employeeNo,
+      }).from(membersTable);
+      const orgMembers  = allMembers.filter((m) => m.organization === org.code);
+      const matcher     = new NameMatcher(orgMembers);
+      const empNoIdx    = buildEmpNoIndex(allMembers, org.code) as Map<string, SheetMemberRef>;
+      const membersById = new Map(allMembers.map((m) => [m.id, m]));
+
+      // Check if a snapshot already exists for this org+period.
+      const existing = await db
+        .select({ id: uploadRecordsTable.id })
+        .from(uploadRecordsTable)
+        .where(and(
+          eq(uploadRecordsTable.month, month),
+          eq(uploadRecordsTable.year, year),
+          eq(uploadRecordsTable.organization, org.code),
+          eq(uploadRecordsTable.status, "processed"),
+          eq(uploadRecordsTable.uploadType, "balance_snapshot" as any),
+        ));
+
+      const rows = sheet.rows.map((row) => {
+        const match = matchSheetRow(row, empNoIdx, matcher, new Map(), membersById);
+        const vals  = computeObValues(row as any);
+        return {
+          rowNumber:          row.rowNumber,
+          rawName:            row.rawName,
+          employeeNo:         row.employeeNo ?? null,
+          matchedMemberId:    match.memberId  ?? null,
+          matchedMemberName:  match.memberName ?? null,
+          matchConfidence:    match.confidence ?? null,
+          totalLoanBalance:   vals.totalLoanBalance,
+          totalStoreDebt:     vals.totalStoreDebt,
+          sharesBalance:      vals.sharesBalance,
+          savingsBalance:     vals.savingsBalance,
+          christmasBalance:   vals.christmasBalance,
+          fireFundBalance:    vals.fireFundBalance,
+        };
+      });
+
+      res.json({
+        sheetName, month, year,
+        totalRows:   rows.length,
+        matchedRows: rows.filter((r) => r.matchedMemberId != null).length,
+        willReplace: existing.length > 0,
+        rows,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: `Balance snapshot preview failed: ${err.message}` });
+    }
+  },
+);
+
+// ── POST /uploads/balance-snapshot/process ───────────────────────────────────
+// Applies the multi-column sheet as a direct SET on all 16 member balance
+// columns.  No transaction rows are created; the upload record is the audit
+// trail. An existing snapshot for the same period is deleted first.
+
+router.post(
+  "/uploads/balance-snapshot/process",
+  requireAuth,
+  requireTreasurer,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const schema = z.object({
+      fileObjectPath: z.string(),
+      sheetName:      z.string(),
+      organization:   z.string(),
+      month:          z.string(),
+      year:           z.number().int(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+    const { fileObjectPath, sheetName, organization, month, year } = parsed.data;
+
+    const org = await loadOrgOrFail(organization, res);
+    if (!org) return;
+
+    try {
+      const wb = await downloadWorkbook(fileObjectPath);
+      if (!wb.SheetNames.includes(sheetName)) {
+        res.status(400).json({ error: `Sheet "${sheetName}" not found` }); return;
+      }
+      const sheet = parseSheet(wb, sheetName);
+
+      const allMembers = await db.select({
+        id: membersTable.id, fullName: membersTable.fullName,
+        organization: membersTable.organization, employeeNo: membersTable.employeeNo,
+      }).from(membersTable);
+      const orgMembers  = allMembers.filter((m) => m.organization === org.code);
+      const matcher     = new NameMatcher(orgMembers);
+      const empNoIdx    = buildEmpNoIndex(allMembers, org.code) as Map<string, SheetMemberRef>;
+      const membersById = new Map(allMembers.map((m) => [m.id, m]));
+
+      const outcome = await db.transaction(async (tx) => {
+        const periodKey = `balance-snapshot-${month.toLowerCase()}-${year}-${org.code}`;
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${periodKey}))`);
+
+        // Remove any existing snapshot for this period.
+        const old = await tx
+          .select({ id: uploadRecordsTable.id })
+          .from(uploadRecordsTable)
+          .where(and(
+            eq(uploadRecordsTable.month, month),
+            eq(uploadRecordsTable.year, year),
+            eq(uploadRecordsTable.organization, org.code),
+            eq(uploadRecordsTable.status, "processed"),
+            eq(uploadRecordsTable.uploadType, "balance_snapshot" as any),
+          ));
+        if (old.length > 0) {
+          await tx.delete(uploadRecordsTable).where(inArray(uploadRecordsTable.id, old.map((r) => r.id)));
+        }
+
+        const [uploadRecord] = await tx.insert(uploadRecordsTable).values({
+          uploadedBy:     req.memberId!,
+          month, year,
+          organization:   org.code,
+          fileObjectPath,
+          status:         "pending",
+          uploadType:     "balance_snapshot" as any,
+        }).returning();
+
+        let processed = 0, notFound = 0;
+        for (const row of sheet.rows) {
+          const match = matchSheetRow(row, empNoIdx, matcher, new Map(), membersById);
+          if (match.memberId == null) { notFound++; continue; }
+          const vals = computeObValues(row as any);
+          await tx.update(membersTable).set({
+            sharesBalance:        vals.sharesBalance.toFixed(2),
+            savingsBalance:       vals.savingsBalance.toFixed(2),
+            providentBalance:     vals.providentBalance.toFixed(2),
+            christmasBalance:     vals.christmasBalance.toFixed(2),
+            realLoanBalance:      vals.realLoanBalance.toFixed(2),
+            emergencyLoanBalance: vals.emergencyLoanBalance.toFixed(2),
+            totalLoanBalance:     vals.totalLoanBalance.toFixed(2),
+            electronicsDebt:      vals.electronicsDebt.toFixed(2),
+            sElectronicsDebt:     vals.sElectronicsDebt.toFixed(2),
+            furnitureDebt:        vals.furnitureDebt.toFixed(2),
+            commodityDebt:        vals.commodityDebt.toFixed(2),
+            ghlFormDebt:          vals.ghlFormDebt.toFixed(2),
+            totalStoreDebt:       vals.totalStoreDebt.toFixed(2),
+            fireFundBalance:      vals.fireFundBalance.toFixed(2),
+            fuelVentureBalance:   vals.fuelVentureBalance.toFixed(2),
+            landLoanBalance:      vals.landLoanBalance.toFixed(2),
+          }).where(eq(membersTable.id, match.memberId));
+          processed++;
+        }
+
+        await tx.update(uploadRecordsTable)
+          .set({ rowsProcessed: processed, rowsSkipped: notFound, status: "processed" })
+          .where(eq(uploadRecordsTable.id, uploadRecord.id));
+
+        return { uploadRecord, processed, notFound };
+      });
+
+      await logAudit({
+        actorId: req.memberId,
+        action: "PROCESS_BALANCE_SNAPSHOT",
+        entity: "upload_record",
+        entityId: outcome.uploadRecord.id,
+        details: `Balance snapshot ${month} ${year} [${org.code}]: ${outcome.processed} members updated, ${outcome.notFound} unmatched`,
+      });
+
+      res.json({
+        uploadRecordId: outcome.uploadRecord.id,
+        processed:      outcome.processed,
+        notFound:       outcome.notFound,
+        month, year,
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: `Balance snapshot processing failed: ${err.message}` });
+    }
+  },
+);
 
 // ── GET /uploads/:id/column-summary ─────────────────────────────────────────
 // Returns per-transaction-type totals for a single upload record, so auditors

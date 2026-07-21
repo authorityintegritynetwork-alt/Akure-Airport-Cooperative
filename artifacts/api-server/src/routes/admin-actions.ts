@@ -9,11 +9,19 @@
  */
 import { Router } from "express";
 import { z } from "zod/v4";
-import { eq } from "drizzle-orm";
-import { db, membersTable, transactionsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import {
+  db,
+  membersTable,
+  transactionsTable,
+  uploadRecordsTable,
+  openingBalancesTable,
+  loansTable,
+} from "@workspace/db";
 import {
   requireAuth,
   requireTreasurer,
+  requireSuperAdmin,
   requireReverification,
 } from "../middlewares/auth";
 import type { AuthRequest } from "../middlewares/auth";
@@ -199,6 +207,111 @@ router.post(
     });
 
     res.json({ count: members.length, totalCredited, amount, year });
+  },
+);
+
+// ── GET /admin/reset-all-data/preview ────────────────────────────────────────
+
+router.get(
+  "/admin/reset-all-data/preview",
+  requireAuth,
+  requireSuperAdmin,
+  async (_req: AuthRequest, res): Promise<void> => {
+    const [txCount] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(transactionsTable);
+    const [uploadCount] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(uploadRecordsTable);
+    const [memberCount] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(membersTable);
+    res.json({
+      memberCount: Number(memberCount?.n ?? 0),
+      txCount: Number(txCount?.n ?? 0),
+      uploadCount: Number(uploadCount?.n ?? 0),
+    });
+  },
+);
+
+// ── POST /admin/reset-all-data ────────────────────────────────────────────────
+// Wipes all transactions, upload records, opening balances, and resets every
+// member's balance columns to zero. Super-admin + OTP step-up required.
+
+router.post(
+  "/admin/reset-all-data",
+  requireAuth,
+  requireSuperAdmin,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const schema = z.object({ confirm: z.literal("RESET") });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Send { confirm: \"RESET\" } to confirm." });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      // 1. Delete all financial transaction rows.
+      await tx.delete(transactionsTable);
+      // 2. Delete all upload records.
+      await tx.delete(uploadRecordsTable);
+      // 3. Delete all opening-balance staging rows.
+      await tx.delete(openingBalancesTable);
+      // 4. Zero every member's 14 balance columns + OB snapshot columns.
+      await tx.update(membersTable).set({
+        sharesBalance:        "0",
+        savingsBalance:       "0",
+        providentBalance:     "0",
+        christmasBalance:     "0",
+        realLoanBalance:      "0",
+        emergencyLoanBalance: "0",
+        totalLoanBalance:     "0",
+        electronicsDebt:      "0",
+        sElectronicsDebt:     "0",
+        furnitureDebt:        "0",
+        commodityDebt:        "0",
+        ghlFormDebt:          "0",
+        totalStoreDebt:       "0",
+        fireFundBalance:      "0",
+        fuelVentureBalance:   "0",
+        landLoanBalance:      "0",
+        obSharesBalance:      null,
+        obSavingsBalance:     null,
+        obProvidentBalance:   null,
+        obChristmasBalance:   null,
+        obRealLoanBalance:    null,
+        obEmergencyLoanBalance: null,
+        obTotalLoanBalance:   null,
+        obElectronicsDebt:    null,
+        obSElectronicsDebt:   null,
+        obFurnitureDebt:      null,
+        obCommodityDebt:      null,
+        obGhlFormDebt:        null,
+        obTotalStoreDebt:     null,
+        obFireFundBalance:    null,
+        obFuelVentureBalance: null,
+        obLandLoanBalance:    null,
+        obUploadedAt:         null,
+      });
+      // 5. Restore each loan's outstanding balance to its original disbursed amount
+      //    and reopen any loans that had been fully repaid.
+      await tx.execute(
+        sql`UPDATE ${loansTable} SET outstanding_balance = amount, status = 'disbursed'
+            WHERE status IN ('disbursed', 'fully_repaid')`,
+      );
+    });
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "RESET_ALL_DATA",
+      entity: "system",
+      entityId: 0,
+      details:
+        "FULL DATA RESET: all transactions, upload records, opening balances and member balance columns wiped to zero by super_admin.",
+    });
+
+    res.json({ ok: true, message: "All balance data has been reset." });
   },
 );
 

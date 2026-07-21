@@ -38,6 +38,7 @@ import {
   Users,
   X,
   FileText,
+  Database,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -193,7 +194,9 @@ export function UploadPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [selectedOrgCode, setSelectedOrgCode] = useState<string>("");
   const [organization, setOrganization] = useState<string>("");
-  const [uploadType, setUploadType] = useState<"standalone" | "payroll_summary" | "category_breakdown">("standalone");
+  const [uploadType, setUploadType] = useState<"standalone" | "payroll_summary" | "category_breakdown" | "combined" | "balance_snapshot">("standalone");
+  const [secondaryFile, setSecondaryFile] = useState<File | null>(null);
+  const [secondaryDragOver, setSecondaryDragOver] = useState(false);
   const [linkedPayrollUploadId, setLinkedPayrollUploadId] = useState<number | null>(null);
   const [stage, setStage] = useState<Stage>("select");
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
@@ -236,6 +239,22 @@ export function UploadPage() {
   const preview = usePreviewExcelUpload();
   const process = useProcessExcelUpload();
   const processWithStepUp = useStepUpAction((data: any) => process.mutateAsync({ data }));
+  // Step-up wrapper for the balance snapshot process endpoint.
+  const processSnapshotWithStepUp = useStepUpAction(
+    async (data: { fileObjectPath: string; sheetName: string; month: string; year: number; organization: string }) => {
+      const resp = await fetch(`${basePath}/api/uploads/balance-snapshot/process`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Processing failed" }));
+        throw Object.assign(new Error(err.error ?? "Processing failed"), { response: { data: err, status: resp.status } });
+      }
+      return resp.json() as Promise<{ processed: number; notFound: number; month: string; year: number }>;
+    },
+  );
   const { data: members } = useListMembers({ status: "active" });
   const { data: orgList } = useListOrganizations();
   useEffect(() => {
@@ -250,8 +269,10 @@ export function UploadPage() {
   const isDualUploadOrg = selectedOrg != null && selectedOrg.excelFormat !== "none";
   useEffect(() => {
     if (!isDualUploadOrg) {
-      setUploadType("standalone");
+      setUploadType((prev) => (prev === "balance_snapshot" ? "balance_snapshot" : "standalone"));
       setLinkedPayrollUploadId(null);
+    } else {
+      setUploadType((prev) => (prev === "standalone" ? "combined" : prev));
     }
   }, [isDualUploadOrg]);
 
@@ -279,6 +300,8 @@ export function UploadPage() {
 
   function reset() {
     setFile(null);
+    setSecondaryFile(null);
+    setSecondaryDragOver(false);
     setStage("select");
     setUploadedPath(null);
     setSheets([]);
@@ -287,11 +310,12 @@ export function UploadPage() {
     setManualMatches({});
     setRejectedRows({});
     setAcknowledgeMismatch(false);
-    setUploadType("standalone");
+    setUploadType(isDualUploadOrg ? "combined" : "standalone");
     setLinkedPayrollUploadId(null);
   }
 
   async function handleUpload() {
+    if (uploadType === "combined") { await handlePairedUpload(); return; }
     if (!file) return;
     setUploading(true);
     try {
@@ -325,7 +349,11 @@ export function UploadPage() {
       const targetSheet = matchingSheet ?? validSheets[validSheets.length - 1];
       if (targetSheet) {
         setChosenSheet(targetSheet.name);
-        await loadPreview(objectPath, targetSheet.name, {});
+        if (uploadType === "balance_snapshot") {
+          await loadBalanceSnapshotPreview(objectPath, targetSheet.name);
+        } else {
+          await loadPreview(objectPath, targetSheet.name, {});
+        }
       } else {
         setStage("pickSheet");
       }
@@ -372,7 +400,11 @@ export function UploadPage() {
     // corrections from a previously previewed sheet.
     setManualMatches({});
     setRejectedRows({});
-    void loadPreview(uploadedPath, name, {}, {});
+    if (uploadType === "balance_snapshot") {
+      void loadBalanceSnapshotPreview(uploadedPath, name);
+    } else {
+      void loadPreview(uploadedPath, name, {}, {});
+    }
   }
 
   function handleAssignMember(rowNumber: number, memberId: number | null) {
@@ -417,6 +449,30 @@ export function UploadPage() {
 
   async function handleProcess() {
     if (!uploadedPath || !chosenSheet) return;
+
+    // Balance snapshot uses a separate endpoint with direct SET semantics.
+    if (uploadType === "balance_snapshot") {
+      try {
+        const snapshotResult = await processSnapshotWithStepUp({
+          fileObjectPath: uploadedPath,
+          sheetName: chosenSheet,
+          month,
+          year,
+          organization,
+        });
+        toast({
+          title: "Balance snapshot applied",
+          description: `${snapshotResult.processed} member${snapshotResult.processed === 1 ? "" : "s"} updated for ${month} ${year}.${snapshotResult.notFound > 0 ? ` (${snapshotResult.notFound} unmatched)` : ""}`,
+        });
+        queryClient.invalidateQueries({ queryKey: getListUploadHistoryQueryKey() });
+        reset();
+      } catch (err: any) {
+        if (err?.cancelled) return;
+        toast({ title: "Processing failed", description: err.message, variant: "destructive" });
+      }
+      return;
+    }
+
     try {
       const result: any = await processWithStepUp({
         fileObjectPath: uploadedPath,
@@ -455,6 +511,100 @@ export function UploadPage() {
     } catch (err: any) {
       if (err?.cancelled) return;
       toast({ title: "Processing failed", description: err.message, variant: "destructive" });
+    }
+  }
+
+  /**
+   * Combined monthly upload — process both the payroll roster AND deduction
+   * breakdown in one wizard session.  Step-up fires once during roster
+   * processing; the breakdown confirm falls within the 10-minute OTP window.
+   */
+  async function handlePairedUpload() {
+    if (!file || !secondaryFile || !organization) return;
+    setUploading(true);
+    try {
+      // 1. Upload roster.
+      const rosterForm = new FormData();
+      rosterForm.append("file", file);
+      const rosterUploadResp = await fetch(`${basePath}/api/storage/uploads/file`, { method: "POST", body: rosterForm });
+      if (!rosterUploadResp.ok) {
+        const d = await rosterUploadResp.json().catch(() => ({}));
+        throw new Error(d?.error ?? "Failed to upload roster file");
+      }
+      const { objectPath: rosterPath } = await rosterUploadResp.json();
+
+      // 2. List sheets in roster.
+      const rosterSheets = await listSheets.mutateAsync({ data: { fileObjectPath: rosterPath, organization } });
+      const validRosterSheets = rosterSheets.sheets.filter((s) => s.looksValid);
+      const bestRosterSheet =
+        validRosterSheets.find(
+          (s) => s.detectedMonth?.toLowerCase() === month.toLowerCase() && s.detectedYear === year,
+        ) ?? validRosterSheets[validRosterSheets.length - 1];
+      if (!bestRosterSheet) throw new Error("Could not detect a valid sheet in the roster file. Try the manual upload flow.");
+
+      // 3. Process roster — fires OTP step-up prompt.
+      await processWithStepUp({
+        fileObjectPath: rosterPath,
+        sheetName: bestRosterSheet.name,
+        month, year, organization,
+        uploadType: "payroll_summary",
+      });
+
+      // 4. Upload breakdown.
+      const breakdownForm = new FormData();
+      breakdownForm.append("file", secondaryFile);
+      const breakdownUploadResp = await fetch(`${basePath}/api/storage/uploads/file`, { method: "POST", body: breakdownForm });
+      if (!breakdownUploadResp.ok) {
+        const d = await breakdownUploadResp.json().catch(() => ({}));
+        throw new Error(d?.error ?? "Failed to upload deduction file");
+      }
+      const { objectPath: breakdownPath } = await breakdownUploadResp.json();
+      setUploadedPath(breakdownPath);
+
+      // 5. List sheets in breakdown.
+      const breakdownSheets = await listSheets.mutateAsync({ data: { fileObjectPath: breakdownPath, organization } });
+      setSheets(breakdownSheets.sheets);
+      const validBreakdownSheets = breakdownSheets.sheets.filter((s) => s.looksValid);
+      const bestBreakdownSheet =
+        validBreakdownSheets.find(
+          (s) => s.detectedMonth?.toLowerCase() === month.toLowerCase() && s.detectedYear === year,
+        ) ?? validBreakdownSheets[validBreakdownSheets.length - 1];
+
+      // Switch to category_breakdown so handleProcess uses the right path.
+      setUploadType("category_breakdown");
+
+      if (bestBreakdownSheet) {
+        setChosenSheet(bestBreakdownSheet.name);
+        await loadPreview(breakdownPath, bestBreakdownSheet.name, {});
+      } else {
+        setStage("pickSheet");
+      }
+    } catch (err: any) {
+      if (err?.cancelled) return;
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /** Preview a balance-snapshot file (no DB writes). */
+  async function loadBalanceSnapshotPreview(path: string, sheetName: string) {
+    try {
+      const resp = await fetch(`${basePath}/api/uploads/balance-snapshot/preview`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileObjectPath: path, sheetName, organization, month, year }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Preview failed" }));
+        throw new Error(err.error ?? "Preview failed");
+      }
+      const data = await resp.json();
+      setPreviewData(data);
+      setStage("preview");
+    } catch (err: any) {
+      toast({ title: "Preview failed", description: err.message, variant: "destructive" });
     }
   }
 
@@ -572,64 +722,92 @@ export function UploadPage() {
               </div>
             </div>
 
-            {/* Upload type — only shown for orgs that have a payroll sheet */}
-            {isDualUploadOrg && (
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Upload Type</label>
-                {isPdf && (
-                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-200">
-                    <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>PDF detected — automatically set to <strong>Payroll Roster</strong>. PDFs can only be used for roster uploads (Step 1 of 2).</span>
-                  </div>
-                )}
-                {isSimpleRoster && (
-                  <div className="mt-2 flex items-start gap-2 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-200">
-                    <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span><strong>{simpleRosterLabel}</strong> format detected — automatically set to <strong>Payroll Roster</strong> (Step 1 of 2). The category breakdown comes from the regular cooperative sheet.</span>
-                  </div>
-                )}
-                <div className="space-y-2 mt-2">
-                  {([
-                    { value: "standalone",         label: "Standalone Upload",    pill: "Direct",      pillClass: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",       icon: <Upload className="w-5 h-5" />,    desc: "Processes transactions immediately — no roster required." },
-                    { value: "payroll_summary",    label: "Payroll Roster",       pill: "Step 1 of 2", pillClass: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",           icon: <ListChecks className="w-5 h-5" />, desc: "Save the active member list from head-office payroll. No transactions created." },
-                    { value: "category_breakdown", label: "Cooperative Archive",  pill: "Step 2 of 2", pillClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300", icon: <Link2 className="w-5 h-5" />,     desc: "Deduction sheet linked to a payroll roster. Absent members are skipped." },
-                  ] as const).map((opt) => {
-                    const isSelected = uploadType === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => { setUploadType(opt.value); setLinkedPayrollUploadId(null); }}
-                        className={`w-full flex items-start gap-4 rounded-xl px-4 py-3.5 text-left border-2 transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/5 dark:bg-primary/10"
-                            : "border-border/60 hover:border-border hover:bg-muted/40"
-                        }`}
-                        data-testid={`upload-type-${opt.value}`}
-                      >
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                          isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                        }`}>
-                          {opt.icon}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
-                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md ${opt.pillClass}`}>{opt.pill}</span>
-                          </div>
-                          <p className={`text-[11px] mt-0.5 leading-relaxed ${isSelected ? "text-primary/80" : "text-muted-foreground"}`}>{opt.desc}</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 mt-1 shrink-0 flex items-center justify-center transition-colors ${
-                          isSelected ? "border-primary bg-primary" : "border-border"
-                        }`}>
-                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
-                        </div>
-                      </button>
-                    );
-                  })}
+            {/* Upload type */}
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Upload Type</label>
+              {isPdf && (
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-200">
+                  <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>PDF detected — automatically set to <strong>Payroll Roster</strong>. PDFs can only be used for roster uploads (Step 1 of 2).</span>
                 </div>
+              )}
+              {isSimpleRoster && (
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-200">
+                  <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span><strong>{simpleRosterLabel}</strong> format detected — automatically set to <strong>Payroll Roster</strong> (Step 1 of 2). The category breakdown comes from the regular cooperative sheet.</span>
+                </div>
+              )}
+              <div className="space-y-2 mt-2">
+                {isDualUploadOrg && ([
+                  { value: "combined"          as const, label: "Combined Monthly Upload", pill: "Recommended",  pillClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300", icon: <CloudUpload className="w-5 h-5" />, desc: "Upload both the payroll roster and deduction breakdown in one step." },
+                  { value: "payroll_summary"   as const, label: "Payroll Roster",          pill: "Step 1 of 2",  pillClass: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",              icon: <ListChecks  className="w-5 h-5" />, desc: "Save the active member list from head-office payroll. No transactions created." },
+                  { value: "category_breakdown"as const, label: "Cooperative Archive",     pill: "Step 2 of 2",  pillClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",  icon: <Link2       className="w-5 h-5" />, desc: "Deduction sheet linked to a payroll roster. Absent members are skipped." },
+                ] as const).map((opt) => {
+                  const isSelected = uploadType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setUploadType(opt.value); setLinkedPayrollUploadId(null); }}
+                      className={`w-full flex items-start gap-4 rounded-xl px-4 py-3.5 text-left border-2 transition-all ${isSelected ? "border-primary bg-primary/5 dark:bg-primary/10" : "border-border/60 hover:border-border hover:bg-muted/40"}`}
+                      data-testid={`upload-type-${opt.value}`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{opt.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
+                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md ${opt.pillClass}`}>{opt.pill}</span>
+                        </div>
+                        <p className={`text-[11px] mt-0.5 leading-relaxed ${isSelected ? "text-primary/80" : "text-muted-foreground"}`}>{opt.desc}</p>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 mt-1 shrink-0 flex items-center justify-center transition-colors ${isSelected ? "border-primary bg-primary" : "border-border"}`}>
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                      </div>
+                    </button>
+                  );
+                })}
+                {!isDualUploadOrg && (() => {
+                  const isSelected = uploadType === "standalone";
+                  return (
+                    <button type="button" onClick={() => setUploadType("standalone")}
+                      className={`w-full flex items-start gap-4 rounded-xl px-4 py-3.5 text-left border-2 transition-all ${isSelected ? "border-primary bg-primary/5 dark:bg-primary/10" : "border-border/60 hover:border-border hover:bg-muted/40"}`}
+                      data-testid="upload-type-standalone"
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}><Upload className="w-5 h-5" /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>Standalone Upload</p>
+                        <p className={`text-[11px] mt-0.5 leading-relaxed ${isSelected ? "text-primary/80" : "text-muted-foreground"}`}>Processes transactions immediately — no roster required.</p>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 mt-1 shrink-0 flex items-center justify-center transition-colors ${isSelected ? "border-primary bg-primary" : "border-border"}`}>
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                      </div>
+                    </button>
+                  );
+                })()}
+                {/* Balance Snapshot — available for all organisations */}
+                {(() => {
+                  const isSelected = uploadType === "balance_snapshot";
+                  return (
+                    <button type="button" onClick={() => { setUploadType("balance_snapshot"); setLinkedPayrollUploadId(null); }}
+                      className={`w-full flex items-start gap-4 rounded-xl px-4 py-3.5 text-left border-2 transition-all ${isSelected ? "border-primary bg-primary/5 dark:bg-primary/10" : "border-border/60 hover:border-border hover:bg-muted/40"}`}
+                      data-testid="upload-type-balance_snapshot"
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}><Database className="w-5 h-5" /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>Balance Snapshot</p>
+                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">Month-end</span>
+                        </div>
+                        <p className={`text-[11px] mt-0.5 leading-relaxed ${isSelected ? "text-primary/80" : "text-muted-foreground"}`}>Set all member balances directly from an end-of-month sheet. Replaces existing snapshot for the same period.</p>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 mt-1 shrink-0 flex items-center justify-center transition-colors ${isSelected ? "border-primary bg-primary" : "border-border"}`}>
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                      </div>
+                    </button>
+                  );
+                })()}
               </div>
-            )}
+            </div>
 
             {/* Roster picker — only for Cooperative Archive mode */}
             {uploadType === "category_breakdown" && (
@@ -703,7 +881,9 @@ export function UploadPage() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Excel File</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {uploadType === "combined" ? "Payroll Roster File" : "Excel File"}
+              </label>
               {/* Hidden real file input — triggered by click on the drop zone */}
               <input
                 id="file-input-hidden"
@@ -770,7 +950,7 @@ export function UploadPage() {
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-semibold text-foreground">
-                      {dragOver ? "Drop it here" : "Drop your file here"}
+                      {dragOver ? "Drop it here" : uploadType === "combined" ? "Drop the payroll roster here" : "Drop your file here"}
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       or <span className="text-primary font-semibold">browse your computer</span>
@@ -781,10 +961,78 @@ export function UploadPage() {
               )}
             </div>
 
+            {/* Secondary file input — deduction breakdown (combined mode only) */}
+            {uploadType === "combined" && (
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Deduction Breakdown File</label>
+                <input
+                  id="file-input-secondary-hidden"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="sr-only"
+                  onChange={(e) => setSecondaryFile(e.target.files?.[0] || null)}
+                  data-testid="input-upload-secondary-file"
+                />
+                {secondaryFile ? (
+                  <div className="mt-1.5 flex items-center gap-3 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 px-4 py-3">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 truncate">{secondaryFile.name}</p>
+                      <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500 mt-0.5">
+                        {(secondaryFile.size / 1024).toFixed(0)} KB · Ready to upload
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSecondaryFile(null)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Remove breakdown file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onDragOver={(e) => { e.preventDefault(); setSecondaryDragOver(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setSecondaryDragOver(false); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setSecondaryDragOver(false);
+                      const dropped = e.dataTransfer.files?.[0];
+                      if (dropped) setSecondaryFile(dropped);
+                    }}
+                    onClick={() => document.getElementById("file-input-secondary-hidden")?.click()}
+                    className={`w-full mt-1.5 rounded-xl border-2 border-dashed py-8 flex flex-col items-center gap-2.5 transition-all cursor-pointer ${
+                      secondaryDragOver
+                        ? "border-primary bg-primary/5"
+                        : "border-border/60 hover:border-primary/40 hover:bg-muted/30"
+                    }`}
+                  >
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${secondaryDragOver ? "bg-primary/10" : "bg-muted"}`}>
+                      <CloudUpload className={`w-5 h-5 transition-colors ${secondaryDragOver ? "text-primary" : "text-muted-foreground"}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-foreground">
+                        {secondaryDragOver ? "Drop it here" : "Drop the deduction breakdown here"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        or <span className="text-primary font-semibold">browse your computer</span>
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">.xlsx · .xls</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+
             <Button
               onClick={handleUpload}
               disabled={
                 !file || !organization || uploading || listSheets.isPending ||
+                (uploadType === "combined" && !secondaryFile) ||
                 (uploadType === "category_breakdown" && !linkedPayrollUploadId)
               }
               className="w-full rounded-xl h-11"
@@ -792,7 +1040,9 @@ export function UploadPage() {
             >
               <Upload className="w-4 h-4 mr-2" />
               {uploading || listSheets.isPending
-                ? "Uploading..."
+                ? "Uploading…"
+                : uploadType === "combined" && !secondaryFile
+                ? "Select the deduction breakdown file to continue"
                 : uploadType === "category_breakdown" && !linkedPayrollUploadId
                 ? "Select a payroll roster to continue"
                 : "Upload & Continue"}
@@ -1018,7 +1268,17 @@ export function UploadPage() {
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
                   A processed upload already exists for {previewData.month} {previewData.year}.
-                  Continuing will record duplicate transactions.
+                  Confirming will <strong>replace</strong> it — the old transactions will be reversed automatically.
+                </span>
+              </div>
+            )}
+            {/* Balance snapshot — will replace existing */}
+            {uploadType === "balance_snapshot" && previewData.willReplace && (
+              <div className="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  A balance snapshot already exists for {previewData.month} {previewData.year}.
+                  Confirming will <strong>replace</strong> it.
                 </span>
               </div>
             )}
@@ -1240,15 +1500,17 @@ export function UploadPage() {
                 onClick={() => handleProcess()}
                 disabled={
                   process.isPending ||
-                  previewData.hasDuplicateNames ||
-                  (previewData.format === "payroll" && previewData.errorRows > 0 && uploadType !== "payroll_summary") ||
-                  (previewData.hasMismatchedTotals && !acknowledgeMismatch)
+                  (uploadType !== "balance_snapshot" && previewData.hasDuplicateNames) ||
+                  (uploadType !== "balance_snapshot" && previewData.format === "payroll" && previewData.errorRows > 0 && uploadType !== "payroll_summary") ||
+                  (uploadType !== "balance_snapshot" && previewData.hasMismatchedTotals && !acknowledgeMismatch)
                 }
                 className="rounded-xl flex-1 min-w-[200px] h-11"
                 data-testid="button-process-upload"
               >
                 {process.isPending
-                  ? "Processing..."
+                  ? "Processing…"
+                  : uploadType === "balance_snapshot"
+                  ? `Apply Snapshot — ${previewData.matchedRows ?? previewData.totalRows} Members`
                   : previewData.hasDuplicateNames
                   ? "Fix duplicate names to continue"
                   : previewData.format === "payroll" && previewData.errorRows > 0 && uploadType !== "payroll_summary"
@@ -1330,6 +1592,11 @@ export function UploadHistoryPage() {
                     {record.uploadType === "category_breakdown" && (
                       <Badge variant="outline" className="rounded-full text-[10px] shrink-0 bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">
                         Coop Archive
+                      </Badge>
+                    )}
+                    {record.uploadType === "balance_snapshot" && (
+                      <Badge variant="outline" className="rounded-full text-[10px] shrink-0 bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20">
+                        Balance Snapshot
                       </Badge>
                     )}
                   </div>

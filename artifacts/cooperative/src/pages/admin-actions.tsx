@@ -22,7 +22,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from "@/lib/format";
-import { Gift, BarChart3, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { Gift, BarChart3, CheckCircle2, AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { useStepUpAction } from "@/lib/step-up";
 import { useToast } from "@/hooks/use-toast";
 
 const MONTHS = [
@@ -392,6 +393,133 @@ function SharesCreditSection() {
   );
 }
 
+// ── Reset all data section ───────────────────────────────────────────────────
+
+function ResetDataSection() {
+  const { toast } = useToast();
+  const [confirmText, setConfirmText] = useState("");
+  const [open, setOpen] = useState(false);
+  const doReset = useStepUpAction(() =>
+    apiPost<{ ok: boolean; message: string }>("/api/admin/reset-all-data", { confirm: "RESET" }),
+  );
+
+  const previewQuery = useQuery({
+    queryKey: ["admin", "reset-preview"],
+    queryFn: () => apiGet<{ memberCount: number; txCount: number; uploadCount: number }>("/api/admin/reset-all-data/preview"),
+    enabled: open,
+    staleTime: 5_000,
+    retry: false,
+  });
+
+  const [resetting, setResetting] = useState(false);
+  const canConfirm = confirmText === "RESET" && !resetting;
+
+  async function handleReset() {
+    setResetting(true);
+    try {
+      const data = await doReset();
+      setOpen(false);
+      setConfirmText("");
+      toast({ title: "Data reset complete", description: data.message });
+    } catch (err: any) {
+      if (err?.cancelled) return;
+      toast({ title: "Reset failed", description: err.message, variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </div>
+          <div>
+            <CardTitle className="text-base text-destructive">Reset All Balance Data</CardTitle>
+            <CardDescription className="mt-0.5">
+              Wipes all transactions, upload records and opening balances. Resets every
+              member's balances to zero and restores loan outstanding amounts to their
+              original disbursed values. Use before importing a fresh balance snapshot.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="flex items-start gap-2 text-xs text-destructive border border-destructive/30 rounded-lg px-3 py-2.5 bg-destructive/5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            <strong>Irreversible.</strong> This deletes the entire financial history for all
+            organisations. Make sure you have a backup before proceeding.
+          </span>
+        </div>
+
+        <Button
+          variant="destructive"
+          onClick={() => setOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          Reset All Data…
+        </Button>
+      </CardContent>
+
+      <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setConfirmText(""); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Reset All Balance Data</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  This will permanently delete <strong>all</strong> transaction history, upload
+                  records and opening balances, and set every member's balance columns to{" "}
+                  <strong>₦0</strong>. Individual loan outstanding balances will be restored to
+                  their original disbursed amounts.
+                </p>
+                {previewQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Calculating…
+                  </div>
+                ) : previewQuery.data ? (
+                  <div className="rounded-lg bg-muted px-3 py-2.5 text-xs space-y-0.5">
+                    <p><strong>{previewQuery.data.txCount.toLocaleString()}</strong> transactions will be deleted</p>
+                    <p><strong>{previewQuery.data.uploadCount.toLocaleString()}</strong> upload records will be deleted</p>
+                    <p><strong>{previewQuery.data.memberCount.toLocaleString()}</strong> member balances will be zeroed</p>
+                  </div>
+                ) : null}
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="reset-confirm" className="text-foreground">
+                    Type <strong>RESET</strong> to confirm
+                  </Label>
+                  <Input
+                    id="reset-confirm"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder="RESET"
+                    className="font-mono"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!canConfirm}
+              onClick={(e) => { e.preventDefault(); void handleReset(); }}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              {resetting ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Resetting…</> : "Reset All Data"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function AdminActionsPage() {
@@ -407,6 +535,7 @@ export function AdminActionsPage() {
 
       <ChristmasPayoutSection />
       <SharesCreditSection />
+      <ResetDataSection />
     </div>
   );
 }
