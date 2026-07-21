@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, membersTable, loansTable, storePurchasesTable, transactionsTable, auditLogsTable, storeItemsTable, notificationsTable, systemSettingsTable } from "@workspace/db";
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and, count, sql, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin, AuthRequest } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -10,7 +10,14 @@ router.get("/dashboard/admin-summary", requireAuth, requireAdmin, async (req: Au
   const totalMembers = allMembers.length;
   const activeMembers = allMembers.filter((m) => m.status === "active").length;
   const pendingMembers = allMembers.filter((m) => m.status === "pending").length;
-  const totalSavings = allMembers.reduce((sum, m) => sum + parseFloat(m.savingsBalance), 0);
+  const totalSavings = allMembers.reduce(
+    (sum, m) =>
+      sum +
+      parseFloat(m.savingsBalance) +
+      parseFloat(m.christmasBalance) +
+      parseFloat(m.fireFundBalance),
+    0,
+  );
   const totalLoansOutstanding = allMembers.reduce((sum, m) => sum + parseFloat(m.totalLoanBalance), 0);
   const totalStoreDebt = allMembers.reduce((sum, m) => sum + parseFloat(m.totalStoreDebt), 0);
 
@@ -69,13 +76,20 @@ router.get("/dashboard/member-summary", requireAuth, async (req: AuthRequest, re
     db.select().from(transactionsTable).where(eq(transactionsTable.memberId, req.memberId!)).orderBy(transactionsTable.createdAt).limit(5),
   ]);
 
+  // Actual outstanding = sum of active loan outstanding balances (what's still owed).
+  // totalLoanBalance tracks cumulative payroll deductions (total repaid) — not outstanding.
+  const outstandingLoanBalance = activeLoans.reduce(
+    (sum, l) => sum + parseFloat(l.outstandingBalance),
+    0,
+  );
+
   res.json({
     savingsBalance: parseFloat(member.savingsBalance),
     christmasBalance: parseFloat(member.christmasBalance),
     providentBalance: parseFloat(member.providentBalance),
     fuelVentureBalance: parseFloat(member.fuelVentureBalance),
     activeLoanCount: activeLoans.length,
-    outstandingLoanBalance: parseFloat(member.totalLoanBalance),
+    outstandingLoanBalance,
     storeDebt: parseFloat(member.totalStoreDebt),
     recentTransactions: recentTx.map((t) => ({
       ...t,
@@ -106,7 +120,7 @@ router.get("/dashboard/recent-activity", requireAuth, requireAdmin, async (req: 
   const logs = await db
     .select()
     .from(auditLogsTable)
-    .orderBy(auditLogsTable.createdAt)
+    .orderBy(desc(auditLogsTable.createdAt))
     .limit(limit);
 
   res.json(
