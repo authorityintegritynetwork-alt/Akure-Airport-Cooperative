@@ -90,7 +90,7 @@ export function CooperativeRecordsPage() {
               {search || orgFilter ? "No records match your filters" : "No cooperative records"}
             </p>
             <p className="text-sm mt-1">
-              Records are created from opening balances and deduction uploads.
+              Records appear here when a deduction upload contains a name that doesn't match any existing member — they are created automatically as pending members. Opening balance imports are stored separately and are linked when a pending member is approved.
             </p>
           </CardContent>
         </Card>
