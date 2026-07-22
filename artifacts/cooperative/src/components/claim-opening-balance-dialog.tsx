@@ -29,16 +29,14 @@ export const OPENING_BALANCE_FIELDS: { key: keyof OpeningBalance; label: string 
   { key: "christmasBalance", label: "Christmas" },
   { key: "realLoanBalance", label: "Regular Loan" },
   { key: "emergencyLoanBalance", label: "Emergency Loan" },
-  { key: "totalLoanBalance", label: "Total Loan" },
-  { key: "electronicsDebt", label: "Electronics Debt" },
-  { key: "sElectronicsDebt", label: "S/Electronics Debt" },
-  { key: "furnitureDebt", label: "Furniture Debt" },
-  { key: "commodityDebt", label: "Commodity Debt" },
-  { key: "ghlFormDebt", label: "GHL Form Debt" },
-  { key: "fireFundBalance", label: "Fire Fund" },
   { key: "fuelVentureBalance", label: "Fuel Venture" },
   { key: "landLoanBalance", label: "Land Loan" },
-  { key: "totalStoreDebt", label: "Total Store Debt" },
+  { key: "fireFundBalance", label: "Fire Fund" },
+  { key: "electronicsDebt", label: "Electronics" },
+  { key: "sElectronicsDebt", label: "S/Electronics" },
+  { key: "furnitureDebt", label: "Furniture" },
+  { key: "commodityDebt", label: "Commodity" },
+  { key: "ghlFormDebt", label: "GHL Form" },
 ];
 
 function confidenceBadge(confidence: string) {
