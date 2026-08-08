@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser, useAuth } from '@clerk/react';
-import { InstallBanner } from "@/components/install-banner";
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +9,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { StepUpProvider, StepUpGate } from "@/lib/step-up";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { InstallProvider } from "@/lib/install-context";
+import { InstallBanner } from "@/components/install-banner";
 
 import { LandingPage, PendingApproval } from "./pages/landing";
 import { AppLayout } from "./components/layout";
@@ -202,19 +203,6 @@ function ProtectedRoute({ component: Component, bare }: { component: React.Compo
   );
 }
 
-function ScopedInstallBanner() {
-  // Use a separate dismiss key for anonymous visitors vs each signed-in user.
-  // This means a logged-in user gets a fresh "post sign-in" prompt even if
-  // they previously dismissed the public landing-page banner.
-  // Important: do NOT remount the banner with a `key` when scope changes —
-  // doing so would lose the cached `beforeinstallprompt` event and prevent
-  // the native install bubble from being shown after sign-in.
-  const { user, isLoaded } = useUser();
-  if (!isLoaded) return null;
-  const scopeKey = user?.id ? `user:${user.id}` : "anon";
-  return <InstallBanner scopeKey={scopeKey} />;
-}
-
 /**
  * Registers a Clerk token getter so every API request carries an
  * Authorization: Bearer header. This is required on non-localhost deployments
@@ -243,7 +231,8 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <ClerkTokenSync />
         <ClerkQueryClientCacheInvalidator />
-        <ScopedInstallBanner />
+        <InstallProvider>
+        <InstallBanner />
         <StepUpProvider>
         <Switch>
           <Route path="/" component={HomeRedirect} />
@@ -337,6 +326,7 @@ function ClerkProviderWithRoutes() {
           </Route>
         </Switch>
         </StepUpProvider>
+        </InstallProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

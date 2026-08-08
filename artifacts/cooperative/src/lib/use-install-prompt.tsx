@@ -7,14 +7,13 @@ type BeforeInstallPromptEvent = Event & {
 
 export type InstallPlatform = "android" | "ios" | "desktop" | "unsupported";
 
-const DISMISS_KEY_PREFIX = "aacs-install-dismissed-at:";
-const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 function detectPlatform(): InstallPlatform {
   if (typeof navigator === "undefined") return "unsupported";
   const ua = navigator.userAgent || "";
   const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
-  const isIPadOS = navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1;
+  const isIPadOS =
+    navigator.platform === "MacIntel" &&
+    (navigator as any).maxTouchPoints > 1;
   if (isIOS || isIPadOS) return "ios";
   if (/Android/.test(ua)) return "android";
   return "desktop";
@@ -27,21 +26,19 @@ function detectStandalone(): boolean {
   return false;
 }
 
-export function useInstallPrompt(scopeKey: string = "anon") {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState<boolean>(() => detectStandalone());
-  const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+/**
+ * Manages PWA install state.
+ * The banner is NOT shown automatically — call `trigger()` to show it.
+ * Dismissal is session-scoped (resets when the tab/browser is closed).
+ */
+export function useInstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState<boolean>(() =>
+    detectStandalone(),
+  );
+  const [bannerVisible, setBannerVisible] = useState(false);
   const platform = useMemo(detectPlatform, []);
-  const storageKey = `${DISMISS_KEY_PREFIX}${scopeKey}`;
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      setDismissedAt(raw ? Number(raw) : null);
-    } catch {
-      setDismissedAt(null);
-    }
-  }, [storageKey]);
 
   useEffect(() => {
     const onBeforeInstall = (e: Event) => {
@@ -51,9 +48,14 @@ export function useInstallPrompt(scopeKey: string = "anon") {
     const onInstalled = () => {
       setDeferredPrompt(null);
       setIsStandalone(true);
+      setBannerVisible(false);
     };
     const mql = window.matchMedia?.("(display-mode: standalone)");
-    const onDisplayChange = () => setIsStandalone(detectStandalone());
+    const onDisplayChange = () => {
+      const standalone = detectStandalone();
+      setIsStandalone(standalone);
+      if (standalone) setBannerVisible(false);
+    };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
@@ -66,45 +68,48 @@ export function useInstallPrompt(scopeKey: string = "anon") {
     };
   }, []);
 
-  const dismiss = useCallback(() => {
-    const now = Date.now();
-    try {
-      localStorage.setItem(storageKey, String(now));
-    } catch {
-      // ignore
-    }
-    setDismissedAt(now);
-  }, [storageKey]);
+  const canPromptNative = !!deferredPrompt;
+  const canShowIOSInstructions = platform === "ios" && !isStandalone;
+  /** True when the device/browser supports installation and app isn't already installed. */
+  const canInstall =
+    !isStandalone && (canPromptNative || canShowIOSInstructions);
 
-  const promptInstall = useCallback(async (): Promise<"accepted" | "dismissed" | "unsupported"> => {
+  const trigger = useCallback(() => {
+    if (!isStandalone && (canPromptNative || canShowIOSInstructions)) {
+      setBannerVisible(true);
+    }
+  }, [isStandalone, canPromptNative, canShowIOSInstructions]);
+
+  const dismiss = useCallback(() => {
+    setBannerVisible(false);
+  }, []);
+
+  const promptInstall = useCallback(async (): Promise<
+    "accepted" | "dismissed" | "unsupported"
+  > => {
     if (!deferredPrompt) return "unsupported";
     try {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       setDeferredPrompt(null);
-      if (choice.outcome === "dismissed") {
-        dismiss();
+      if (choice.outcome === "accepted") {
+        setIsStandalone(true);
+        setBannerVisible(false);
       }
       return choice.outcome;
     } catch {
       return "dismissed";
     }
-  }, [deferredPrompt, dismiss]);
-
-  const dismissedRecently =
-    dismissedAt != null && Date.now() - dismissedAt < DISMISS_TTL_MS;
-
-  const canPromptNative = !!deferredPrompt;
-  const canShowIOSInstructions = platform === "ios" && !isStandalone;
-  const eligible = !isStandalone && (canPromptNative || canShowIOSInstructions);
-  const visible = eligible && !dismissedRecently;
+  }, [deferredPrompt]);
 
   return {
     platform,
     isStandalone,
+    canInstall,
     canPromptNative,
     canShowIOSInstructions,
-    visible,
+    bannerVisible,
+    trigger,
     dismiss,
     promptInstall,
   };

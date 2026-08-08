@@ -18,17 +18,19 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, BookOpen, Upload, Archive, History, FileText, Zap } from "lucide-react";
+import { Bell, LayoutDashboard, Wallet, CreditCard, ShoppingCart, ShoppingBag, BellRing, Users, Settings, UserCog, Shield, Sun, Moon, Building2, Megaphone, Headphones, BookOpen, Upload, Archive, History, FileText, Zap, Smartphone } from "lucide-react";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useTheme } from "@/lib/theme";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { AdminMobileBottomNav } from "@/components/admin-mobile-bottom-nav";
+import { useInstall } from "@/lib/install-context";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: profile } = useGetProfile();
   const { signOut } = useClerk();
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { canInstall, trigger: triggerInstall } = useInstall();
 
   const { data: notifications } = useListNotifications({ unread: true }, {
     query: {
@@ -185,6 +187,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   Sign Out
                 </Button>
               </div>
+              {canInstall && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 text-primary border-primary/30 hover:bg-primary/5"
+                  onClick={triggerInstall}
+                  data-testid="sidebar-install-app"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  Install app
+                </Button>
+              )}
             </div>
           </SidebarFooter>
         </Sidebar>

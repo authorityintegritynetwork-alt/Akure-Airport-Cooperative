@@ -24,7 +24,9 @@ import {
   Moon,
   LogOut,
   Headphones,
+  Smartphone,
 } from "lucide-react";
+import { useInstall } from "@/lib/install-context";
 
 type Tab = {
   href?: string;
@@ -39,6 +41,7 @@ export function MobileBottomNav() {
   const { signOut } = useClerk();
   const { theme, toggleTheme } = useTheme();
   const { data: profile } = useGetProfile();
+  const { canInstall, trigger: triggerInstall } = useInstall();
   const { data: notifications } = useListNotifications(
     { unread: true },
     {
@@ -162,6 +165,25 @@ export function MobileBottomNav() {
                           onClick={() => setMoreOpen(false)}
                         />
                       </div>
+
+                      {canInstall && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => { setMoreOpen(false); triggerInstall(); }}
+                            data-testid="more-install-app"
+                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-primary/5 active:bg-primary/10 transition-colors text-left"
+                          >
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <Smartphone className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium text-foreground block">Install app</span>
+                              <span className="text-xs text-muted-foreground">Add to your home screen</span>
+                            </div>
+                          </button>
+                        </div>
+                      )}
 
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <Button
