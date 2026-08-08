@@ -13,3 +13,4 @@ export * from "./stepUp";
 export * from "./broadcasts";
 export * from "./support";
 export * from "./emailFailures";
+export * from "./dataClearRequests";

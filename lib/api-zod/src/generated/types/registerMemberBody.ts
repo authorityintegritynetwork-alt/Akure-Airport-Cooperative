@@ -8,7 +8,7 @@
 
 export interface RegisterMemberBody {
   fullName: string;
-  phone?: string;
+  phone: string;
   memberType: 'staff' | 'pensioner';
   staffId: string;
   organization: string;

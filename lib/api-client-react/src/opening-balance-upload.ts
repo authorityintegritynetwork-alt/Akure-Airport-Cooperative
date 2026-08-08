@@ -39,7 +39,10 @@ export interface ObUploadPreviewResult {
 export interface ObUploadProcessBody {
   fileObjectPath: string;
   sheetName?: string;
-  replaceExisting?: boolean;
+  /** Month (1–12) these balances are effective from. */
+  effectiveMonth: number;
+  /** Year these balances are effective from. */
+  effectiveYear: number;
 }
 
 export interface ObUploadProcessResult {

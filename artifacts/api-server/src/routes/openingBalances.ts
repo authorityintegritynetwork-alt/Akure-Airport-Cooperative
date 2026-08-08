@@ -116,6 +116,7 @@ router.get(
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
     const [member] = await db
       .select({ id: membersTable.id, fullName: membersTable.fullName })
@@ -189,6 +190,7 @@ router.post(
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const memberId = parseInt(raw, 10);
+    if (Number.isNaN(memberId)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
     const parsed = ClaimOpeningBalanceBody.safeParse(req.body);
     if (!parsed.success) {
@@ -261,6 +263,11 @@ router.post(
         // Preserve any timestamp already written by the OB upload; fall back to now
         // for members who are being claimed without a prior OB upload match.
         obUploadedAt: member.obUploadedAt ?? new Date(),
+        // Carry through the effective date from the OB row if set.
+        ...((opening as any).effectiveMonth != null && {
+          obEffectiveMonth: (opening as any).effectiveMonth,
+          obEffectiveYear:  (opening as any).effectiveYear,
+        }),
         status: "active" as const,
       };
 
@@ -357,6 +364,10 @@ const ObUploadProcessBody = z.object({
   fileObjectPath: z.string().min(1),
   sheetName: z.string().optional(),
   organization: z.string().optional(),
+  /** Month (1–12) from which these balances take effect. Required. */
+  effectiveMonth: z.number().int().min(1).max(12),
+  /** Year from which these balances take effect. Required. */
+  effectiveYear: z.number().int().min(2000).max(2100),
 });
 
 // Helper: compute all balance values from parsed row amounts
@@ -493,6 +504,16 @@ router.post(
       const totalRows = sheet.rows.length + skippedDetails.length;
       const uploadedAt = new Date();
 
+      const effectiveMonth = parsed.data.effectiveMonth;
+      const effectiveYear = parsed.data.effectiveYear;
+
+      // Fetch full member rows so we can distinguish active vs pending.
+      const allMembersWithStatus = await db
+        .select({ id: membersTable.id, fullName: membersTable.fullName, status: membersTable.status })
+        .from(membersTable);
+      const memberStatusMap = new Map(allMembersWithStatus.map((m) => [m.id, m.status]));
+      let activeOverridden = 0;
+
       await db.transaction(async (tx) => {
         // Step 1: Delete all existing opening_balance rows for this org
         // (or all rows if no org specified — global sheet)
@@ -505,18 +526,29 @@ router.post(
           await tx.delete(openingBalancesTable);
         }
 
-        // Step 2: Insert new rows and sync ob_* on matched members.
+        // Step 2: Insert new rows and sync members.
         // The parser guarantees every kept row has a non-blank name and at
         // least one non-zero balance; rejected rows are already in
         // skippedDetails above.
         for (const row of sheet.rows) {
           const name = row.rawName.trim();
           const vals = computeObValues(row);
+          const match = matcher.match(name);
+          const matchedMemberId = match.memberId ?? null;
+          const matchedStatus = matchedMemberId != null ? memberStatusMap.get(matchedMemberId) : undefined;
+          // Mark the OB row as claimed immediately for active members since we
+          // apply their balances in this same transaction; keep unclaimed for
+          // pending/unmatched members so the approval-gate claim flow still works.
+          const obStatus = matchedStatus === "active" ? "claimed" : "unclaimed";
 
-          await tx.insert(openingBalancesTable).values({
+          const [insertedRow] = await tx.insert(openingBalancesTable).values({
             fullName: name,
             organization: org,
-            status: "unclaimed",
+            status: obStatus,
+            effectiveMonth,
+            effectiveYear,
+            linkedMemberId: matchedStatus === "active" ? matchedMemberId : null,
+            claimedAt: matchedStatus === "active" ? uploadedAt : null,
             sharesBalance: vals.sharesBalance.toString(),
             savingsBalance: vals.savingsBalance.toString(),
             providentBalance: vals.providentBalance.toString(),
@@ -533,34 +565,52 @@ router.post(
             fireFundBalance: vals.fireFundBalance.toString(),
             fuelVentureBalance: vals.fuelVentureBalance.toString(),
             landLoanBalance: vals.landLoanBalance.toString(),
-          });
+          } as any).returning();
           inserted++;
 
-          // Step 3: Sync ob_* snapshot columns on any matched member
-          const match = matcher.match(name);
-          if (match.memberId != null) {
+          // Step 3: Sync ob_* snapshot columns and effective date on any matched member.
+          if (matchedMemberId != null) {
+            const memberUpdate: Record<string, any> = {
+              // ob_* snapshot — always updated
+              obSharesBalance: vals.sharesBalance.toString(),
+              obSavingsBalance: vals.savingsBalance.toString(),
+              obProvidentBalance: vals.providentBalance.toString(),
+              obChristmasBalance: vals.christmasBalance.toString(),
+              obRealLoanBalance: vals.realLoanBalance.toString(),
+              obEmergencyLoanBalance: vals.emergencyLoanBalance.toString(),
+              obTotalLoanBalance: vals.totalLoanBalance.toString(),
+              obElectronicsDebt: vals.electronicsDebt.toString(),
+              obSElectronicsDebt: vals.sElectronicsDebt.toString(),
+              obFurnitureDebt: vals.furnitureDebt.toString(),
+              obCommodityDebt: vals.commodityDebt.toString(),
+              obGhlFormDebt: vals.ghlFormDebt.toString(),
+              obFireFundBalance: vals.fireFundBalance.toString(),
+              obFuelVentureBalance: vals.fuelVentureBalance.toString(),
+              obLandLoanBalance: vals.landLoanBalance.toString(),
+              obTotalStoreDebt: vals.totalStoreDebt.toString(),
+              obUploadedAt: uploadedAt,
+              // Effective date — controls where the balance timeline starts
+              obEffectiveMonth: effectiveMonth,
+              obEffectiveYear: effectiveYear,
+            };
+
+            if (matchedStatus === "active") {
+              // Active member: directly override current balance columns with
+              // the new values so the upload becomes the new balance baseline.
+              for (const { field } of OPENING_BALANCE_FIELDS) {
+                memberUpdate[field] = (vals as any)[field]?.toString() ?? "0";
+              }
+              memberUpdate.totalLoanBalance = vals.totalLoanBalance.toString();
+              memberUpdate.totalStoreDebt   = vals.totalStoreDebt.toString();
+              activeOverridden++;
+            }
+            // Pending members: ob_* and effective date are set above; current
+            // balance columns are initialised at the approval-gate claim step.
+
             await tx
               .update(membersTable)
-              .set({
-                obSharesBalance: vals.sharesBalance.toString(),
-                obSavingsBalance: vals.savingsBalance.toString(),
-                obProvidentBalance: vals.providentBalance.toString(),
-                obChristmasBalance: vals.christmasBalance.toString(),
-                obRealLoanBalance: vals.realLoanBalance.toString(),
-                obEmergencyLoanBalance: vals.emergencyLoanBalance.toString(),
-                obTotalLoanBalance: vals.totalLoanBalance.toString(),
-                obElectronicsDebt: vals.electronicsDebt.toString(),
-                obSElectronicsDebt: vals.sElectronicsDebt.toString(),
-                obFurnitureDebt: vals.furnitureDebt.toString(),
-                obCommodityDebt: vals.commodityDebt.toString(),
-                obGhlFormDebt: vals.ghlFormDebt.toString(),
-                obFireFundBalance: vals.fireFundBalance.toString(),
-                obFuelVentureBalance: vals.fuelVentureBalance.toString(),
-                obLandLoanBalance: vals.landLoanBalance.toString(),
-                obTotalStoreDebt: vals.totalStoreDebt.toString(),
-                obUploadedAt: uploadedAt,
-              } as any)
-              .where(eq(membersTable.id, match.memberId));
+              .set(memberUpdate)
+              .where(eq(membersTable.id, matchedMemberId));
             membersSynced++;
           }
         }
@@ -577,7 +627,9 @@ router.post(
           skipped: skippedDetails.length,
           membersSynced,
           skippedDetails,
-        });
+          effectiveMonth,
+          effectiveYear,
+        } as any);
       });
 
       await logAudit({
@@ -585,10 +637,10 @@ router.post(
         action: "IMPORT_OPENING_BALANCES",
         entity: "opening_balance",
         entityId: 0,
-        details: `Superseded opening balances from "${sheetName}"${org ? ` (${org})` : ""}: ${inserted} inserted, ${skippedDetails.length} skipped, ${membersSynced} member book balances updated.`,
+        details: `Re-uploaded opening balances from "${sheetName}"${org ? ` (${org})` : ""} effective ${effectiveMonth}/${effectiveYear}: ${inserted} inserted, ${skippedDetails.length} skipped, ${membersSynced} members synced (${activeOverridden} active balances overridden).`,
       });
 
-      res.json({ inserted, skipped: skippedDetails.length, membersSynced, totalRows, skippedDetails });
+      res.json({ inserted, skipped: skippedDetails.length, membersSynced, activeOverridden, totalRows, skippedDetails });
     } catch (err: any) {
       res.status(400).json({ error: `Failed to process file: ${err.message}` });
     }
@@ -628,6 +680,7 @@ router.post(
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
     // Only flagged duplicates may be reconciled, and only while still flagged —
     // this guards against discarding legitimate unclaimed/claimed rows and makes

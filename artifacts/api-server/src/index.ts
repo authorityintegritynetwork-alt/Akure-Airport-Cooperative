@@ -114,6 +114,25 @@ async function applyIdempotentPatches() {
     `ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "shares_balance" numeric(15,2) NOT NULL DEFAULT 0`,
     `ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "ob_shares_balance" numeric(15,2)`,
     `ALTER TABLE "opening_balances" ADD COLUMN IF NOT EXISTS "shares_balance" numeric(15,2) NOT NULL DEFAULT 0`,
+    // Opening-balance effective date: allows re-uploads to become the new
+    // starting point for a member's balance timeline from a specified month.
+    `ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "ob_effective_month" integer`,
+    `ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "ob_effective_year" integer`,
+    `ALTER TABLE "opening_balances" ADD COLUMN IF NOT EXISTS "effective_month" integer`,
+    `ALTER TABLE "opening_balances" ADD COLUMN IF NOT EXISTS "effective_year" integer`,
+    `ALTER TABLE "opening_balance_imports" ADD COLUMN IF NOT EXISTS "effective_month" integer`,
+    `ALTER TABLE "opening_balance_imports" ADD COLUMN IF NOT EXISTS "effective_year" integer`,
+    `CREATE TABLE IF NOT EXISTS "data_clear_requests" (
+      "id" serial PRIMARY KEY,
+      "requested_by_id" integer NOT NULL,
+      "reason" text,
+      "status" text NOT NULL DEFAULT 'pending',
+      "reviewed_by_id" integer,
+      "reviewed_at" timestamp,
+      "requester_name" text NOT NULL,
+      "requester_email" text,
+      "created_at" timestamp NOT NULL DEFAULT now()
+    )`,
   ];
   for (const patch of patches) {
     try {

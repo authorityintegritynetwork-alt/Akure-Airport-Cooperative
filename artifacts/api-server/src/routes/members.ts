@@ -238,6 +238,7 @@ router.post(
   "/members/blank-record",
   requireAuth,
   requireAdminOnly,
+  requireReverification,
   async (req: AuthRequest, res): Promise<void> => {
     const { fullName, organization, staffId, phone, memberType } = req.body ?? {};
     if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
@@ -395,6 +396,7 @@ router.post("/members", requireAuth, requireAdmin, async (req: AuthRequest, res)
 router.get("/members/:id", requireAuth, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
   if (
     req.memberRole === "member" &&
@@ -438,6 +440,7 @@ router.patch(
   async (req: AuthRequest, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
   const parsed = UpdateMemberBody.safeParse(req.body);
   if (!parsed.success) {
@@ -580,6 +583,7 @@ router.post(
 router.post("/members/:id/activate", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
   const [member] = await db
     .update(membersTable)
@@ -606,6 +610,7 @@ router.post("/members/:id/activate", requireAuth, requireAdmin, requireReverific
 router.post("/members/:id/deactivate", requireAuth, requireAdmin, requireReverification, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
   const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
 
   const [member] = await db
@@ -736,6 +741,7 @@ router.post(
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
     const parsed = ApproveMatchBody.safeParse(req.body ?? {});
     if (!parsed.success) {
@@ -891,6 +897,7 @@ router.post(
   async (req: AuthRequest, res): Promise<void> => {
     const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
     const [signup] = await db
       .select()
@@ -1011,6 +1018,7 @@ router.delete(
 router.get("/members/:id/summary", requireAuth, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
   if (req.memberRole === "member" && req.memberId !== id) {
     res.status(403).json({ error: "Forbidden" });
@@ -1121,6 +1129,8 @@ router.get(
       v == null ? 0 : parseFloat(v) || 0;
 
     const hasOb = member.obUploadedAt !== null;
+    const effectiveMonth = (member as any).obEffectiveMonth as number | null ?? null;
+    const effectiveYear  = (member as any).obEffectiveYear  as number | null ?? null;
 
     // Fetch transactions and disbursed loans in parallel.
     const [txns, loanRows] = await Promise.all([
@@ -1165,6 +1175,15 @@ router.get(
       if (!t.month || t.year == null) continue;
       const colKey = TX_TO_COL[t.type];
       if (!colKey) continue;
+
+      // If an effective date is set, hide transactions before that month —
+      // the OB upload has replaced the starting balance from that point.
+      if (effectiveMonth != null && effectiveYear != null) {
+        const txMonthNum = MONTH_ORDER[t.month.toLowerCase()] ?? 0;
+        const txOrdinal  = t.year * 12 + txMonthNum;
+        const effOrdinal = effectiveYear * 12 + effectiveMonth;
+        if (txOrdinal < effOrdinal) continue;
+      }
 
       const pk = `${t.year}-${t.month}`;
       if (!periodColMap.has(pk)) {
@@ -1238,6 +1257,8 @@ router.get(
       fullName: member.fullName,
       memberStatus: member.status,
       hasOb,
+      obEffectiveMonth: effectiveMonth,
+      obEffectiveYear: effectiveYear,
       columns,
       loanEvents,
     });

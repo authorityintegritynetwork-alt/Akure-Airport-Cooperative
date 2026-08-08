@@ -59,6 +59,10 @@ export function CompleteProfilePage() {
       toast({ title: `${label} is required`, variant: "destructive" });
       return;
     }
+    if (!phone.trim()) {
+      toast({ title: "Phone number is required", variant: "destructive" });
+      return;
+    }
     if (!organization) {
       toast({ title: "Please select your employer", variant: "destructive" });
       return;
@@ -66,7 +70,7 @@ export function CompleteProfilePage() {
     register.mutate({
       data: {
         fullName: fullName.trim(),
-        phone: phone.trim() || undefined,
+        phone: phone.trim(),
         memberType,
         staffId: staffId.trim(),
         organization,
@@ -96,13 +100,14 @@ export function CompleteProfilePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone number</Label>
+              <Label htmlFor="phone">Phone number *</Label>
               <Input
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="08012345678"
                 type="tel"
+                required
               />
             </div>
             <div className="space-y-1.5">

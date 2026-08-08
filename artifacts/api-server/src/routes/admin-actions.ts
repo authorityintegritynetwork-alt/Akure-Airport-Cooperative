@@ -17,15 +17,18 @@ import {
   uploadRecordsTable,
   openingBalancesTable,
   loansTable,
+  dataClearRequestsTable,
 } from "@workspace/db";
 import {
   requireAuth,
+  requireRole,
   requireTreasurer,
   requireSuperAdmin,
   requireReverification,
 } from "../middlewares/auth";
 import type { AuthRequest } from "../middlewares/auth";
 import { logAudit } from "../lib/audit";
+import { sendMail } from "../lib/mailer";
 
 const router = Router();
 
@@ -312,6 +315,278 @@ router.post(
     });
 
     res.json({ ok: true, message: "All balance data has been reset." });
+  },
+);
+
+// ── POST /admin/request-data-clear ───────────────────────────────────────────
+// Any member with the "admin" role (not super_admin — they can do it directly)
+// can raise a request.  Super admins are notified by email immediately.
+
+router.post(
+  "/admin/request-data-clear",
+  requireAuth,
+  requireRole("admin"),
+  async (req: AuthRequest, res): Promise<void> => {
+    const schema = z.object({ reason: z.string().max(500).optional() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request body." });
+      return;
+    }
+
+    // Confirm there is no already-pending request from any admin.
+    const existing = await db
+      .select({ id: dataClearRequestsTable.id })
+      .from(dataClearRequestsTable)
+      .where(eq(dataClearRequestsTable.status, "pending"))
+      .limit(1);
+
+    if (existing.length > 0) {
+      res.status(409).json({
+        error: "A data-clear request is already pending super-admin review.",
+      });
+      return;
+    }
+
+    const requester = await db
+      .select({ fullName: membersTable.fullName, email: membersTable.email })
+      .from(membersTable)
+      .where(eq(membersTable.id, req.memberId!))
+      .limit(1);
+
+    const requesterName = requester[0]?.fullName ?? "Unknown admin";
+    const requesterEmail = requester[0]?.email ?? null;
+
+    const [inserted] = await db
+      .insert(dataClearRequestsTable)
+      .values({
+        requestedById: req.memberId!,
+        reason: parsed.data.reason ?? null,
+        requesterName,
+        requesterEmail,
+      })
+      .returning();
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "REQUEST_DATA_CLEAR",
+      entity: "system",
+      entityId: inserted.id,
+      details: `Admin "${requesterName}" raised a data-clear request${parsed.data.reason ? `: "${parsed.data.reason}"` : ""}. Awaiting super-admin approval.`,
+    });
+
+    // Email all super admins.
+    const superAdmins = await db
+      .select({ fullName: membersTable.fullName, email: membersTable.email })
+      .from(membersTable)
+      .where(eq(membersTable.role, "super_admin"));
+
+    const reasonLine = parsed.data.reason
+      ? `\n\nReason given: "${parsed.data.reason}"`
+      : "";
+
+    for (const sa of superAdmins) {
+      if (!sa.email) continue;
+      await sendMail({
+        to: sa.email,
+        subject: "Action required: Data Clear Request — Akure Airport Co-op",
+        text: `Hello ${sa.fullName},\n\n${requesterName} has submitted a request to reset all balance data in the cooperative management system.${reasonLine}\n\nPlease log in to review and approve or reject this request:\nhttps://akureairportsociety.com\n\nThis request will remain open until you act on it.\n\n— Akure Airport Staff Cooperative`,
+        html: `<p>Hello ${sa.fullName},</p><p><strong>${requesterName}</strong> has submitted a request to <strong>reset all balance data</strong> in the cooperative management system.${parsed.data.reason ? `</p><p>Reason: <em>${parsed.data.reason}</em>` : ""}</p><p>Please <a href="https://akureairportsociety.com">log in</a> to review and approve or reject this request.</p><p>This request will remain open until you act on it.</p><p style="color:#888">— Akure Airport Staff Cooperative</p>`,
+      });
+    }
+
+    res.json({ ok: true, requestId: inserted.id });
+  },
+);
+
+// ── GET /admin/data-clear-requests/pending ───────────────────────────────────
+
+router.get(
+  "/admin/data-clear-requests/pending",
+  requireAuth,
+  requireSuperAdmin,
+  async (_req: AuthRequest, res): Promise<void> => {
+    const rows = await db
+      .select()
+      .from(dataClearRequestsTable)
+      .where(eq(dataClearRequestsTable.status, "pending"));
+    res.json({ requests: rows });
+  },
+);
+
+// ── GET /admin/data-clear-request/status ─────────────────────────────────────
+// Accessible to any admin role — returns whether a pending request exists so
+// the admin UI can show a "pending" state without hitting the super-admin-only
+// endpoint above.
+
+router.get(
+  "/admin/data-clear-request/status",
+  requireAuth,
+  requireRole("admin", "super_admin"),
+  async (_req: AuthRequest, res): Promise<void> => {
+    const [row] = await db
+      .select({
+        id: dataClearRequestsTable.id,
+        createdAt: dataClearRequestsTable.createdAt,
+        reason: dataClearRequestsTable.reason,
+        requesterName: dataClearRequestsTable.requesterName,
+      })
+      .from(dataClearRequestsTable)
+      .where(eq(dataClearRequestsTable.status, "pending"))
+      .limit(1);
+    res.json({ pending: row != null, request: row ?? null });
+  },
+);
+
+// ── POST /admin/data-clear-requests/:id/approve ──────────────────────────────
+// Super admin approves — the actual wipe runs here (step-up required).
+
+router.post(
+  "/admin/data-clear-requests/:id/approve",
+  requireAuth,
+  requireSuperAdmin,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid request id." }); return; }
+
+    const [request] = await db
+      .select()
+      .from(dataClearRequestsTable)
+      .where(eq(dataClearRequestsTable.id, id))
+      .limit(1);
+
+    if (!request) { res.status(404).json({ error: "Request not found." }); return; }
+    if (request.status !== "pending") {
+      res.status(409).json({ error: `Request is already ${request.status}.` });
+      return;
+    }
+
+    // Execute the full wipe inside a transaction (same logic as reset-all-data).
+    await db.transaction(async (tx) => {
+      await tx.delete(transactionsTable);
+      await tx.delete(uploadRecordsTable);
+      await tx.delete(openingBalancesTable);
+      await tx.update(membersTable).set({
+        savingsBalance:         "0",
+        providentBalance:       "0",
+        christmasBalance:       "0",
+        realLoanBalance:        "0",
+        emergencyLoanBalance:   "0",
+        totalLoanBalance:       "0",
+        electronicsDebt:        "0",
+        sElectronicsDebt:       "0",
+        furnitureDebt:          "0",
+        commodityDebt:          "0",
+        ghlFormDebt:            "0",
+        totalStoreDebt:         "0",
+        fireFundBalance:        "0",
+        fuelVentureBalance:     "0",
+        landLoanBalance:        "0",
+        sharesBalance:          "0",
+        obSharesBalance:        null,
+        obSavingsBalance:       null,
+        obProvidentBalance:     null,
+        obChristmasBalance:     null,
+        obRealLoanBalance:      null,
+        obEmergencyLoanBalance: null,
+        obTotalLoanBalance:     null,
+        obElectronicsDebt:      null,
+        obSElectronicsDebt:     null,
+        obFurnitureDebt:        null,
+        obCommodityDebt:        null,
+        obGhlFormDebt:          null,
+        obTotalStoreDebt:       null,
+        obFireFundBalance:      null,
+        obFuelVentureBalance:   null,
+        obLandLoanBalance:      null,
+        obUploadedAt:           null,
+      });
+      await tx.execute(
+        sql`UPDATE ${loansTable} SET outstanding_balance = amount, status = 'disbursed'
+            WHERE status IN ('disbursed', 'fully_repaid')`,
+      );
+      // Mark the request as approved.
+      await tx
+        .update(dataClearRequestsTable)
+        .set({ status: "approved", reviewedById: req.memberId!, reviewedAt: new Date() })
+        .where(eq(dataClearRequestsTable.id, id));
+    });
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "APPROVE_DATA_CLEAR",
+      entity: "system",
+      entityId: id,
+      details: `Super-admin approved data-clear request #${id} (raised by "${request.requesterName}"). Full data wipe executed.`,
+    });
+
+    // Notify the requester.
+    if (request.requesterEmail) {
+      await sendMail({
+        to: request.requesterEmail,
+        subject: "Your data-clear request has been approved — Akure Airport Co-op",
+        text: `Hello ${request.requesterName},\n\nYour request to reset all balance data has been approved and executed by a super administrator. All transaction history, upload records, and opening balances have been wiped.\n\n— Akure Airport Staff Cooperative`,
+        html: `<p>Hello ${request.requesterName},</p><p>Your request to <strong>reset all balance data</strong> has been <strong>approved and executed</strong> by a super administrator. All transaction history, upload records, and opening balances have been wiped.</p><p style="color:#888">— Akure Airport Staff Cooperative</p>`,
+      });
+    }
+
+    res.json({ ok: true, message: "Data-clear request approved and data wiped." });
+  },
+);
+
+// ── POST /admin/data-clear-requests/:id/reject ───────────────────────────────
+
+router.post(
+  "/admin/data-clear-requests/:id/reject",
+  requireAuth,
+  requireSuperAdmin,
+  async (req: AuthRequest, res): Promise<void> => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid request id." }); return; }
+
+    const schema = z.object({ reason: z.string().max(500).optional() });
+    const parsed = schema.safeParse(req.body);
+
+    const [request] = await db
+      .select()
+      .from(dataClearRequestsTable)
+      .where(eq(dataClearRequestsTable.id, id))
+      .limit(1);
+
+    if (!request) { res.status(404).json({ error: "Request not found." }); return; }
+    if (request.status !== "pending") {
+      res.status(409).json({ error: `Request is already ${request.status}.` });
+      return;
+    }
+
+    await db
+      .update(dataClearRequestsTable)
+      .set({ status: "rejected", reviewedById: req.memberId!, reviewedAt: new Date() })
+      .where(eq(dataClearRequestsTable.id, id));
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "REJECT_DATA_CLEAR",
+      entity: "system",
+      entityId: id,
+      details: `Super-admin rejected data-clear request #${id} (raised by "${request.requesterName}")${parsed.success && parsed.data.reason ? `: "${parsed.data.reason}"` : ""}.`,
+    });
+
+    // Notify the requester.
+    if (request.requesterEmail) {
+      const reasonLine = parsed.success && parsed.data.reason
+        ? `\n\nReason: "${parsed.data.reason}"`
+        : "";
+      await sendMail({
+        to: request.requesterEmail,
+        subject: "Your data-clear request has been rejected — Akure Airport Co-op",
+        text: `Hello ${request.requesterName},\n\nYour request to reset all balance data has been reviewed and rejected by a super administrator. No data has been deleted.${reasonLine}\n\nIf you think this was an error, please contact a super admin directly.\n\n— Akure Airport Staff Cooperative`,
+        html: `<p>Hello ${request.requesterName},</p><p>Your request to reset all balance data has been <strong>rejected</strong> by a super administrator. No data has been deleted.</p>${parsed.success && parsed.data.reason ? `<p>Reason: <em>${parsed.data.reason}</em></p>` : ""}<p style="color:#888">— Akure Airport Staff Cooperative</p>`,
+      });
+    }
+
+    res.json({ ok: true, message: "Data-clear request rejected." });
   },
 );
 

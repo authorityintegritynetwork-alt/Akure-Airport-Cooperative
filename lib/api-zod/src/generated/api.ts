@@ -101,7 +101,7 @@ export const GetStepUpStatusResponse = zod.object({
  */
 export const RegisterMemberBody = zod.object({
   fullName: zod.string(),
-  phone: zod.string().optional(),
+  phone: zod.string().min(1, "Phone number is required"),
   memberType: zod.enum(["staff", "pensioner"]),
   staffId: zod.string().min(1, "Staff/Pensioner number is required"),
   organization: zod.string(),

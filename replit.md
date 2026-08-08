@@ -41,6 +41,23 @@ The `dev-start.mjs` script in `api-server/` starts both:
 1. The Vite dev server for the cooperative frontend (port 5173)
 2. The API Express server (port 8080, which proxies to 5173)
 
+## Running on Replit
+
+The app is started via the managed **`artifacts/api-server: API Server`** workflow, which:
+1. Builds the API server (`esbuild`)
+2. Starts the Vite dev server for the cooperative frontend (port 5173)
+3. Starts the Express API server (port 8080), which proxies all non-API traffic to Vite
+
+**Required secrets** (already configured in Replit Secrets):
+- `DATABASE_URL` — PostgreSQL connection string
+- `CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` — Clerk auth keys
+- `VITE_CLERK_PUBLISHABLE_KEY` — public Clerk key exposed to the frontend
+- `SESSION_SECRET` — session signing secret
+- `SMTP_USER` / `SMTP_APP_PASSWORD` — Gmail SMTP for step-up OTP emails
+- `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PRIVATE_OBJECT_DIR`, `PUBLIC_OBJECT_SEARCH_PATHS` — object storage
+
+**⚠️ Clerk on Replit dev:** The current `CLERK_PUBLISHABLE_KEY` is a production key locked to `akureairportsociety.com`. To use the app in the Replit preview pane, you need Clerk development keys (starting with `pk_test_`) issued for the `.replit.dev` domain. Update the three Clerk secrets with dev keys from your Clerk dashboard.
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

@@ -18,11 +18,30 @@ import {
   AlertCircle,
   AlertTriangle,
   ChevronRight,
+  Calendar,
 } from "lucide-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Stage = "select" | "pickSheet" | "preview";
+
+const MONTHS = [
+  { value: 1,  label: "January" },
+  { value: 2,  label: "February" },
+  { value: 3,  label: "March" },
+  { value: 4,  label: "April" },
+  { value: 5,  label: "May" },
+  { value: 6,  label: "June" },
+  { value: 7,  label: "July" },
+  { value: 8,  label: "August" },
+  { value: 9,  label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+const currentYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
 const BALANCE_COLS: { key: keyof ObUploadPreviewRow; label: string }[] = [
   { key: "savings", label: "Savings" },
@@ -53,6 +72,10 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
     rows: ObUploadPreviewRow[];
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Effective date — required before import
+  const [effectiveMonth, setEffectiveMonth] = useState<number>(new Date().getMonth() + 1);
+  const [effectiveYear, setEffectiveYear] = useState<number>(currentYear);
 
   const previewMutation = usePreviewOpeningBalanceUpload();
   const processMutation = useProcessOpeningBalanceUpload();
@@ -125,11 +148,18 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
       const result = await processWithStepUp({
         fileObjectPath: uploadedPath,
         sheetName: chosenSheet,
+        effectiveMonth,
+        effectiveYear,
       });
-      const synced = (result as any).membersSynced ?? 0;
+      const r = result as any;
+      const synced = r.membersSynced ?? 0;
+      const overridden = r.activeOverridden ?? 0;
+      const monthLabel = MONTHS.find((m) => m.value === effectiveMonth)?.label ?? effectiveMonth;
       toast({
         title: "Opening balances updated",
-        description: `${result.inserted} records imported${synced > 0 ? `, ${synced} member book balance${synced === 1 ? "" : "s"} updated` : ""}.`,
+        description: `${r.inserted} records imported effective ${monthLabel} ${effectiveYear}${
+          overridden > 0 ? `. ${overridden} active member balance${overridden === 1 ? "" : "s"} overridden` : ""
+        }${synced > overridden ? `. ${synced - overridden} pending member${synced - overridden === 1 ? "" : "s"} staged for approval` : ""}.`,
       });
       queryClient.invalidateQueries({
         predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/opening-balances",
@@ -146,6 +176,8 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
     }
   }
 
+  const effectiveMonthLabel = MONTHS.find((m) => m.value === effectiveMonth)?.label ?? "";
+
   if (stage === "select") {
     return (
       <Card>
@@ -157,16 +189,42 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Upload the Excel sheet containing the current opening balances. This will
-            replace all existing opening balance records and update the book balance for
-            any member whose name matches a row in the sheet. Each row should have a
-            member name and balance columns (Savings, Provident, Christmas, Real Loan,
-            Emergency Loan, store debts, etc.).
+            Upload a balance sheet to set new starting balances for members. Active
+            members' balances are overridden immediately; statements will hide any
+            history before the effective month. Pending members have their opening
+            balance staged for when they are approved.
           </p>
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-            <strong>Note:</strong> Uploading a new sheet replaces all existing opening
-            balance records and refreshes the book balance shown to every matched member.
+          {/* Effective date picker */}
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              Effective from
+            </div>
+            <p className="text-xs text-muted-foreground">
+              These balances will be treated as the starting point from this month. Transactions
+              before this date will be hidden from statements.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <select
+                value={effectiveMonth}
+                onChange={(e) => setEffectiveMonth(Number(e.target.value))}
+                className="rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {MONTHS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              <select
+                value={effectiveYear}
+                onChange={(e) => setEffectiveYear(Number(e.target.value))}
+                className="rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {YEARS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <Button
@@ -259,6 +317,37 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Effective date summary — editable before confirming */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800/40 dark:bg-blue-900/10 px-3 py-2 space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-300">
+              <Calendar className="w-4 h-4" />
+              Effective from {effectiveMonthLabel} {effectiveYear}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <select
+                value={effectiveMonth}
+                onChange={(e) => setEffectiveMonth(Number(e.target.value))}
+                className="rounded-md border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {MONTHS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              <select
+                value={effectiveYear}
+                onChange={(e) => setEffectiveYear(Number(e.target.value))}
+                className="rounded-md border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {YEARS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-blue-700 dark:text-blue-400">
+              Active members' balances will be overridden and their statement history hidden before this month.
+            </p>
+          </div>
+
           <div className="rounded-md border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -332,7 +421,9 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
               className="gap-2"
             >
               <CheckCircle className="w-4 h-4" />
-              {processMutation.isPending ? "Importing…" : `Import ${previewData.totalRows} records`}
+              {processMutation.isPending
+                ? "Importing…"
+                : `Import ${previewData.totalRows} records — effective ${effectiveMonthLabel} ${effectiveYear}`}
             </Button>
             <Button variant="outline" onClick={reset}>
               Cancel
@@ -340,7 +431,6 @@ export function OpeningBalanceUpload({ onImported }: { onImported?: () => void }
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Rows that already exist (same name, unclaimed) will be skipped automatically.
             You will be asked to confirm with a security code before the import is saved.
           </p>
         </CardContent>

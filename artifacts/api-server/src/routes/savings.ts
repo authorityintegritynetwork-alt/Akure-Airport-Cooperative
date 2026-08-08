@@ -25,6 +25,7 @@ router.get("/savings/my", requireAuth, async (req: AuthRequest, res): Promise<vo
 router.get("/savings/:memberId", requireAuth, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const raw = Array.isArray(req.params.memberId) ? req.params.memberId[0] : req.params.memberId;
   const memberId = parseInt(raw, 10);
+  if (Number.isNaN(memberId)) { res.status(400).json({ error: "Invalid member id" }); return; }
 
   const [member] = await db.select().from(membersTable).where(eq(membersTable.id, memberId));
   if (!member) {

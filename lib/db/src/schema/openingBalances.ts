@@ -89,6 +89,10 @@ export const openingBalancesTable = pgTable(
     totalStoreDebt: numeric("total_store_debt", { precision: 15, scale: 2 })
       .notNull()
       .default("0"),
+    /** The month (1–12) this row's balances represent as a starting point. */
+    effectiveMonth: integer("effective_month"),
+    /** The year this row's balances represent as a starting point. */
+    effectiveYear: integer("effective_year"),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -156,6 +160,8 @@ export const openingBalanceImportsTable = pgTable(
       .$type<ObImportSkippedRow[]>()
       .notNull()
       .default([]),
+    effectiveMonth: integer("effective_month"),
+    effectiveYear: integer("effective_year"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

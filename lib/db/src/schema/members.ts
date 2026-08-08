@@ -104,6 +104,10 @@ export const membersTable = pgTable(
     obLandLoanBalance: numeric("ob_land_loan_balance", { precision: 15, scale: 2 }),
     obTotalStoreDebt: numeric("ob_total_store_debt", { precision: 15, scale: 2 }),
     obUploadedAt: timestamp("ob_uploaded_at", { withTimezone: true }),
+    /** Effective month (1–12) of the most-recent opening-balance re-upload. */
+    obEffectiveMonth: integer("ob_effective_month"),
+    /** Effective year of the most-recent opening-balance re-upload. */
+    obEffectiveYear: integer("ob_effective_year"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

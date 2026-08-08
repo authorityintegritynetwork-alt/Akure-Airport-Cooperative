@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -22,9 +24,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatCurrency } from "@/lib/format";
-import { Gift, BarChart3, CheckCircle2, AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { Gift, BarChart3, CheckCircle2, AlertTriangle, Loader2, Trash2, Send, Clock, X } from "lucide-react";
 import { useStepUpAction } from "@/lib/step-up";
 import { useToast } from "@/hooks/use-toast";
+import { useGetProfile } from "@workspace/api-client-react";
 
 const MONTHS = [
   "January","February","March","April","May","June",
@@ -35,8 +38,10 @@ const currentYear = new Date().getFullYear();
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -50,7 +55,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(path, { credentials: "include" });
+  const res = await fetch(`${BASE}${path}`, { credentials: "include" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(err.error ?? "Request failed");
@@ -520,9 +525,275 @@ function ResetDataSection() {
   );
 }
 
+// ── Request data clear (admin role only) ─────────────────────────────────────
+
+function RequestDataClearSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState("");
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Check if there's already a pending request. Uses the admin-accessible
+  // status endpoint (not the super-admin-only /pending list).
+  const statusQuery = useQuery({
+    queryKey: ["admin", "data-clear-request-status"],
+    queryFn: () => apiGet<{ pending: boolean; request: { id: number; createdAt: string; reason: string | null; requesterName: string } | null }>("/api/admin/data-clear-request/status"),
+    staleTime: 30_000,
+  });
+
+  const hasPending = statusQuery.data?.pending ?? false;
+  const myPending = statusQuery.data?.request ?? null;
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    try {
+      await apiPost("/api/admin/request-data-clear", { reason: reason.trim() || undefined });
+      toast({
+        title: "Request submitted",
+        description: "All super admins have been notified by email. The request will stay open until one of them approves or rejects it.",
+      });
+      setOpen(false);
+      setReason("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "data-clear-request-status"] });
+    } catch (err: any) {
+      // 409 means a request is already pending — refresh status to show it.
+      if (err.message?.includes("already pending")) {
+        queryClient.invalidateQueries({ queryKey: ["admin", "data-clear-request-status"] });
+      }
+      toast({ title: "Could not submit request", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </div>
+          <div>
+            <CardTitle className="text-base text-destructive">Reset All Balance Data</CardTitle>
+            <CardDescription className="mt-0.5">
+              Wipes all transactions, upload records and opening balances. Resets every
+              member's balances to zero. Because this is irreversible, a super admin must
+              approve the request before it runs.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="flex items-start gap-2 text-xs text-destructive border border-destructive/30 rounded-lg px-3 py-2.5 bg-destructive/5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            <strong>Irreversible.</strong> Once a super admin approves this request, all financial
+            history for all organisations will be permanently deleted. Make sure you have a backup
+            before requesting.
+          </span>
+        </div>
+
+        {hasPending && myPending ? (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700/40 dark:bg-amber-900/10 px-3 py-2.5 space-y-1">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+              <Clock className="w-4 h-4" />
+              Request pending super-admin review
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Submitted {new Date(myPending.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.
+              {myPending.reason ? ` Reason: "${myPending.reason}"` : ""}
+            </p>
+          </div>
+        ) : (
+          <Button
+            variant="destructive"
+            onClick={() => setOpen(true)}
+            className="w-full sm:w-auto gap-2"
+            disabled={statusQuery.isLoading}
+          >
+            <Send className="w-3.5 h-3.5" />
+            Request Data Reset…
+          </Button>
+        )}
+      </CardContent>
+
+      <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setReason(""); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Request Data Reset</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  This will send a notification to all super admins asking them to approve a full
+                  data wipe. The reset will only run once a super admin confirms it.
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="clear-reason">Reason <span className="text-muted-foreground">(optional)</span></Label>
+                  <Textarea
+                    id="clear-reason"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Why is this reset needed?"
+                    rows={3}
+                    maxLength={500}
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={submitting}
+              onClick={(e) => { e.preventDefault(); void handleSubmit(); }}
+              className="bg-destructive hover:bg-destructive/90 text-white gap-2"
+            >
+              {submitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Sending…</> : <><Send className="w-3.5 h-3.5" />Send Request</>}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
+// ── Pending clear requests banner (super_admin only) ──────────────────────────
+
+function PendingClearRequestsBanner() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const pendingQuery = useQuery({
+    queryKey: ["admin", "data-clear-requests-pending"],
+    queryFn: () => apiGet<{ requests: any[] }>("/api/admin/data-clear-requests/pending"),
+    staleTime: 30_000,
+  });
+
+  const doApprove = useStepUpAction((id: number) =>
+    apiPost<{ ok: boolean; message: string }>(`/api/admin/data-clear-requests/${id}/approve`, {}),
+  );
+
+  const requests = pendingQuery.data?.requests ?? [];
+  if (requests.length === 0) return null;
+
+  async function handleApprove(id: number) {
+    try {
+      const result = await doApprove(id);
+      toast({ title: "Data wiped", description: result.message });
+      queryClient.invalidateQueries({ queryKey: ["admin", "data-clear-requests-pending"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "data-clear-request-status"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "reset-preview"] });
+    } catch (err: any) {
+      if (err?.cancelled) return;
+      toast({ title: "Approval failed", description: err.message, variant: "destructive" });
+    }
+  }
+
+  async function handleReject(id: number) {
+    try {
+      await apiPost(`/api/admin/data-clear-requests/${id}/reject`, { reason: rejectReason.trim() || undefined });
+      toast({ title: "Request rejected" });
+      setRejectOpen(false);
+      setRejectReason("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "data-clear-requests-pending"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "data-clear-request-status"] });
+    } catch (err: any) {
+      toast({ title: "Rejection failed", description: err.message, variant: "destructive" });
+    }
+  }
+
+  return (
+    <>
+      {requests.map((r) => (
+        <div
+          key={r.id}
+          className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700/40 dark:bg-amber-900/10 p-4 space-y-3"
+        >
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                Pending data-clear request
+              </span>
+              <Badge variant="outline" className="text-xs border-amber-400 text-amber-700">Awaiting your approval</Badge>
+            </div>
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+          </div>
+
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <strong>{r.requesterName}</strong> has requested a full data reset.
+            {r.reason ? <> Reason: <em>"{r.reason}"</em></> : " No reason given."}
+          </p>
+
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="destructive"
+              className="gap-1.5"
+              onClick={() => handleApprove(r.id)}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Approve &amp; Wipe Data
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => { setActiveId(r.id); setRejectOpen(true); }}
+            >
+              <X className="w-3.5 h-3.5" />
+              Reject
+            </Button>
+          </div>
+        </div>
+      ))}
+
+      <AlertDialog open={rejectOpen} onOpenChange={(v) => { setRejectOpen(v); if (!v) setRejectReason(""); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject data-clear request</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>The requesting admin will be notified by email that their request was rejected.</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reject-reason">Reason <span className="text-muted-foreground">(optional)</span></Label>
+                  <Textarea
+                    id="reject-reason"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="Why are you rejecting this?"
+                    rows={2}
+                    maxLength={500}
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void handleReject(activeId!); }}>
+              Reject Request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function AdminActionsPage() {
+  const { data: profile } = useGetProfile();
+  const isSuperAdmin = profile?.role === "super_admin";
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -533,9 +804,14 @@ export function AdminActionsPage() {
         </p>
       </div>
 
+      {/* Pending requests banner — super admins only */}
+      {isSuperAdmin && <PendingClearRequestsBanner />}
+
       <ChristmasPayoutSection />
       <SharesCreditSection />
-      <ResetDataSection />
+
+      {/* Super admins can wipe directly; regular admins submit a request */}
+      {isSuperAdmin ? <ResetDataSection /> : <RequestDataClearSection />}
     </div>
   );
 }
