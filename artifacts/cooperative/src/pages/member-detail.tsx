@@ -90,8 +90,7 @@ export function MemberDetailPage() {
     currentUser?.role === "treasurer" || currentUser?.role === "super_admin";
   const canLink =
     (currentUser?.role === "admin" || currentUser?.role === "super_admin") &&
-    member?.status === "active" &&
-    isAllZeroBalance(member);
+    !!(member as any)?.canBeRetroactivelyLinked;
 
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [, navigate] = useLocation();

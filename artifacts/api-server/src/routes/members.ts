@@ -428,18 +428,41 @@ router.get("/members/:id", requireAuth, async (req: AuthRequest, res): Promise<v
 
   const formatted = formatMember(member);
 
+  // Compute retroactive-link eligibility from raw DB values (before any masking).
+  // A member can be retroactively linked only when they were approved as a brand-new
+  // zero-balance account AND have never received any financial transactions.
+  const BALANCE_KEYS = [
+    "sharesBalance", "savingsBalance", "providentBalance", "christmasBalance",
+    "realLoanBalance", "emergencyLoanBalance", "totalLoanBalance",
+    "electronicsDebt", "sElectronicsDebt", "furnitureDebt", "commodityDebt",
+    "ghlFormDebt", "fireFundBalance", "totalStoreDebt", "fuelVentureBalance", "landLoanBalance",
+  ] as const;
+  const allBalancesZero =
+    member.clerkUserId !== null &&
+    member.status === "active" &&
+    BALANCE_KEYS.every((k) => parseFloat((member as any)[k] ?? "0") === 0);
+
+  let canBeRetroactivelyLinked = false;
+  if (allBalancesZero) {
+    const [txnCount] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(transactionsTable)
+      .where(eq(transactionsTable.memberId, id));
+    canBeRetroactivelyLinked = (txnCount?.count ?? 1) === 0;
+  }
+
   // Mask balances for regular members when super-admin has enabled balance hiding.
   if (req.memberRole === "member") {
     const [settings] = await db
       .select({ balancesHidden: systemSettingsTable.balancesHidden })
       .from(systemSettingsTable);
     if (settings?.balancesHidden) {
-      res.json(maskMemberBalances(formatted));
+      res.json({ ...maskMemberBalances(formatted), canBeRetroactivelyLinked });
       return;
     }
   }
 
-  res.json(formatted);
+  res.json({ ...formatted, canBeRetroactivelyLinked });
 });
 
 router.patch(
