@@ -10,6 +10,7 @@ import {
   stepUpGrantsTable,
   uploadRecordsTable,
   organizationsTable,
+  auditLogsTable,
 } from "@workspace/db";
 import { eq, ilike, or, and, sql, isNull, isNotNull } from "drizzle-orm";
 import {
@@ -428,28 +429,22 @@ router.get("/members/:id", requireAuth, async (req: AuthRequest, res): Promise<v
 
   const formatted = formatMember(member);
 
-  // Compute retroactive-link eligibility from raw DB values (before any masking).
-  // A member can be retroactively linked only when they were approved as a brand-new
-  // zero-balance account AND have never received any financial transactions.
-  const BALANCE_KEYS = [
-    "sharesBalance", "savingsBalance", "providentBalance", "christmasBalance",
-    "realLoanBalance", "emergencyLoanBalance", "totalLoanBalance",
-    "electronicsDebt", "sElectronicsDebt", "furnitureDebt", "commodityDebt",
-    "ghlFormDebt", "fireFundBalance", "totalStoreDebt", "fuelVentureBalance", "landLoanBalance",
-  ] as const;
-  const allBalancesZero =
-    member.clerkUserId !== null &&
-    member.status === "active" &&
-    BALANCE_KEYS.every((k) => parseFloat((member as any)[k] ?? "0") === 0);
-
-  let canBeRetroactivelyLinked = false;
-  if (allBalancesZero) {
-    const [txnCount] = await db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(transactionsTable)
-      .where(eq(transactionsTable.memberId, id));
-    canBeRetroactivelyLinked = (txnCount?.count ?? 1) === 0;
-  }
+  // A member can be retroactively linked only if they were approved as a brand-new
+  // zero-balance account (APPROVE_SIGNUP_NEW audit entry exists for this member ID).
+  // Members approved via match-to-existing-record have APPROVE_SIGNUP_MATCH instead
+  // and must never show this banner regardless of their current balance state.
+  const [newApprovalAudit] = await db
+    .select({ id: auditLogsTable.id })
+    .from(auditLogsTable)
+    .where(
+      and(
+        eq(auditLogsTable.entity, "member"),
+        eq(auditLogsTable.entityId, id),
+        eq(auditLogsTable.action, "APPROVE_SIGNUP_NEW"),
+      ),
+    )
+    .limit(1);
+  const canBeRetroactivelyLinked = !!newApprovalAudit;
 
   // Mask balances for regular members when super-admin has enabled balance hiding.
   if (req.memberRole === "member") {
