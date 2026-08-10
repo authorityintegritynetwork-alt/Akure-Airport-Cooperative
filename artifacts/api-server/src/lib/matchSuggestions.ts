@@ -7,9 +7,13 @@ export interface MatchSuggestionDTO {
   fullName: string;
   organization: string | null;
   staffId: string | null;
+  /** The employee number from the cooperative record (from deduction uploads). */
+  employeeNo: string | null;
   phone: string | null;
   memberType: "staff" | "pensioner" | null;
   confidence: "exact" | "fuzzy" | "none";
+  /** True when this record was pinned to the top because its employee_no matched the member's submitted staff ID. */
+  matchedById: boolean;
   savingsBalance: number;
   totalLoanBalance: number;
   totalStoreDebt: number;
@@ -38,6 +42,8 @@ export function computeMatchSuggestionsFromRecords(
   organization?: string | null,
   limit = 6,
   includeFinancials = true,
+  /** The staff/employee number submitted by the member at sign-up. Used to cross-reference against employee_no in cooperative records. */
+  signupStaffId?: string | null,
 ): MatchSuggestionDTO[] {
   // Filter by org client-side — records are already loaded.
   const records = organization
@@ -54,14 +60,17 @@ export function computeMatchSuggestionsFromRecords(
   const toDTO = (
     r: any,
     confidence: MatchSuggestionDTO["confidence"],
+    matchedById = false,
   ): MatchSuggestionDTO => ({
     recordId: r.id,
     fullName: r.fullName,
     organization: r.organization,
-    staffId: r.staffId,
+    staffId: r.staffId ?? null,
+    employeeNo: r.employeeNo ?? null,
     phone: r.phone ?? null,
     memberType: (r.memberType as "staff" | "pensioner" | null) ?? null,
     confidence,
+    matchedById,
     savingsBalance: includeFinancials ? parseFloat(r.savingsBalance) : 0,
     totalLoanBalance: includeFinancials ? parseFloat(r.totalLoanBalance) : 0,
     totalStoreDebt: includeFinancials ? parseFloat(r.totalStoreDebt) : 0,
@@ -70,8 +79,25 @@ export function computeMatchSuggestionsFromRecords(
   const out: MatchSuggestionDTO[] = [];
   const seen = new Set<number>();
 
+  // ── Step 1: Employee-number cross-reference (highest priority) ────────────
+  // If the member entered a staff/employee number at sign-up and it matches
+  // a cooperative record's employee_no exactly, pin that record first with
+  // exact confidence and flag it as ID-confirmed.
+  if (signupStaffId?.trim()) {
+    const normalised = signupStaffId.trim().replace(/^0+/, ""); // strip leading zeros for loose match
+    for (const r of records as any[]) {
+      const recNo = (r.employeeNo ?? "").trim().replace(/^0+/, "");
+      if (recNo && recNo === normalised) {
+        out.push(toDTO(r, "exact", true));
+        seen.add(r.id);
+        break; // employee numbers should be unique
+      }
+    }
+  }
+
+  // ── Step 2: Name-based matching ───────────────────────────────────────────
   const best = matcher.match(fullName);
-  if (best.memberId != null) {
+  if (best.memberId != null && !seen.has(best.memberId)) {
     const r = byId.get(best.memberId);
     if (r) {
       out.push(toDTO(r, best.confidence === "exact" ? "exact" : "fuzzy"));
@@ -79,6 +105,7 @@ export function computeMatchSuggestionsFromRecords(
     }
   }
 
+  // ── Step 3: Token-overlap fallback ────────────────────────────────────────
   const wantTokens = new Set(tokenize(fullName));
   for (const r of records as any[]) {
     if (seen.has(r.id)) continue;

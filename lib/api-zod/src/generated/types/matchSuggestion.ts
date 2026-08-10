@@ -14,11 +14,15 @@ export interface MatchSuggestion {
   organization?: string | null;
   /** @nullable */
   staffId?: string | null;
+  /** Employee number from the cooperative record (deduction uploads). @nullable */
+  employeeNo?: string | null;
   /** @nullable */
   phone?: string | null;
   /** @nullable */
   memberType?: "staff" | "pensioner" | null;
   confidence: MatchSuggestionConfidence;
+  /** True when this record was pinned because its employee_no matched the member's submitted staff ID. */
+  matchedById?: boolean;
   savingsBalance: number;
   totalLoanBalance: number;
   totalStoreDebt: number;

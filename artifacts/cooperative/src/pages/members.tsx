@@ -1074,7 +1074,14 @@ export function MembersPage() {
   );
 }
 
-function confidenceBadge(confidence: MatchSuggestion["confidence"]) {
+function confidenceBadge(confidence: MatchSuggestion["confidence"], matchedById?: boolean) {
+  if (matchedById) {
+    return (
+      <Badge variant="default" className="text-[10px] rounded-full px-2 bg-emerald-600 hover:bg-emerald-600 gap-1">
+        <span>✓ ID confirmed</span>
+      </Badge>
+    );
+  }
   const map: Record<string, { variant: "default" | "secondary" | "outline"; label: string }> = {
     exact: { variant: "default", label: "Strong match" },
     fuzzy: { variant: "secondary", label: "Possible match" },
@@ -1141,7 +1148,7 @@ function PendingSignupsList({
                       ID {s.staffId}
                     </Badge>
                   )}
-                  {top ? confidenceBadge(top.confidence) : (
+                  {top ? confidenceBadge(top.confidence, top.matchedById) : (
                     <Badge variant="outline" className="text-[10px] rounded-full px-2">
                       No match found
                     </Badge>
@@ -1386,11 +1393,11 @@ function ReviewSignupDialog({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-sm">{sug.fullName}</span>
-                        {confidenceBadge(sug.confidence)}
+                        {confidenceBadge(sug.confidence, sug.matchedById)}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {sug.organization || "—"}
-                        {sug.staffId ? ` · ID ${sug.staffId}` : ""}
+                        {(sug.employeeNo || sug.staffId) ? ` · No. ${sug.employeeNo ?? sug.staffId}` : ""}
                         {" · "}{formatCurrency(sug.savingsBalance)} savings
                       </p>
                     </button>

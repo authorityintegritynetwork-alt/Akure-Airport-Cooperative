@@ -162,6 +162,9 @@ router.get(
         unlinkedRecords,
         s.pendingName ?? s.fullName,
         s.organization,
+        6,
+        true,
+        s.staffId, // cross-reference member's entered number against employee_no
       ),
     }));
 
