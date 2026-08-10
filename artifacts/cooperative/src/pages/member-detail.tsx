@@ -431,7 +431,7 @@ function isAllZeroBalance(member: any): boolean {
     member.ghlFormDebt,
     member.fireFundBalance,
     member.totalStoreDebt,
-  ].every((v) => (v ?? 0) === 0);
+  ].every((v) => parseFloat(v ?? "0") === 0);
 }
 
 // ── Link cooperative record dialog ────────────────────────────────────────────
