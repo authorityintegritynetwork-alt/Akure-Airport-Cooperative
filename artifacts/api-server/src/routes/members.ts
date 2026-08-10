@@ -6,6 +6,8 @@ import {
   loansTable,
   storePurchasesTable,
   notificationsTable,
+  otpCodesTable,
+  stepUpGrantsTable,
   uploadRecordsTable,
   organizationsTable,
 } from "@workspace/db";
@@ -224,7 +226,9 @@ router.get(
         or(
           ilike(membersTable.fullName, `%${q}%`),
           ilike(membersTable.staffId, `%${q}%`),
+          ilike(membersTable.employeeNo, `%${q}%`),
           ilike(membersTable.email, `%${q}%`),
+          ilike(membersTable.phone, `%${q}%`),
         )!,
       )
       .limit(limit);
@@ -1106,8 +1110,16 @@ router.post(
         }
 
         // Both rows are locked, validated, and confirmed history-free.
-        // Delete source first to avoid unique-constraint conflicts (email/staffId)
-        // when we copy identity fields onto the target.
+        // Explicitly delete transient FK-referenced rows whose DB constraints are
+        // NO ACTION (not CASCADE as the schema intends — the actual DB constraints
+        // differ from the Drizzle schema definition).
+        await tx.delete(notificationsTable).where(eq(notificationsTable.memberId, id));
+        await tx.delete(stepUpGrantsTable).where(eq(stepUpGrantsTable.memberId, id));
+        await tx.delete(otpCodesTable).where(eq(otpCodesTable.memberId, id));
+
+        // Delete source member row. Done after transient rows to avoid FK errors.
+        // Also done before updating the target to avoid unique-constraint conflicts
+        // (email/staffId) when we copy identity fields onto the target.
         await tx.delete(membersTable).where(eq(membersTable.id, id));
 
         const [updated] = await tx
