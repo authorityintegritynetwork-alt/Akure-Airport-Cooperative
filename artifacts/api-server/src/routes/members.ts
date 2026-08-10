@@ -38,7 +38,7 @@ import { inArray } from "drizzle-orm";
 const router: IRouter = Router();
 
 import { formatMember, maskMemberBalances } from "../lib/formatMember";
-import { computeMatchSuggestions } from "../lib/matchSuggestions";
+import { computeMatchSuggestions, computeMatchSuggestionsFromRecords } from "../lib/matchSuggestions";
 import { requireAdminOnly } from "../middlewares/auth";
 import { ApproveMatchBody } from "@workspace/api-zod";
 import { sendMail } from "../lib/mailer";
@@ -125,34 +125,45 @@ router.get(
   requireAuth,
   requireAdmin,
   async (_req: AuthRequest, res): Promise<void> => {
-    const signups = await db
-      .select()
-      .from(membersTable)
-      .where(
-        and(
-          isNotNull(membersTable.pendingClerkUserId),
-          isNull(membersTable.clerkUserId),
+    // Fetch pending signups and all unlinked cooperative records in parallel.
+    // The unlinked records are reused for every signup's match suggestions so
+    // we do ONE scan of the members table instead of N (one per signup).
+    const [signups, unlinkedRecords] = await Promise.all([
+      db
+        .select()
+        .from(membersTable)
+        .where(
+          and(
+            isNotNull(membersTable.pendingClerkUserId),
+            isNull(membersTable.clerkUserId),
+          ),
         ),
-      );
+      db
+        .select()
+        .from(membersTable)
+        .where(
+          and(
+            isNull(membersTable.clerkUserId),
+            isNull(membersTable.pendingClerkUserId),
+          ),
+        ),
+    ]);
 
-    const result = [];
-    for (const s of signups) {
-      const suggestions = await computeMatchSuggestions(
+    const result = signups.map((s) => ({
+      id: s.id,
+      fullName: s.fullName,
+      pendingName: s.pendingName,
+      pendingEmail: s.pendingEmail,
+      organization: s.organization,
+      staffId: s.staffId,
+      phone: s.phone,
+      createdAt: s.createdAt,
+      suggestions: computeMatchSuggestionsFromRecords(
+        unlinkedRecords,
         s.pendingName ?? s.fullName,
         s.organization,
-      );
-      result.push({
-        id: s.id,
-        fullName: s.fullName,
-        pendingName: s.pendingName,
-        pendingEmail: s.pendingEmail,
-        organization: s.organization,
-        staffId: s.staffId,
-        phone: s.phone,
-        createdAt: s.createdAt,
-        suggestions,
-      });
-    }
+      ),
+    }));
 
     res.json(result);
   },
