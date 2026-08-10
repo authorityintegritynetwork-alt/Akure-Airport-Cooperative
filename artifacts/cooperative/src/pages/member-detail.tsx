@@ -8,13 +8,18 @@ import {
   useListLoans,
   useListStorePurchases,
   useGetProfile,
+  useSearchAllMembers,
+  useLinkCooperativeRecord,
   getGetMemberQueryKey,
+  getSearchAllMembersQueryKey,
   getGetMemberSummaryQueryKey,
   getGetMemberBalanceTimelineQueryKey,
   getListTransactionsQueryKey,
   getListLoansQueryKey,
   getListStorePurchasesQueryKey,
+  type SearchAllMembersResponseItem,
 } from "@workspace/api-client-react";
+import { useStepUpAction } from "@/lib/step-up";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +37,8 @@ import {
   Wrench,
   Landmark,
   Table2,
+  Link2,
+  Search,
 } from "lucide-react";
 import {
   Dialog,
@@ -81,7 +88,12 @@ export function MemberDetailPage() {
   const { data: currentUser } = useGetProfile();
   const canAdjust =
     currentUser?.role === "treasurer" || currentUser?.role === "super_admin";
+  const canLink =
+    (currentUser?.role === "admin" || currentUser?.role === "super_admin") &&
+    member?.status === "active" &&
+    isAllZeroBalance(member);
 
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [, navigate] = useLocation();
 
   // Pending sign-ups should be managed exclusively from the Pending Sign-ups
@@ -218,6 +230,33 @@ export function MemberDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Zero-balance link banner — only shown to admins when member has no history */}
+      {canLink && (
+        <Card className="rounded-2xl border-amber-200/60 bg-amber-50/50 dark:bg-amber-500/5 dark:border-amber-400/20 shadow-sm">
+          <CardContent className="p-4 flex items-start gap-3">
+            <Link2 className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                No cooperative record linked
+              </p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mt-0.5">
+                This member was approved with zero balance. If they have existing savings or loan history, link their cooperative record now.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 rounded-xl border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/10"
+              onClick={() => setLinkDialogOpen(true)}
+              data-testid="button-link-cooperative-record"
+            >
+              <Link2 className="w-3.5 h-3.5 mr-1.5" />
+              Link record
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Per-product balance breakdown */}
       <PerProductBalances member={member} memberId={memberId} canAdjust={canAdjust} />
@@ -357,7 +396,252 @@ export function MemberDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {canLink && (
+        <LinkCooperativeRecordDialog
+          memberId={memberId}
+          open={linkDialogOpen}
+          onOpenChange={setLinkDialogOpen}
+          onLinked={(newId) => {
+            setLinkDialogOpen(false);
+            navigate(`/members/${newId}`, { replace: true });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Helper: are ALL balance columns zero? ─────────────────────────────────────
+function isAllZeroBalance(member: any): boolean {
+  return [
+    member.sharesBalance,
+    member.savingsBalance,
+    member.providentBalance,
+    member.christmasBalance,
+    member.realLoanBalance,
+    member.emergencyLoanBalance,
+    member.fuelVentureBalance,
+    member.landLoanBalance,
+    member.totalLoanBalance,
+    member.electronicsDebt,
+    member.sElectronicsDebt,
+    member.furnitureDebt,
+    member.commodityDebt,
+    member.ghlFormDebt,
+    member.fireFundBalance,
+    member.totalStoreDebt,
+  ].every((v) => (v ?? 0) === 0);
+}
+
+// ── Link cooperative record dialog ────────────────────────────────────────────
+function LinkCooperativeRecordDialog({
+  memberId,
+  open,
+  onOpenChange,
+  onLinked,
+}: {
+  memberId: number;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onLinked: (newId: number) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selectedRecord, setSelectedRecord] =
+    useState<SearchAllMembersResponseItem | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Full record details (for savings balance preview in confirm step)
+  const { data: selectedFull } = useGetMember(selectedRecord?.id ?? 0, {
+    query: {
+      enabled: !!selectedRecord?.id,
+      queryKey: getGetMemberQueryKey(selectedRecord?.id ?? 0),
+    },
+  });
+
+  const { data: searchResults, isFetching: isSearching } = useSearchAllMembers(
+    { q: debouncedQuery },
+    {
+      query: {
+        enabled: debouncedQuery.length >= 2,
+        queryKey: getSearchAllMembersQueryKey({ q: debouncedQuery }),
+      },
+    },
+  );
+
+  const linkMutation = useLinkCooperativeRecord();
+  const linkWithStepUp = useStepUpAction(
+    (cooperativeRecordId: number) =>
+      linkMutation.mutateAsync({ id: memberId, data: { cooperativeRecordId } }),
+  );
+
+  function resetDialog() {
+    setSelectedRecord(null);
+    setSearchQuery("");
+    setDebouncedQuery("");
+  }
+
+  async function handleConfirm() {
+    if (!selectedRecord) return;
+    try {
+      const result = await linkWithStepUp(selectedRecord.id);
+      onLinked(result.id);
+    } catch (err: any) {
+      toast({
+        title: "Link failed",
+        description:
+          err?.response?.data?.error ?? err?.message ?? "Something went wrong.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  const isSearchMode = debouncedQuery.length >= 2;
+  const unlinkedResults = (searchResults ?? []).filter((r) => !r.isLinked);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) resetDialog();
+      }}
+    >
+      <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Link to cooperative record</DialogTitle>
+          <DialogDescription>
+            Search for the member's existing cooperative record to transfer their savings and loan history onto this account.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!selectedRecord ? (
+          /* ── Search step ── */
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9 h-9 text-sm"
+                placeholder="Search by name, ID or phone…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {isSearchMode ? (
+              isSearching ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 rounded-xl" />
+                  ))}
+                </div>
+              ) : unlinkedResults.length > 0 ? (
+                <div className="space-y-2">
+                  {unlinkedResults.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setSelectedRecord(r)}
+                      className="w-full text-left border rounded-xl p-3 transition border-border hover:border-primary/50 hover:bg-muted/30"
+                    >
+                      <p className="font-medium text-sm">{r.fullName}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {r.organization || "—"}
+                        {r.staffId ? ` · ID ${r.staffId}` : ""}
+                        {r.phone ? ` · ${r.phone}` : ""}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  No unclaimed records found for "{debouncedQuery}"
+                </p>
+              )
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                Type at least 2 characters to search all cooperative records.
+              </p>
+            )}
+          </div>
+        ) : (
+          /* ── Confirm step ── */
+          <div className="space-y-4">
+            {/* Selected record summary */}
+            <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Selected cooperative record
+              </p>
+              <p className="font-semibold">{selectedRecord.fullName}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedRecord.organization || "—"}
+                {selectedRecord.staffId ? ` · ID ${selectedRecord.staffId}` : ""}
+                {selectedRecord.phone ? ` · ${selectedRecord.phone}` : ""}
+              </p>
+              {selectedFull && (
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs border-t border-border/40 pt-2">
+                  <span className="text-muted-foreground">Savings balance</span>
+                  <span className="font-semibold tabular-nums text-right">
+                    {formatCurrency(selectedFull.savingsBalance)}
+                  </span>
+                  {(selectedFull.totalLoanBalance ?? 0) > 0 && (
+                    <>
+                      <span className="text-muted-foreground">Loan balance</span>
+                      <span className="font-semibold tabular-nums text-right">
+                        {formatCurrency(selectedFull.totalLoanBalance)}
+                      </span>
+                    </>
+                  )}
+                  {selectedFull.employeeNo && (
+                    <>
+                      <span className="text-muted-foreground">Employee No.</span>
+                      <span className="font-semibold text-right">
+                        {selectedFull.employeeNo}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Warning */}
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-400/20 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+              <p className="font-semibold">⚠️ This action cannot be undone</p>
+              <p>
+                The member's current zero-balance account will be permanently deleted and replaced by this cooperative record. Their login access will be preserved.
+              </p>
+            </div>
+
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setSelectedRecord(null)}
+                disabled={linkMutation.isPending}
+              >
+                ← Change record
+              </Button>
+              <Button
+                className="rounded-xl"
+                onClick={handleConfirm}
+                disabled={linkMutation.isPending}
+                data-testid="button-confirm-link"
+              >
+                <Link2 className="w-3.5 h-3.5 mr-1.5" />
+                {linkMutation.isPending ? "Linking…" : "Confirm & link"}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -593,11 +877,11 @@ function MiniProductTile({
         {label}
       </p>
       <p className="text-sm font-bold tabular-nums mt-0.5 truncate">
-        {formatCurrency(value)}
+        {formatCurrency(Number(value))}
       </p>
       {ob != null && parseFloat(String(ob)) > 0 && (
         <p className="text-[9px] text-muted-foreground mt-0.5 tabular-nums">
-          OB: {formatCurrency(ob)}
+          OB: {formatCurrency(Number(ob))}
         </p>
       )}
     </div>

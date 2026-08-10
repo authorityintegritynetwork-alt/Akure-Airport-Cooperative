@@ -40,7 +40,7 @@ const router: IRouter = Router();
 import { formatMember, maskMemberBalances } from "../lib/formatMember";
 import { computeMatchSuggestions, computeMatchSuggestionsFromRecords } from "../lib/matchSuggestions";
 import { requireAdminOnly } from "../middlewares/auth";
-import { ApproveMatchBody } from "@workspace/api-zod";
+import { ApproveMatchBody, LinkCooperativeRecordBody } from "@workspace/api-zod";
 import { sendMail } from "../lib/mailer";
 import { systemSettingsTable } from "@workspace/db";
 
@@ -931,6 +931,231 @@ router.post(
     });
 
     res.json({ rejected: true });
+  },
+);
+
+router.post(
+  "/members/:id/link-cooperative-record",
+  requireAuth,
+  requireAdminOnly,
+  requireReverification,
+  async (req: AuthRequest, res): Promise<void> => {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid member id" }); return; }
+
+    const parsed = LinkCooperativeRecordBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const { cooperativeRecordId } = parsed.data;
+
+    // Forbid self-linking: the actor's own member row would be deleted,
+    // breaking their auth resolution on the very next request.
+    if (id === req.memberId) {
+      res.status(400).json({
+        error:
+          "You cannot link your own account. Ask another admin to perform this action.",
+      });
+      return;
+    }
+
+    // Load the already-approved member
+    const [member] = await db.select().from(membersTable).where(eq(membersTable.id, id));
+    if (!member || !member.clerkUserId) {
+      res.status(404).json({ error: "Approved member not found" });
+      return;
+    }
+    if (member.status !== "active") {
+      res.status(409).json({
+        error: "Only active members can be retroactively linked.",
+      });
+      return;
+    }
+
+    // Only allow linking when ALL balance columns are zero — the signal that
+    // the member was approved as a brand-new account with no history.
+    const BALANCE_COLS = [
+      "sharesBalance", "savingsBalance", "providentBalance", "christmasBalance",
+      "realLoanBalance", "emergencyLoanBalance", "totalLoanBalance",
+      "electronicsDebt", "sElectronicsDebt", "furnitureDebt", "commodityDebt",
+      "ghlFormDebt", "fireFundBalance", "totalStoreDebt", "fuelVentureBalance", "landLoanBalance",
+    ] as const;
+    const allZero = BALANCE_COLS.every(
+      (col) => parseFloat((member as any)[col] ?? "0") === 0,
+    );
+    if (!allZero) {
+      res.status(409).json({
+        error:
+          "This member already has balance data and cannot be retroactively linked. Contact a super admin if a manual merge is needed.",
+      });
+      return;
+    }
+
+    // Load and validate the cooperative record
+    const [record] = await db
+      .select()
+      .from(membersTable)
+      .where(eq(membersTable.id, cooperativeRecordId));
+    if (!record) {
+      res.status(404).json({ error: "Cooperative record not found" });
+      return;
+    }
+    if (record.clerkUserId || record.pendingClerkUserId) {
+      res.status(409).json({
+        error: "That cooperative record is already linked to an app account.",
+      });
+      return;
+    }
+
+    // Atomically: lock both rows (consistent low→high ID order to prevent
+    // deadlocks), re-validate all conditions under the lock, then delete the
+    // zero-balance source and promote the cooperative record target.
+    // Locking before any mutation closes the concurrent-approve race and the
+    // concurrent-balance-adjustment race.
+    const firstId = Math.min(id, cooperativeRecordId);
+    const secondId = Math.max(id, cooperativeRecordId);
+
+    type LinkResult =
+      | { ok: true; member: typeof record }
+      | { ok: false; status: number; error: string };
+    let result: LinkResult;
+    try {
+      result = await db.transaction(async (tx): Promise<LinkResult> => {
+        // Acquire exclusive locks in consistent order to prevent deadlocks.
+        const [first] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, firstId))
+          .for("update");
+        const [second] = await tx
+          .select()
+          .from(membersTable)
+          .where(eq(membersTable.id, secondId))
+          .for("update");
+
+        // Map the locked rows back to source / target.
+        const lockedSource = firstId === id ? first : second;
+        const lockedTarget = firstId === cooperativeRecordId ? first : second;
+
+        // Re-validate source: must still be a Clerk-linked, active member with zero balances.
+        if (!lockedSource || !lockedSource.clerkUserId) {
+          return { ok: false, status: 404, error: "Approved member not found" };
+        }
+        if (lockedSource.status !== "active") {
+          return {
+            ok: false,
+            status: 409,
+            error: "Only active members can be retroactively linked.",
+          };
+        }
+        const allZeroNow = BALANCE_COLS.every(
+          (col) => parseFloat((lockedSource as any)[col] ?? "0") === 0,
+        );
+        if (!allZeroNow) {
+          return {
+            ok: false,
+            status: 409,
+            error:
+              "This member's balance was modified concurrently. Retroactive linking is no longer safe.",
+          };
+        }
+
+        // Re-validate target: must still be unclaimed.
+        if (!lockedTarget) {
+          return { ok: false, status: 404, error: "Cooperative record not found" };
+        }
+        if (lockedTarget.clerkUserId || lockedTarget.pendingClerkUserId) {
+          return {
+            ok: false,
+            status: 409,
+            error: "That cooperative record is already linked to an app account.",
+          };
+        }
+
+        // Check for any RESTRICT FK references on the source row. Deletion
+        // would fail on these, and a raw PG FK error is unhelpful. We check
+        // all RESTRICT-constrained tables explicitly and return a clear 409.
+        // (notifications, otp_codes, and step_up_grants are ON DELETE CASCADE
+        //  and will be cleaned up automatically — they are not checked here.)
+        const histResult = await tx.execute(sql`
+          SELECT
+            (SELECT COUNT(*) FROM transactions         WHERE member_id = ${id})::int         AS txn,
+            (SELECT COUNT(*) FROM loans                WHERE member_id = ${id})::int         AS loan,
+            (SELECT COUNT(*) FROM store_purchases      WHERE member_id = ${id})::int         AS purchase,
+            (SELECT COUNT(*) FROM support_tickets      WHERE member_id = ${id})::int                   AS ticket,
+            (SELECT COUNT(*) FROM support_tickets      WHERE assigned_to_member_id = ${id})::int       AS assigned_ticket,
+            (SELECT COUNT(*) FROM support_messages     WHERE sender_member_id = ${id})::int            AS message,
+            (SELECT COUNT(*) FROM broadcasts           WHERE sender_member_id = ${id})::int  AS broadcast,
+            (SELECT COUNT(*) FROM upload_records       WHERE uploaded_by = ${id})::int       AS upload,
+            (SELECT COUNT(*) FROM opening_balance_imports WHERE uploaded_by = ${id})::int   AS ob_import
+        `);
+        const h = histResult.rows[0] as any;
+        const hasHistory =
+          h.txn > 0 || h.loan > 0 || h.purchase > 0 ||
+          h.ticket > 0 || h.assigned_ticket > 0 ||
+          h.message > 0 || h.broadcast > 0 || h.upload > 0 || h.ob_import > 0;
+        if (hasHistory) {
+          return {
+            ok: false,
+            status: 409,
+            error:
+              "This member has activity history (transactions, support tickets, uploads, etc.) that prevents retroactive linking. A super admin must perform this merge manually.",
+          };
+        }
+
+        // Both rows are locked, validated, and confirmed history-free.
+        // Delete source first to avoid unique-constraint conflicts (email/staffId)
+        // when we copy identity fields onto the target.
+        await tx.delete(membersTable).where(eq(membersTable.id, id));
+
+        const [updated] = await tx
+          .update(membersTable)
+          .set({
+            clerkUserId: lockedSource.clerkUserId,
+            email: lockedSource.email,
+            role: lockedSource.role,   // preserve source's admin/member role
+            status: "active",
+          })
+          .where(eq(membersTable.id, cooperativeRecordId))
+          .returning();
+
+        return { ok: true, member: updated };
+      });
+    } catch (err: any) {
+      const code = err?.code ?? err?.cause?.code;
+      if (code === "23505") {
+        res.status(409).json({
+          error: "This account or email is already linked to a member.",
+        });
+        return;
+      }
+      if (code === "23503") {
+        // FK violation — a reference we didn't anticipate; surface clearly.
+        res.status(409).json({
+          error:
+            "This member has related records that prevent deletion. A super admin must perform this merge manually.",
+        });
+        return;
+      }
+      throw err;
+    }
+
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+
+    await logAudit({
+      actorId: req.memberId,
+      action: "LINK_COOPERATIVE_RECORD",
+      entity: "member",
+      entityId: result.member.id,
+      details: `Retroactively linked approved member "${member.fullName}" (id ${id}) to cooperative record: ${result.member.fullName} (id ${cooperativeRecordId})`,
+    });
+
+    res.json(formatMember(result.member));
   },
 );
 

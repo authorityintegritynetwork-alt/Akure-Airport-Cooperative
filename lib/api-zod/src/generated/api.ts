@@ -711,6 +711,17 @@ export const ApproveMatchParams = zod.object({
   id: zod.coerce.number(),
 });
 
+/**
+ * @summary Retroactively link an already-approved zero-balance member to an existing cooperative record (Admin only, step-up)
+ */
+export const LinkCooperativeRecordParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const LinkCooperativeRecordBody = zod.object({
+  cooperativeRecordId: zod.number().int().positive(),
+});
+
 export const ApproveMatchBody = zod.object({
   cooperativeRecordId: zod.number().nullish(),
   overrides: zod

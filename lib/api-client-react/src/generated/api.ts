@@ -102,6 +102,7 @@ import type {
   VerifyStepUpCodeBody,
   SearchAllMembersResponseItem,
   CreateBlankCooperativeRecordBody,
+  LinkCooperativeRecordBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -2166,6 +2167,89 @@ export const useRejectMatch = <
   TContext
 > => {
   return useMutation(getRejectMatchMutationOptions(options));
+};
+
+/**
+ * @summary Retroactively link an already-approved zero-balance member to an existing cooperative record (Admin only, step-up)
+ */
+export const getLinkCooperativeRecordUrl = (id: number) => {
+  return `/api/members/${id}/link-cooperative-record`;
+};
+
+export const linkCooperativeRecord = async (
+  id: number,
+  linkCooperativeRecordBody: LinkCooperativeRecordBody,
+  options?: RequestInit,
+): Promise<Member> => {
+  return customFetch<Member>(getLinkCooperativeRecordUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(linkCooperativeRecordBody),
+  });
+};
+
+export const getLinkCooperativeRecordMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkCooperativeRecord>>,
+    TError,
+    { id: number; data: BodyType<LinkCooperativeRecordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof linkCooperativeRecord>>,
+  TError,
+  { id: number; data: BodyType<LinkCooperativeRecordBody> },
+  TContext
+> => {
+  const mutationKey = ["linkCooperativeRecord"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof linkCooperativeRecord>>,
+    { id: number; data: BodyType<LinkCooperativeRecordBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+    return linkCooperativeRecord(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LinkCooperativeRecordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof linkCooperativeRecord>>
+>;
+export type LinkCooperativeRecordMutationBody = BodyType<LinkCooperativeRecordBody>;
+export type LinkCooperativeRecordMutationError = ErrorType<void>;
+
+export const useLinkCooperativeRecord = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkCooperativeRecord>>,
+    TError,
+    { id: number; data: BodyType<LinkCooperativeRecordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof linkCooperativeRecord>>,
+  TError,
+  { id: number; data: BodyType<LinkCooperativeRecordBody> },
+  TContext
+> => {
+  return useMutation(getLinkCooperativeRecordMutationOptions(options));
 };
 
 /**

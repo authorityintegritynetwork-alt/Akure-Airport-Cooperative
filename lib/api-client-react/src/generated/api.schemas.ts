@@ -313,6 +313,10 @@ export interface PendingSignup {
   suggestions: MatchSuggestion[];
 }
 
+export interface LinkCooperativeRecordBody {
+  cooperativeRecordId: number;
+}
+
 export interface ApproveMatchBody {
   /** @nullable */
   cooperativeRecordId?: number | null;
