@@ -1,0 +1,81 @@
+Build ready to start ▶️
+>> Cloning github.com/authorityintegritynetwork-alt/Akure-Airport-Cooperative.git commit sha 37d216f707892b1ee26b0f0e1c7255f5edd7f399 into /builder/workspace
+Initialized empty Git repository in /builder/workspace/.git/
+From https://github.com/authorityintegritynetwork-alt/Akure-Airport-Cooperative
+ * branch            37d216f707892b1ee26b0f0e1c7255f5edd7f399 -> FETCH_HEAD
+HEAD is now at 37d216f Refactor match suggestions and member routes with updated database exports
+Starting Docker daemon...
+Waiting for the Docker daemon to start...
+done
+Timer: Analyzer started at 2026-08-10T10:38:57Z
+Timer: Analyzer ran for 4.454249481s and ended at 2026-08-10T10:39:02Z
+Timer: Detector started at 2026-08-10T10:39:08Z
+4 of 5 buildpacks participating
+koyeb/build-command-nodejs 0.1.0
+heroku/nodejs-engine       3.6.5
+heroku/nodejs-corepack     3.6.5
+heroku/nodejs-pnpm-install 3.6.5
+Timer: Detector ran for 14.201560532s and ended at 2026-08-10T10:39:22Z
+Timer: Restorer started at 2026-08-10T10:39:24Z
+Skipping buildpack layer analysis
+Timer: Restorer ran for 1.228821249s and ended at 2026-08-10T10:39:25Z
+Timer: Builder started at 2026-08-10T10:39:35Z
+[INFO] Found custom build command: 'CI=true pnpm install && pnpm --filter @workspace/cooperative run build && pnpm --filter @workspace/api-server run build'
+
+[1;35m## Heroku Node.js Engine[0m
+
+- Checking Node.js version
+  - Node.js version not specified, using `[0;33m22.x[0m`
+  - Resolved Node.js version: `[0;33m22.15.1[0m`
+- Installing Node.js distribution
+  - Downloading Node.js `[0;33m22.15.1 (linux-amd64)[0m` from [1;4;36mhttps://nodejs.org/download/release/v22.15.1/node-v22.15.1-linux-x64.tar.gz[0m[2;1m .[0m[2;1m.[0m[2;1m. [0m(< 0.1s)
+  - Verifying checksum
+  - Extracting Node.js `[0;33m22.15.1 (linux-amd64)[0m`
+  - Installing Node.js `[0;33m22.15.1 (linux-amd64)[0m`[2;1m .[0m[2;1m.[0m[2;1m. [0m(< 0.1s)
+- Done (finished in 5.0s)
+
+[1;35m## Heroku Node.js Corepack[0m
+
+- Using Corepack version `[0;33m0.32.0[0m`
+- Found `[0;33mpackageManager[0m` set to `[0;33mpnpm@10.26.1[0m` in `[0;33mpackage.json[0m`
+- Enabling Corepack
+  - Creating Corepack shims
+  - Executing `[0;33m[1;36mcorepack enable --install-directory /layers/heroku_nodejs-corepack/shim/bin pnpm[0m`
+- Installing `[0;33mpnpm@10.26.1[0m`
+  - Creating Corepack package manager
+  - Running `[0;33m[1;36mcorepack prepare[0m`
+
+      Preparing pnpm@10.26.1...
+      Internal Error: Error when performing the request to https://registry.npmjs.org/pnpm/-/pnpm-10.26.1.tgz; for troubleshooting help, see https://github.com/nodejs/corepack#troubleshooting
+          at fetch (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:22051:11)
+          at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+          at async fetchUrlStream (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:22081:20)
+          at async download (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:22204:18)
+          at async installVersion (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:22296:55)
+          at async Engine.ensurePackageManager (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:22847:32)
+          at async PrepareCommand.execute (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:23567:27)
+          at async PrepareCommand.validateAndExecute (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:20258:22)
+          at async _Cli.run (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:21195:18)
+          at async Object.runMain (/layers/heroku_nodejs-engine/dist/lib/node_modules/corepack/dist/lib/corepack.cjs:23642:19)
+
+  - Done (15.2s)
+
+- [1;36mDebug Info:[0m
+  - Command failed `corepack prepare`
+    exit status: 1
+    stdout: <see above>
+    stderr: <see above>
+
+[0;31m! Failed to prepare Corepack[0m
+[0;31m![0m
+[0;31m! Unable to download package manager via `corepack prepare`.[0m
+[0;31m![0m
+[0;31m! The causes for this error are unknown. We do not have suggestions for diagnosis or a workaround at this time. You can help our understanding by sharing your buildpack log and a description of the issue at:[0m
+[0;31m! [1;4;36mhttps://github.com/heroku/buildpacks-nodejs/issues[0m
+[0;31m![0m
+[0;31m! If you're able to reproduce the problem with an example application and the `[0;33mpack[0m[0;31m` build tool ([1;4;36mhttps://buildpacks.io/docs/for-platform-operators/how-to/integrate-ci/pack/[0m[0;31m), adding that information to the discussion will also help. Once we have more information around the causes of this error we may update this message.[0m
+
+
+Timer: Builder ran for 1m16.875627443s and ended at 2026-08-10T10:40:52Z
+[31;1mERROR: [0mfailed to build: exit status 1
+Build failed ❌
