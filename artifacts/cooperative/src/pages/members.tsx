@@ -74,7 +74,6 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet";
-import { ClaimOpeningBalanceDialog } from "@/components/claim-opening-balance-dialog";
 
 const createMemberSchema = z.object({
   fullName: z.string().min(2, "Full name required"),
@@ -122,8 +121,11 @@ export function MembersPage() {
   const [editingMember, setEditingMember] = useState<any | null>(null);
   const [deletingMember, setDeletingMember] = useState<any | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [approvingMember, setApprovingMember] = useState<{ id: number; fullName: string } | null>(null);
-  const [tab, setTab] = useState<"members" | "pending">("members");
+  const initialTab = (() => {
+    const sp = new URLSearchParams(searchString);
+    return sp.get("tab") === "pending" ? "pending" : "members";
+  })();
+  const [tab, setTab] = useState<"members" | "pending">(initialTab);
   const [reviewSignup, setReviewSignup] = useState<PendingSignup | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const queryClient = useQueryClient();
@@ -848,17 +850,6 @@ export function MembersPage() {
                       <Eye className="w-3.5 h-3.5" /> View
                     </Button>
                   </Link>
-                  {member.status === "pending" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1 rounded-lg gap-1.5 text-xs h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                      onClick={() => setApprovingMember({ id: member.id, fullName: member.fullName })}
-                      data-testid={`button-activate-${member.id}`}
-                    >
-                      <UserCheck className="w-3.5 h-3.5" /> Approve
-                    </Button>
-                  )}
                   {member.status === "active" && (
                     <Button
                       variant="ghost"
@@ -1074,13 +1065,6 @@ export function MembersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ClaimOpeningBalanceDialog
-        member={approvingMember}
-        open={approvingMember != null}
-        onOpenChange={(v) => {
-          if (!v) setApprovingMember(null);
-        }}
-      />
     </div>
   );
 }

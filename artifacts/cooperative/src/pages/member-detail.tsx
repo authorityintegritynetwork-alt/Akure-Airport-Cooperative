@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useRoute } from "wouter";
+import { useState, useEffect } from "react";
+import { useRoute, useLocation } from "wouter";
 import {
   useGetMember,
   useGetMemberSummary,
@@ -81,6 +81,16 @@ export function MemberDetailPage() {
   const { data: currentUser } = useGetProfile();
   const canAdjust =
     currentUser?.role === "treasurer" || currentUser?.role === "super_admin";
+
+  const [, navigate] = useLocation();
+
+  // Pending sign-ups should be managed exclusively from the Pending Sign-ups
+  // tab. If an admin somehow navigates here for a pending member, send them back.
+  useEffect(() => {
+    if (member && member.status === "pending") {
+      navigate("/members?tab=pending", { replace: true });
+    }
+  }, [member, navigate]);
 
   if (!memberId) {
     return (

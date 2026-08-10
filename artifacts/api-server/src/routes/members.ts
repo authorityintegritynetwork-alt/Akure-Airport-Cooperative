@@ -84,16 +84,12 @@ router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res):
     return;
   }
 
-  // The Members section shows only app accounts: rows that are either linked
-  // to a Clerk identity (active members) or have a pending sign-up awaiting
-  // approval. Pure cooperative records (clerkUserId AND pendingClerkUserId both
-  // NULL) live in the separate Cooperative Records view.
-  const conditions: any[] = [
-    or(
-      isNotNull(membersTable.clerkUserId),
-      isNotNull(membersTable.pendingClerkUserId),
-    )!,
-  ];
+  // The Members section shows only fully-approved app accounts (rows with a
+  // Clerk identity assigned). Pending sign-ups (pendingClerkUserId set,
+  // clerkUserId NULL) are managed exclusively via the Pending Sign-ups tab and
+  // must NOT appear here. Pure cooperative records (both IDs NULL) remain in
+  // the separate Cooperative Records view.
+  const conditions: any[] = [isNotNull(membersTable.clerkUserId)];
 
   if (params.data.status) {
     conditions.push(eq(membersTable.status, params.data.status as any));
