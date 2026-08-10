@@ -139,6 +139,7 @@ export const ListMembersQueryParams = zod.object({
   status: zod.enum(["pending", "active", "inactive"]).optional(),
   organization: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
+  unlinked: zod.coerce.boolean().optional(),
 });
 
 export const ListMembersResponseItem = zod.object({
@@ -192,6 +193,7 @@ export const ListMembersResponseItem = zod.object({
   obTotalStoreDebt: zod.number().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  canBeRetroactivelyLinked: zod.boolean().optional(),
 });
 export const ListMembersResponse = zod.array(ListMembersResponseItem);
 

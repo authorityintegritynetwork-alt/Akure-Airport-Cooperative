@@ -43,6 +43,7 @@ export interface Member {
   organization: string;
   /** @nullable */
   employeeNo?: string | null;
+  canBeRetroactivelyLinked?: boolean;
   sharesBalance: number;
   savingsBalance: number;
   providentBalance: number;

@@ -117,6 +117,7 @@ export function MembersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [orgFilter, setOrgFilter] = useState<string>("");
+  const [unlinkedFilter, setUnlinkedFilter] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<any | null>(null);
   const [deletingMember, setDeletingMember] = useState<any | null>(null);
@@ -141,6 +142,7 @@ export function MembersPage() {
   if (search) params.search = search;
   if (statusFilter) params.status = statusFilter;
   if (orgFilter) params.organization = orgFilter;
+  if (unlinkedFilter) params.unlinked = "true";
 
   const { data: members, isLoading } = useListMembers(params, {
     query: { queryKey: getListMembersQueryKey(params) },
@@ -337,14 +339,15 @@ export function MembersPage() {
   }
 
   const totalCount = members?.length ?? 0;
-  const hasFilters = !!(search || statusFilter || orgFilter);
+  const hasFilters = !!(search || statusFilter || orgFilter || unlinkedFilter);
   const activeFilterCount =
-    (statusFilter ? 1 : 0) + (orgFilter ? 1 : 0);
+    (statusFilter ? 1 : 0) + (orgFilter ? 1 : 0) + (unlinkedFilter ? 1 : 0);
 
   function clearAllFilters() {
     setSearch("");
     setStatusFilter("");
     setOrgFilter("");
+    setUnlinkedFilter(false);
   }
 
   return (
@@ -611,6 +614,21 @@ export function MembersPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Record link</label>
+                <Select
+                  value={unlinkedFilter ? "unlinked" : "all"}
+                  onValueChange={(v) => setUnlinkedFilter(v === "unlinked")}
+                >
+                  <SelectTrigger className="rounded-xl mt-1.5" data-testid="select-linked-filter-mobile">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All members</SelectItem>
+                    <SelectItem value="unlinked">Unlinked only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <SheetFooter className="mt-6 flex-row gap-2">
               <Button
@@ -654,6 +672,18 @@ export function MembersPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select
+            value={unlinkedFilter ? "unlinked" : "all"}
+            onValueChange={(v) => setUnlinkedFilter(v === "unlinked")}
+          >
+            <SelectTrigger className="w-36 rounded-xl" data-testid="select-linked-filter">
+              <SelectValue placeholder="Record link" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All members</SelectItem>
+              <SelectItem value="unlinked">Unlinked only</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -679,6 +709,18 @@ export function MembersPage() {
                 type="button"
                 onClick={() => setOrgFilter("")}
                 className="hover:bg-background/50 rounded-full p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
+          {unlinkedFilter && (
+            <Badge className="rounded-full gap-1 pr-1 bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-400/20">
+              Unlinked only
+              <button
+                type="button"
+                onClick={() => setUnlinkedFilter(false)}
+                className="hover:bg-background/30 rounded-full p-0.5"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -822,6 +864,11 @@ export function MembersPage() {
                       >
                         {member.role.replace("_", " ")}
                       </Badge>
+                      {member.canBeRetroactivelyLinked && (
+                        <Badge className="text-[10px] rounded-full px-2 bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-400/20">
+                          Unlinked
+                        </Badge>
+                      )}
                       <Badge
                         variant="outline"
                         className="text-[10px] rounded-full px-2 lg:hidden"

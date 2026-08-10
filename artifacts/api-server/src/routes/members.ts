@@ -12,7 +12,7 @@ import {
   organizationsTable,
   auditLogsTable,
 } from "@workspace/db";
-import { eq, ilike, or, and, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, ilike, or, and, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import {
   requireAuth,
   requireAdmin,
@@ -108,13 +108,46 @@ router.get("/members", requireAuth, requireAdmin, async (req: AuthRequest, res):
       )!,
     );
   }
+  if (params.data.unlinked) {
+    // Only members approved as brand-new (zero balance) with no retroactive link yet
+    conditions.push(sql`EXISTS (
+      SELECT 1 FROM audit_logs al
+      WHERE al.entity = 'member'
+        AND al.entity_id = ${membersTable.id}
+        AND al.action = 'APPROVE_SIGNUP_NEW'
+    )`);
+  }
 
   const members = await db
     .select()
     .from(membersTable)
     .where(conditions.length === 1 ? conditions[0] : and(...conditions));
 
-  res.json(members.map(formatMember));
+  if (members.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  // Bulk-check which returned members were approved as new — one query, not N
+  const memberIds = members.map((m) => m.id);
+  const newApprovalRows = await db
+    .select({ entityId: auditLogsTable.entityId })
+    .from(auditLogsTable)
+    .where(
+      and(
+        eq(auditLogsTable.entity, "member"),
+        eq(auditLogsTable.action, "APPROVE_SIGNUP_NEW"),
+        inArray(auditLogsTable.entityId, memberIds),
+      ),
+    );
+  const unlinkedIds = new Set(newApprovalRows.map((r) => r.entityId));
+
+  res.json(
+    members.map((m) => ({
+      ...formatMember(m),
+      canBeRetroactivelyLinked: unlinkedIds.has(m.id),
+    })),
+  );
 });
 
 // ── Pending sign-ups awaiting approval/match ────────────────────────────────
