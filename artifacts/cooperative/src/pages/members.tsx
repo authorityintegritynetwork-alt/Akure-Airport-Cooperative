@@ -54,7 +54,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useStepUpAction } from "@/lib/step-up";
-import { PlusCircle, Search, UserCheck, UserX, Eye, Pencil, Trash2, SlidersHorizontal, X, Users } from "lucide-react";
+import { PlusCircle, Search, UserCheck, UserX, Eye, Pencil, Trash2, SlidersHorizontal, X, Users, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -144,8 +144,17 @@ export function MembersPage() {
     query: { queryKey: getListMembersQueryKey(params) },
   });
 
-  const { data: pendingSignups, isLoading: pendingLoading } = useListPendingSignups({
-    query: { enabled: canManage, queryKey: ["listPendingSignups"] },
+  const {
+    data: pendingSignups,
+    isLoading: pendingLoading,
+    isFetching: pendingFetching,
+    refetch: refetchPending,
+  } = useListPendingSignups({
+    query: {
+      enabled: canManage,
+      queryKey: ["listPendingSignups"],
+      refetchInterval: 30_000, // auto-refresh every 30 s
+    },
   });
   const pendingCount = pendingSignups?.length ?? 0;
 
@@ -523,6 +532,8 @@ export function MembersPage() {
         <PendingSignupsList
           signups={pendingSignups}
           isLoading={pendingLoading}
+          isRefreshing={pendingFetching}
+          onRefresh={() => refetchPending()}
           onReview={setReviewSignup}
         />
       ) : (
@@ -1094,10 +1105,14 @@ function confidenceBadge(confidence: MatchSuggestion["confidence"], matchedById?
 function PendingSignupsList({
   signups,
   isLoading,
+  isRefreshing,
+  onRefresh,
   onReview,
 }: {
   signups: PendingSignup[] | undefined;
   isLoading: boolean;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
   onReview: (s: PendingSignup) => void;
 }) {
   if (isLoading) {
@@ -1107,6 +1122,21 @@ function PendingSignupsList({
       </div>
     );
   }
+
+  const refreshBtn = (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={isRefreshing}
+      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+      title="Refresh"
+      data-testid="refresh-pending-signups"
+    >
+      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+      {isRefreshing ? "Refreshing…" : "Refresh"}
+    </button>
+  );
+
   if (!signups || signups.length === 0) {
     return (
       <Card className="rounded-2xl shadow-sm">
@@ -1116,12 +1146,17 @@ function PendingSignupsList({
           <p className="text-sm mt-1">
             New members who sign up will appear here for your review and approval.
           </p>
+          <div className="mt-4 flex justify-center">{refreshBtn}</div>
         </CardContent>
       </Card>
     );
   }
   return (
     <div className="space-y-2.5">
+      <div className="flex items-center justify-between px-0.5">
+        <p className="text-xs text-muted-foreground">{signups.length} waiting for review</p>
+        {refreshBtn}
+      </div>
       {signups.map((s) => {
         const top = s.suggestions[0];
         return (
